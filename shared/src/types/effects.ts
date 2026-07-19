@@ -19,8 +19,19 @@ export interface ScheduledEffect {
   effect: EffectPayload;
 }
 
+/**
+ * WICHTIG: Physische Geld-/Personalbewegungen passieren ausschließlich im
+ * Wochentick. Aktionen mutieren nur Absichts-Felder (Budgets, Preisindex,
+ * Ausschreibungen) und legen ScheduledEffects an — auch für „sofortige"
+ * Wirkungen (dueWeek = aktuelle Woche). So gibt es genau EINEN Ort, an dem
+ * Cash fließt, und die Kapitalflussrechnung stimmt konstruktionsbedingt.
+ */
 export type EffectPayload =
   | { kind: 'HIRES_ARRIVE'; dept: Department; seniority: Seniority; count: number; costPerHire: Money }
+  | { kind: 'EXECUTE_LAYOFF'; dept: Department; count: number; generousSeverance: boolean }
+  | { kind: 'DEBT_DRAW'; amount: Money }
+  | { kind: 'DEBT_REPAY'; amount: Money }
+  | { kind: 'SALARY_RAISE'; pct: number }
   | { kind: 'SATISFACTION_DELTA'; dept: Department | 'all'; amount: number }
   | { kind: 'REPUTATION_DELTA'; dimension: ReputationDimension; amount: number }
   | { kind: 'ADD_MODIFIER'; modifier: Omit<ActiveModifier, 'id'> }

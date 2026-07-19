@@ -1,0 +1,255 @@
+import type { ActionValidation, PlayerAction } from '../types/actions.js';
+import type { CompanyState } from '../types/company.js';
+import type { DecisionRecord, Hypothesis } from '../types/evaluation.js';
+import type { EffectPayload } from '../types/effects.js';
+import { totalMrr, runwayWeeks } from './derive.js';
+import { computeKpis } from './kpis.js';
+import { nextId, schedule as scheduleFx } from './stateHelpers.js';
+import { resolveEventOption } from './eventsDeck.js';
+
+/**
+ * Aktions-Schicht: validiert Spieler-Aktionen und wendet sie an.
+ *
+ * WICHTIG: Aktionen mutieren nur Absichts-Felder (Budgets, Preisindex,
+ * Ausschreibungen, Event-Status) und legen ScheduledEffects an. Alle Geld-
+ * und Personalbewegungen führt ausschließlich der Wochentick aus — dadurch
+ * bleibt die Kapitalflussrechnung konstruktionsbedingt konsistent.
+ */
+
+const PRICE_COOLDOWN_WEEKS = 8;
+
+export function validateAction(state: CompanyState, action: PlayerAction): ActionValidation {
+  const errors: string[] = [];
+  const warnings: string[] = [];
+  const f = state.finance;
+
+  switch (action.type) {
+    case 'PRICE_CHANGE': {
+      if (Math.abs(action.pct) > 0.3) errors.push('Preisänderung ist auf ±30 % begrenzt.');
+      if (Math.abs(action.pct) < 0.005) errors.push('Preisänderung unter 0,5 % hat keinen Effekt.');
+      const last = state.customers.lastPriceChangeWeek;
+      if (last !== null && state.meta.week - last < PRICE_COOLDOWN_WEEKS) {
+        errors.push(`Preis wurde in Woche ${last} geändert — nächste Änderung frühestens Woche ${last + PRICE_COOLDOWN_WEEKS} (Markt braucht Verlässlichkeit).`);
+      }
+      if (action.pct > 0.15) warnings.push('Mehr als +15 % auf einmal riskiert einen spürbaren Churn-Spike beim Renewal.');
+      break;
+    }
+    case 'START_HIRING': {
+      if (action.count < 1 || action.count > 10) errors.push('1–10 Stellen pro Ausschreibung.');
+      if (!Number.isInteger(action.count)) errors.push('Anzahl muss ganzzahlig sein.');
+      if (runwayWeeks(state) < 20) warnings.push('Runway unter 20 Wochen — jede neue Stelle verkürzt ihn weiter.');
+      break;
+    }
+    case 'LAYOFF': {
+      const inDept = state.people.employees.filter((e) => e.dept === action.dept).length;
+      if (action.count < 1) errors.push('Mindestens 1 Stelle.');
+      if (action.count > inDept) errors.push(`Nur ${inDept} Beschäftigte in dieser Abteilung.`);
+      if (action.count >= inDept && inDept > 0) warnings.push('Die komplette Abteilung abzubauen legt deren Funktion still.');
+      const humane = state.identity.values.some((v) => /mensch|team|respekt|fair/i.test(v)) || /mensch/i.test(state.identity.motto);
+      if (humane && !action.generousSeverance) {
+        warnings.push(`Eure Werte („${state.identity.values.join('", „')}") versprechen etwas anderes — eine harte Trennung ohne faire Abfindung wird intern und extern zitiert werden.`);
+      }
+      break;
+    }
+    case 'SET_MARKETING_BUDGET': {
+      if (action.monthlyAmount < 0) errors.push('Budget kann nicht negativ sein.');
+      if (action.monthlyAmount > 250_000) errors.push('Mehr als 250 k€/Monat ist in dieser Unternehmensgröße nicht absorbierbar.');
+      break;
+    }
+    case 'SET_RND_ALLOCATION': {
+      const sumAlloc = action.features + action.techDebt + action.bugfixes;
+      if (Math.abs(sumAlloc - 1) > 0.001) errors.push('Die Allokation muss in Summe 100 % ergeben.');
+      if (action.features < 0 || action.techDebt < 0 || action.bugfixes < 0) errors.push('Keine negativen Anteile.');
+      if (action.techDebt < 0.05 && state.product.techDebt > 60) warnings.push('Tech-Debt über 60 und keine Tilgung: Das Ausfallrisiko steigt jede Woche.');
+      break;
+    }
+    case 'SET_CS_BUDGET': {
+      if (action.monthlyAmount < 0) errors.push('Budget kann nicht negativ sein.');
+      if (action.monthlyAmount > 100_000) errors.push('Mehr als 100 k€/Monat CS-Programme sind nicht sinnvoll einsetzbar.');
+      break;
+    }
+    case 'ADJUST_SALARIES': {
+      if (action.pct <= 0 || action.pct > 0.15) errors.push('Gehaltsrunde: 0–15 %.');
+      break;
+    }
+    case 'RAISE_DEBT': {
+      if (action.amount <= 0) errors.push('Betrag muss positiv sein.');
+      const newPrincipal = f.debt.principal + action.amount;
+      if (newPrincipal > f.debt.creditLine) {
+        errors.push(`Kreditlinie ${fmt(f.debt.creditLine)} — es sind nur noch ${fmt(Math.max(0, f.debt.creditLine - f.debt.principal))} ziehbar.`);
+      }
+      const arr = totalMrr(state) * 12;
+      const cov = f.debt.covenants.find((c) => c.type === 'maxDebtToArr');
+      if (cov && cov.type === 'maxDebtToArr' && arr > 0 && newPrincipal / arr > cov.value) {
+        errors.push(`Covenant „${cov.labelDe}" würde verletzt (${((newPrincipal / arr) * 100).toFixed(0)} % > ${cov.value * 100} %).`);
+      }
+      break;
+    }
+    case 'REPAY_DEBT': {
+      if (action.amount <= 0) errors.push('Betrag muss positiv sein.');
+      if (action.amount > f.debt.principal) errors.push('Mehr Tilgung als Restschuld.');
+      if (action.amount > f.cash * 0.8) warnings.push('Diese Tilgung würde über 80 % der Kasse binden.');
+      break;
+    }
+    case 'RESPOND_EVENT': {
+      const ev = state.openEvents.find((e) => e.instanceId === action.eventInstanceId);
+      if (!ev) errors.push('Ereignis nicht gefunden.');
+      else if (ev.status !== 'open') errors.push('Ereignis ist bereits entschieden.');
+      break;
+    }
+  }
+  return { ok: errors.length === 0, errorsDe: errors, warningsDe: warnings };
+}
+
+function fmt(v: number): string {
+  return `${Math.round(v / 1000)} k€`;
+}
+
+function schedule(state: CompanyState, delayWeeks: number, sourceDe: string, sourceId: string | null, effect: EffectPayload): void {
+  scheduleFx(state, delayWeeks, sourceDe, sourceId, effect, 'decision');
+}
+
+/**
+ * Wendet eine validierte Aktion an. Gibt den DecisionRecord zurück
+ * (Bewertungs-Pipeline: Hypothese wurde vorher vom UI eingesammelt).
+ */
+export function applyAction(state: CompanyState, action: PlayerAction, hypothesis: Hypothesis | null, decisionId: string): DecisionRecord {
+  const v = validateAction(state, action);
+  if (!v.ok) throw new Error('Aktion ungültig: ' + v.errorsDe.join(' '));
+
+  const week = state.meta.week;
+  const analysis: string[] = [];
+  let summary = '';
+
+  switch (action.type) {
+    case 'PRICE_CHANGE': {
+      const pctTxt = `${action.pct > 0 ? '+' : ''}${(action.pct * 100).toFixed(0)} %`;
+      state.customers.priceIndex *= 1 + action.pct;
+      state.customers.lastPriceChangeWeek = week;
+      summary = `Listenpreis ${pctTxt}${action.applyToExisting ? ' (auch Bestand beim Renewal)' : ' (nur Neugeschäft)'}`;
+      analysis.push(`Neugeschäfts-ARPA ändert sich ab sofort um ${pctTxt}; die Win-Rate reagiert gegenläufig (Preis-Elastizität).`);
+      if (action.applyToExisting) {
+        const churnFactor = 1 + Math.max(0, action.pct) * 2.2;
+        schedule(state, 4, `Preisänderung W${week}`, decisionId, {
+          kind: 'ADD_MODIFIER',
+          modifier: { target: 'churnMonthly', factor: churnFactor, startWeek: week + 4, endWeek: week + 14, sourceDe: `Renewal-Repricing (${pctTxt})` },
+        });
+        schedule(state, 4, `Preisänderung W${week}`, decisionId, { kind: 'RENEWAL_REPRICING', segmentId: 'all', priceDeltaApplied: action.pct });
+        analysis.push(`Bestandskunden werden ab Woche ${week + 4} beim Renewal umgestellt — erhöhtes Kündigungsrisiko für ~10 Wochen (Faktor ${churnFactor.toFixed(2)} auf den Churn).`);
+      }
+      if (action.pct < -0.08) {
+        schedule(state, 3, `Preissenkung W${week}`, decisionId, { kind: 'COMPETITOR_PRICE_MOVE', competitorId: 'comp_nordcloud', priceIndexDelta: -0.06 });
+        analysis.push('NordCloud Systems (Preiskämpfer) wird voraussichtlich in 2–4 Wochen nachziehen.');
+      }
+      break;
+    }
+    case 'START_HIRING': {
+      const baseFill = { junior: 5, mid: 7, senior: 10, lead: 13 }[action.seniority];
+      const repFactor = 1 + (55 - state.reputation.laborMarket) / 100;
+      state.people.openRequisitions.push({
+        id: nextId(state, 'req'),
+        dept: action.dept,
+        seniority: action.seniority,
+        count: action.count,
+        openedWeek: week,
+        expectedWeeksToFill: Math.max(2, Math.round(baseFill * repFactor)),
+        costPerHire: action.seniority === 'lead' ? 18_000 : action.seniority === 'senior' ? 12_000 : 7_000,
+      });
+      summary = `${action.count}× ${action.seniority} in ${deptDe(action.dept)} ausgeschrieben`;
+      analysis.push(`Time-to-Fill ≈ ${Math.max(2, Math.round(baseFill * repFactor))} Wochen (Arbeitsmarkt-Reputation ${state.reputation.laborMarket}/100 wirkt als Faktor ${repFactor.toFixed(2)}).`);
+      analysis.push('Kosten entstehen erst bei Besetzung: Recruiting-Fee einmalig, danach laufende Payroll mit ~6 Wochen Einarbeitung (50 % Produktivität).');
+      break;
+    }
+    case 'LAYOFF': {
+      schedule(state, 0, `Entlassungsrunde W${week}`, decisionId, {
+        kind: 'EXECUTE_LAYOFF', dept: action.dept, count: action.count, generousSeverance: action.generousSeverance,
+      });
+      summary = `${action.count} Stelle(n) in ${deptDe(action.dept)} abgebaut${action.generousSeverance ? ' (faires Paket)' : ''}`;
+      analysis.push('Abfindungen werden diese Woche zahlungswirksam; die Payroll sinkt ab nächster Woche.');
+      analysis.push(`Folgeeffekte: Moral ↓ ${action.generousSeverance ? 'moderat' : 'deutlich'}, Arbeitsmarkt-Reputation ↓, erhöhtes freiwilliges Kündigungsrisiko in Woche ${week + 2}–${week + 8}.`);
+      break;
+    }
+    case 'SET_MARKETING_BUDGET': {
+      const old = state.finance.budgetsMonthly.marketing;
+      state.finance.budgetsMonthly.marketing = action.monthlyAmount;
+      summary = `Marketing-Budget: ${fmt(old)} → ${fmt(action.monthlyAmount)}/Monat`;
+      analysis.push('Lead-Zufluss folgt dem Budget mit 2–6 Wochen Verzögerung (Kampagnen-Anlauf), mit abnehmendem Grenznutzen.');
+      break;
+    }
+    case 'SET_RND_ALLOCATION': {
+      state.product.rndAllocation = { features: action.features, techDebt: action.techDebt, bugfixes: action.bugfixes };
+      summary = `R&D-Allokation: ${(action.features * 100).toFixed(0)} % Features / ${(action.techDebt * 100).toFixed(0)} % Tech-Debt / ${(action.bugfixes * 100).toFixed(0)} % Bugs`;
+      analysis.push('Feature-Fokus erhöht kurzfristig den Wettbewerbs-Score, lässt aber Tech-Debt wachsen — Velocity und Ausfallrisiko reagieren mit Wochen Verzögerung.');
+      break;
+    }
+    case 'SET_CS_BUDGET': {
+      const old = state.finance.budgetsMonthly.customerSuccess;
+      state.finance.budgetsMonthly.customerSuccess = action.monthlyAmount;
+      summary = `CS-Programme: ${fmt(old)} → ${fmt(action.monthlyAmount)}/Monat`;
+      if (action.monthlyAmount > old) {
+        const factor = Math.max(0.75, 1 - (action.monthlyAmount - old) / 120_000);
+        schedule(state, 4, `CS-Ausbau W${week}`, decisionId, {
+          kind: 'ADD_MODIFIER',
+          modifier: { target: 'churnMonthly', factor, startWeek: week + 4, endWeek: week + 30, sourceDe: 'CS-/Onboarding-Programm' },
+        });
+        analysis.push(`Churn-Wirkung ab Woche ${week + 4}: Faktor ≈ ${factor.toFixed(2)} auf die Monats-Churnrate (Programme brauchen Anlaufzeit).`);
+      } else {
+        analysis.push('Kürzung wirkt sofort auf die Kosten; der Bestand merkt fehlende Betreuung erst mit Verzögerung.');
+      }
+      break;
+    }
+    case 'ADJUST_SALARIES': {
+      schedule(state, 0, `Gehaltsrunde W${week}`, decisionId, { kind: 'SALARY_RAISE', pct: action.pct });
+      summary = `Gehaltsrunde +${(action.pct * 100).toFixed(1)} % für alle`;
+      analysis.push(`Payroll steigt dauerhaft um ~${(action.pct * 100).toFixed(1)} %; Zufriedenheit und Bindung steigen sofort.`);
+      break;
+    }
+    case 'RAISE_DEBT': {
+      schedule(state, 0, `Kreditziehung W${week}`, decisionId, { kind: 'DEBT_DRAW', amount: action.amount });
+      summary = `Kreditlinie gezogen: ${fmt(action.amount)}`;
+      analysis.push(`Cash +${fmt(action.amount)} diese Woche; Zinslast steigt um ${fmt((action.amount * state.finance.debt.annualRate) / 12)}/Monat.`);
+      break;
+    }
+    case 'REPAY_DEBT': {
+      schedule(state, 0, `Tilgung W${week}`, decisionId, { kind: 'DEBT_REPAY', amount: action.amount });
+      summary = `Kredit getilgt: ${fmt(action.amount)}`;
+      analysis.push('Zinslast sinkt; dafür ist die Liquiditätsreserve kleiner.');
+      break;
+    }
+    case 'RESPOND_EVENT': {
+      const res = resolveEventOption(state, action.eventInstanceId, action.optionId, decisionId);
+      summary = res.summaryDe;
+      analysis.push(...res.analysisDe);
+      break;
+    }
+  }
+
+  const kpis = computeKpis(state);
+  const record: DecisionRecord = {
+    id: decisionId,
+    week,
+    action,
+    summaryDe: summary,
+    hypothesis,
+    immediateAnalysisDe: analysis,
+    evaluateAtWeek: week + 4,
+    kpiBaseline: {
+      mrr: kpis.values.mrr,
+      logoChurnMonthly: kpis.values.logoChurnMonthly,
+      netBurnMonthly: kpis.values.netBurnMonthly,
+      runwayWeeks: kpis.values.runwayWeeks,
+      avgSatisfaction: kpis.values.avgSatisfaction,
+      customers: kpis.values.customers,
+      ebitdaMonthly: kpis.values.ebitdaMonthly,
+      boardTrust: kpis.values.boardTrust,
+    },
+  };
+  state.decisionLog.push(record);
+  return record;
+}
+
+export function deptDe(d: string): string {
+  return (
+    { engineering: 'Engineering', sales: 'Vertrieb', marketing: 'Marketing', cs: 'Customer Success', ga: 'Verwaltung (G&A)' }[d] ?? d
+  );
+}

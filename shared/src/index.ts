@@ -24,3 +24,20 @@ export * from './types/kpi.js';
 export * from './types/evaluation.js';
 export * from './types/company.js';
 export * from './types/game.js';
+
+// ── Engine (deterministisch — die „Wahrheit") ────────────────────────
+export * from './engine/rng.js';
+export * from './engine/names.js';
+export * from './engine/scenarios/locations.js';
+export * from './engine/scenarios/difficulty.js';
+export * from './engine/init.js';
+export * from './engine/derive.js';
+export * from './engine/kpis.js';
+export * from './engine/stateHelpers.js';
+export * from './engine/actions.js';
+export * from './engine/eventsDeck.js';
+export * from './engine/board.js';
+export * from './engine/tick.js';
+export * from './engine/invariants.js';
+export * from './engine/evaluate.js';
+export * from './engine/replay.js';

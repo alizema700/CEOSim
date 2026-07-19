@@ -6,10 +6,11 @@ import type { Fraction, Id, Money, Score, WeekIndex } from './common.js';
  * - Kohorten bündeln Kunden nach Startquartal (13-Wochen-Blöcke), damit die
  *   Arrays über Jahre beschränkt bleiben. Jede Kohorte altert, churnt gemäß
  *   eigener Kurve und expandiert (Seat-/Plan-Upgrades).
- * - Key-Accounts sind zusätzlich EINZELN benannte Großkunden (für Events wie
- *   „Key Account droht zu kündigen" und Umsatz-Konzentration/HHI).
- *   Ihr MRR ist TEIL des Kohorten-MRR (keine Doppelzählung: `keyAccountMrr`
- *   je Kohorte weist den enthaltenen Anteil aus).
+ * - Key-Accounts sind EINZELN benannte Großkunden mit EIGENEM MRR (nicht in
+ *   Kohorten enthalten — Gesamt-MRR = Kohorten + Key-Accounts). Sie tragen
+ *   Events („Key Account droht zu kündigen") und die Umsatz-Konzentration
+ *   (HHI). Key-Accounts haben Jahresverträge und churnen nur zum Renewal
+ *   oder durch Eskalations-Events.
  */
 export interface CustomerState {
   segments: CustomerSegment[];
@@ -46,15 +47,12 @@ export interface CustomerCohort {
   baseMonthlyChurn: Fraction;
   /** Monatliche Netto-Expansion des Bestands (Upgrades − Downgrades). */
   monthlyExpansion: Fraction;
-  /** Anteil des Kohorten-MRR, der auf benannte Key-Accounts entfällt. */
-  keyAccountMrr: Money;
 }
 
 export interface KeyAccount {
   id: Id;
   name: string; // z. B. "TechCorp AG"
   segmentId: Id;
-  cohortId: Id;
   mrr: Money;
   /** Gesundheit 0..100 — sinkt bei Outages, Preiserhöhungen, schlechtem Support. */
   health: Score;
@@ -77,4 +75,7 @@ export interface PipelineState {
   leadToTrialRate: Fraction;
   /** Basis-Win-Rate Trial→Kunde (vor Modifikatoren). */
   trialWinRate: Fraction;
+  /** Rollende 13-Wochen-Fenster für CAC/Magic Number (jüngste zuletzt). */
+  recentNewLogos: number[];
+  recentSmSpend: number[];
 }

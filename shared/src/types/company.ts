@@ -9,6 +9,7 @@ import type { CeoState } from './ceo.js';
 import type { ActiveModifier, ScheduledEffect } from './effects.js';
 import type { ActiveRandomEvent } from './randomEvents.js';
 import type { KpiSnapshot } from './kpi.js';
+import type { DecisionRecord, Evaluation } from './evaluation.js';
 
 /**
  * ═══════════════════════════════════════════════════════════════════
@@ -51,6 +52,15 @@ export interface CompanyState {
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];
+
+  /**
+   * Entscheidungs- & Bewertungslog. Teil des States, weil beides
+   * deterministisch aus Events berechnet wird (Replay-sicher). LLM-Prosa
+   * (Evaluation.llmAnalysisDe) bleibt hier IMMER null — der Server hält
+   * Erzähltexte separat, damit der State LLM-unabhängig reproduzierbar ist.
+   */
+  decisionLog: DecisionRecord[];
+  evaluations: Evaluation[];
 
   /** Interner deterministischer Zähler für ID-Vergabe. */
   idCounter: number;
