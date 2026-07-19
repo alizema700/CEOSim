@@ -57,4 +57,25 @@ export const api = {
       model: string;
     }>('/settings/llm'),
   importGame: (events: GameEvent[]) => http<{ state: CompanyState }>('/games/import', { method: 'POST', body: JSON.stringify({ events }) }),
+
+  // ── Phase 2: Kommunikation ──
+  messageStatus: (id: string) => http<{ status: Record<string, string> }>(`/games/${id}/messages/status`),
+  setMessageStatus: (id: string, mid: string, status: 'read' | 'archived' | 'inbox') =>
+    http<{ ok: boolean }>(`/games/${id}/messages/${mid}/status`, { method: 'POST', body: JSON.stringify({ status }) }),
+  getThread: (id: string, key: string) => http<{ turns: ThreadTurn[] }>(`/games/${id}/threads/${encodeURIComponent(key)}`),
+  sendThread: (id: string, key: string, text: string) =>
+    http<{ turns: ThreadTurn[]; relationshipDelta?: number }>(`/games/${id}/threads/${encodeURIComponent(key)}`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    }),
+  sendMeeting: (id: string, aptId: string, text: string) =>
+    http<{ turns: ThreadTurn[] }>(`/games/${id}/meetings/${aptId}`, { method: 'POST', body: JSON.stringify({ text }) }),
 };
+
+export interface ThreadTurn {
+  author: string;
+  authorRole: string;
+  isPlayer: boolean;
+  text: string;
+  atISO: string;
+}

@@ -31,7 +31,13 @@ export interface GameSetup {
 export type GameEvent =
   | { seq: number; gameId: Id; week: WeekIndex; atISO: string; type: 'GAME_CREATED'; payload: { setup: GameSetup; seed: number } }
   | { seq: number; gameId: Id; week: WeekIndex; atISO: string; type: 'DECISION_MADE'; payload: { decisionId: Id; action: PlayerAction; hypothesis: Hypothesis | null } }
-  | { seq: number; gameId: Id; week: WeekIndex; atISO: string; type: 'WEEK_CLOSED'; payload: Record<string, never> };
+  | { seq: number; gameId: Id; week: WeekIndex; atISO: string; type: 'WEEK_CLOSED'; payload: Record<string, never> }
+  /**
+   * Begrenzter Intent aus der LLM-Erzählschicht (z. B. Beziehungs-Delta nach
+   * einem Gespräch). Der Payload enthält den vollständigen Intent — Replay
+   * wendet ihn deterministisch an, ohne das LLM zu brauchen.
+   */
+  | { seq: number; gameId: Id; week: WeekIndex; atISO: string; type: 'INTENT'; payload: { intent: import('./comms.js').CommsIntent } };
 
 /**
  * Wochenbericht — Ergebnis von closeWeek(). Reine Ausgabe (kein State),

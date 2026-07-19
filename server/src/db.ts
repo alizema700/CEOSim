@@ -66,6 +66,27 @@ function migrate(d: DatabaseSync): void {
       created_at TEXT NOT NULL
     );
 
+    -- UI-Overlay: Lese-/Archiv-Status je Nachricht (nicht Teil des Engine-States).
+    CREATE TABLE IF NOT EXISTS message_status (
+      game_id    TEXT NOT NULL,
+      message_id TEXT NOT NULL,
+      status     TEXT NOT NULL,
+      PRIMARY KEY (game_id, message_id)
+    );
+
+    -- Freie Dialoge (Erzählschicht): Mail-Antworten, DMs, Meeting-Szenen.
+    CREATE TABLE IF NOT EXISTS chat_messages (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      game_id    TEXT NOT NULL,
+      thread_key TEXT NOT NULL,
+      author     TEXT NOT NULL,
+      author_role TEXT NOT NULL,
+      is_player  INTEGER NOT NULL,
+      text       TEXT NOT NULL,
+      at_iso     TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_chat_thread ON chat_messages(game_id, thread_key, id);
+
     -- Token-Kosten-Tracking für das Dashboard in den Einstellungen.
     CREATE TABLE IF NOT EXISTS llm_usage (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,

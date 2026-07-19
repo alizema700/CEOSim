@@ -30,8 +30,8 @@ import { computeKpis } from './kpis.js';
 import { checkInvariants, assertInvariants } from './invariants.js';
 import { updateBoardTrust } from './board.js';
 import { maybeTriggerEvents, autoResolveOverdueEvents, removeEmployee } from './eventsDeck.js';
-import { nextId, schedule } from './stateHelpers.js';
-import { deptDe } from './actions.js';
+import { deptDe, nextId, schedule } from './stateHelpers.js';
+import { addMessage, deliverDelegationResult, generateWeeklyComms, upkeepCalendar } from './comms.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -102,6 +102,10 @@ export function closeWeek(state: CompanyState): WeekReport {
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);
   const triggeredEvents = maybeTriggerEvents(state, occurrences);
+
+  // ── 7b. Kommunikation & Kalender (Phase 2) ────────────────────────
+  upkeepCalendar(state);
+  generateWeeklyComms(state);
 
   // ── 8. Board & Game-Over ──────────────────────────────────────────
   const { delta: trustDelta, drivers } = updateBoardTrust(state);
@@ -290,6 +294,38 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
         occ.push({ icon: '🧾', textDe: `Einmalkosten: ${fx.labelDe} (${k(fx.amount)}).`, severity: 'warn' });
       }
       break;
+    case 'ONE_OFF_INCOME':
+      if (fx.amount > 0) {
+        ledger.oneOffsPaid -= fx.amount; // negativer Einmaleffekt = Ertrag
+        occ.push({ icon: '💰', textDe: `Einmalertrag: ${fx.labelDe} (+${k(fx.amount)}).`, severity: 'good' });
+      }
+      break;
+    case 'DEMAND_SHIFT':
+      state.activeModifiers.push({
+        id: nextId(state, 'mod'),
+        target: 'demandIndex',
+        factor: fx.factor,
+        startWeek: week,
+        endWeek: week + fx.weeks,
+        sourceDe: fx.sourceDe,
+      });
+      occ.push({ icon: '🌫️', textDe: `Marktweite Nachfrage verschiebt sich (×${fx.factor.toFixed(2)} für ${fx.weeks} Wochen): ${fx.sourceDe}.`, severity: 'warn' });
+      break;
+    case 'DELEGATION_RESULT':
+      deliverDelegationResult(state, fx.messageId, fx.execId, occ);
+      break;
+    case 'DELAYED_SCANDAL': {
+      const rng = stream(state.meta.seed, 'scandal', week, fx.fine);
+      if (rng() < fx.probability) {
+        ledger.oneOffsPaid += fx.fine;
+        state.reputation.press = clamp(state.reputation.press - 8, 0, 100);
+        state.reputation.investors = clamp(state.reputation.investors - 5, 0, 100);
+        state.ceo.boardTrust = clamp(state.ceo.boardTrust - 8, 0, 100);
+        state.ceo.trustLog.push({ week, delta: -8, reasonDe: `Skandal aufgeflogen: ${fx.topicDe}` });
+        occ.push({ icon: '🔥', textDe: `ES IST RAUSGEKOMMEN: ${fx.topicDe} — Bußgeld/Schaden ${k(fx.fine)}, Presse & Board toben.`, severity: 'bad' });
+      }
+      break;
+    }
   }
 }
 
@@ -324,6 +360,17 @@ function tickPeople(state: CompanyState, ledger: Ledger, occ: Occurrence[]): voi
     const satFactor = e.satisfaction < 35 ? 3.0 : e.satisfaction < 50 ? 1.8 : e.satisfaction > 75 ? 0.5 : 1.0;
     if (rng() < e.attritionRiskWeekly * satFactor * attritionMult) {
       occ.push({ icon: '🚪', textDe: `${e.firstName} ${e.lastName} (${e.roleTitleDe}) kündigt${e.keyPerson ? ' — Schlüsselperson!' : ''}.`, severity: 'bad' });
+      addMessage(state, {
+        from: { name: `${e.firstName} ${e.lastName}`, roleDe: e.roleTitleDe, refId: e.id, company: null },
+        subjectDe: 'Meine Kündigung',
+        bodyDe: `hiermit kündige ich mein Arbeitsverhältnis fristgerecht. Die Entscheidung ist mir nicht leicht gefallen — aber ${e.satisfaction < 45 ? 'die letzten Monate haben mich ausgelaugt, und ich sehe hier aktuell keine Perspektive für mich' : 'ich habe ein Angebot bekommen, das ich nicht ausschlagen kann'}. Für die Übergabe stehe ich selbstverständlich bereit. Danke für die gemeinsame Zeit.`,
+        kind: 'employee',
+        eventInstanceId: null,
+        delegable: false,
+        suggestedActionType: 'START_HIRING',
+        templateId: 'resignation',
+        priority: e.keyPerson ? 'hoch' : 'normal',
+      });
       if (e.keyPerson) {
         state.activeModifiers.push({
           id: nextId(state, 'mod'), target: 'velocity', factor: 0.9,
@@ -375,10 +422,10 @@ function tickCustomers(state: CompanyState, ledger: Ledger, occ: Occurrence[]): 
   // — Pipeline: Budget → Leads → Trials → Wins —
   const weeklyMarketing = state.finance.budgetsMonthly.marketing / WEEKS_PER_MONTH;
   const pressFactor = 0.7 + 0.6 * (state.reputation.press / 100);
-  const leadGenMult = modifierProduct(state, 'leadGen') * state.market.demandIndex;
+  const leadGenMult = modifierProduct(state, 'leadGen') * state.market.demandIndex * modifierProduct(state, 'demandIndex');
   // Abnehmender Grenznutzen: √-Skalierung oberhalb der Basis von 25 k€/Monat.
   const budgetFactor = Math.sqrt(Math.max(0, state.finance.budgetsMonthly.marketing) / 25_000);
-  const leads = Math.round(30 * budgetFactor * pressFactor * leadGenMult * gaussian(rng, 1, 0.08));
+  const leads = Math.round(25 * budgetFactor * pressFactor * leadGenMult * gaussian(rng, 1, 0.08));
   cust.pipeline.lastWeekLeads = leads;
   cust.pipeline.trials.push({ count: leads * cust.pipeline.leadToTrialRate, weeksToDecision: 3 });
 
@@ -587,6 +634,14 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
 
   // Eigenkapital fortschreiben
   f.retainedEarnings += netIncome;
+
+  // Covenant-Verletzungs-Zähler (Bank-Eskalations-Event)
+  const minCashCov = f.debt.covenants.find((c) => c.type === 'minCash');
+  if (minCashCov && minCashCov.type === 'minCash' && f.cash < minCashCov.value) {
+    f.consecutiveMinCashBreachWeeks += 1;
+  } else {
+    f.consecutiveMinCashBreachWeeks = 0;
+  }
 
   const cashflow: CashFlowStatement = {
     cashStart: toCents(cashStart),

@@ -15,11 +15,15 @@ export type View =
   | 'saves'
   | 'wizard'
   | 'dashboard'
+  | 'inbox'
+  | 'chat'
+  | 'calendar'
   | 'decisions'
   | 'evaluations'
   | 'finance'
   | 'team'
   | 'customers'
+  | 'product'
   | 'market'
   | 'settings';
 
@@ -36,8 +40,13 @@ interface BoardroomStore {
   busy: boolean;
   error: string | null;
   hypothesisMode: boolean; // Hypothese-Abfrage an/aus (didaktisch)
+  /** Lese-/Archiv-Status je Nachricht (DB-Overlay, nicht Teil des Engine-States). */
+  messageStatus: Record<string, string>;
+  showBriefing: boolean;
 
   setView: (v: View) => void;
+  markMessage: (mid: string, status: 'read' | 'archived' | 'inbox') => Promise<void>;
+  dismissBriefing: () => void;
   setError: (e: string | null) => void;
   setHypothesisMode: (on: boolean) => void;
   dismissWeekReport: () => void;
@@ -61,8 +70,17 @@ export const useStore = create<BoardroomStore>((set, get) => ({
   busy: false,
   error: null,
   hypothesisMode: true,
+  messageStatus: {},
+  showBriefing: false,
 
   setView: (view) => set({ view }),
+  dismissBriefing: () => set({ showBriefing: false }),
+  markMessage: async (mid, status) => {
+    const s = get().state;
+    if (!s) return;
+    set((prev) => ({ messageStatus: { ...prev.messageStatus, [mid]: status } }));
+    await api.setMessageStatus(s.meta.gameId, mid, status).catch(() => undefined);
+  },
   setError: (error) => set({ error }),
   setHypothesisMode: (hypothesisMode) => set({ hypothesisMode }),
   dismissWeekReport: () => set({ weekReport: null }),
@@ -79,8 +97,14 @@ export const useStore = create<BoardroomStore>((set, get) => ({
   openGame: async (id) => {
     set({ busy: true, error: null });
     try {
-      const [{ state, evaluations }, { reports }] = await Promise.all([api.getGame(id), api.getReports(id)]);
-      set({ state, evaluations, reports, view: 'dashboard', lastDecision: null });
+      const [{ state, evaluations }, { reports }, { status }] = await Promise.all([
+        api.getGame(id),
+        api.getReports(id),
+        api.messageStatus(id).catch(() => ({ status: {} as Record<string, string> })),
+      ]);
+      const latestBriefing = [...state.comms.messages].reverse().find((m) => m.kind === 'briefing');
+      const briefingUnread = latestBriefing ? status[latestBriefing.id] === undefined : false;
+      set({ state, evaluations, reports, view: 'dashboard', lastDecision: null, messageStatus: status, showBriefing: briefingUnread });
     } catch (e) {
       set({ error: (e as Error).message });
     } finally {

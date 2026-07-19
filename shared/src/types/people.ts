@@ -11,6 +11,8 @@ export interface PeopleState {
   employees: Employee[];
   /** Benannte Führungs-Personas (CTO, Head of Sales, …) mit Persönlichkeit. */
   executives: Executive[];
+  /** Sekretärin / Chief of Staff — erste Anlaufstelle, Briefings, Kalender. */
+  assistant: AssistantPersona;
   /** Laufende Stellenausschreibungen mit Time-to-Fill-Logik. */
   openRequisitions: Requisition[];
   /** Ø-Zufriedenheit je Abteilung (abgeleitet, aber gecacht für Ton/Frequenz von Nachrichten). */
@@ -53,6 +55,12 @@ export interface Executive {
 }
 
 export type ExecutiveRole = 'cto' | 'headOfSales' | 'headOfCs' | 'cfo';
+
+export interface AssistantPersona {
+  id: Id;
+  name: string;
+  personalityDe: string;
+}
 
 export interface Requisition {
   id: Id;

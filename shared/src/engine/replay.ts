@@ -4,6 +4,7 @@ import { createCompany } from './init.js';
 import { applyAction } from './actions.js';
 import { closeWeek } from './tick.js';
 import { runDueEvaluations } from './evaluate.js';
+import { applyCommsIntent } from './comms.js';
 
 /**
  * Event-Sourcing-Replay: rekonstruiert den CompanyState deterministisch aus
@@ -32,6 +33,9 @@ export function replayGame(events: GameEvent[]): { state: CompanyState; reports:
         reports.push(report);
         break;
       }
+      case 'INTENT':
+        applyCommsIntent(state, ev.payload.intent);
+        break;
       case 'GAME_CREATED':
         throw new Error('Replay: GAME_CREATED darf nur einmal vorkommen.');
     }

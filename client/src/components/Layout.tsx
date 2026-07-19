@@ -6,16 +6,16 @@ import { eur, num, dateDe } from '../format.js';
 
 /** Linke Navigation + Top-Bar (Cash · Runway · Board · Datum · Woche abschließen). */
 
-const NAV: { view: View | null; label: string; icon: string; phase?: number }[] = [
+const NAV: { view: View | null; label: string; icon: string; phase?: number; badge?: 'unread' }[] = [
   { view: 'dashboard', label: t('nav_dashboard'), icon: '▤' },
+  { view: 'inbox', label: t('nav_inbox'), icon: '✉', badge: 'unread' },
+  { view: 'chat', label: t('nav_chat'), icon: '💬' },
+  { view: 'calendar', label: t('nav_calendar'), icon: '📅' },
   { view: 'decisions', label: t('nav_decisions'), icon: '⌘' },
   { view: 'evaluations', label: t('nav_evaluations'), icon: '✎' },
-  { view: null, label: t('nav_inbox'), icon: '✉', phase: 2 },
-  { view: null, label: t('nav_chat'), icon: '💬', phase: 2 },
-  { view: null, label: t('nav_calendar'), icon: '📅', phase: 2 },
   { view: 'team', label: t('nav_team'), icon: '👥' },
   { view: 'customers', label: t('nav_customers'), icon: '◎' },
-  { view: null, label: t('nav_product'), icon: '⚙', phase: 2 },
+  { view: 'product', label: t('nav_product'), icon: '⚙' },
   { view: 'market', label: t('nav_market'), icon: '⚔' },
   { view: 'finance', label: t('nav_finance'), icon: '€' },
   { view: null, label: t('nav_legal'), icon: '§', phase: 3 },
@@ -26,8 +26,10 @@ const NAV: { view: View | null; label: string; icon: string; phase?: number }[] 
 ];
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { state, view, setView, closeWeek, busy, leaveGame } = useStore();
+  const { state, view, setView, closeWeek, busy, leaveGame, messageStatus } = useStore();
   if (!state) return <>{children}</>;
+
+  const unread = state.comms.messages.filter((m) => messageStatus[m.id] === undefined).length;
 
   const runway = runwayWeeks(state);
   const dateISO = weekToDateISO(state.meta.startDateISO, state.meta.week);
@@ -56,6 +58,9 @@ export function Layout({ children }: { children: ReactNode }) {
             >
               <span className="w-4 text-center">{item.icon}</span>
               <span className="flex-1">{item.label}</span>
+              {item.badge === 'unread' && unread > 0 && (
+                <span className="num rounded-full bg-accent/20 px-1.5 text-[9px] text-accent">{unread}</span>
+              )}
               {item.phase && <span className="rounded border border-line px-1 text-[9px] text-dim/60">P{item.phase}</span>}
             </button>
           ))}

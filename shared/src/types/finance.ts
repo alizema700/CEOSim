@@ -37,6 +37,9 @@ export interface FinanceState {
   /** COGS als Anteil vom Umsatz (Hosting, Support-Infrastruktur …). */
   cogsRate: Fraction;
 
+  /** Wochen in Folge, in denen der minCash-Covenant verletzt war (Bank-Eskalation). */
+  consecutiveMinCashBreachWeeks: number;
+
   /** Monatliche NICHT-Personal-Budgets je Funktion (per Entscheidung steuerbar). */
   budgetsMonthly: {
     /** Marketing/Demand-Gen (Werbebudget, Events, Content). */

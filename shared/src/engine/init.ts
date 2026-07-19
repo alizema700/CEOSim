@@ -14,6 +14,7 @@ import { DIFFICULTIES } from './scenarios/difficulty.js';
 import { accountName, personName, ROLE_TITLES } from './names.js';
 import { gaussian, intBetween, stream } from './rng.js';
 import { computeKpis } from './kpis.js';
+import { addMessage, execSender, upkeepCalendar } from './comms.js';
 
 /**
  * Spielinitialisierung: baut aus GameSetup + Seed den Start-CompanyState.
@@ -139,6 +140,13 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
     };
   });
 
+  const assistantName = personName(rngPeople);
+  const assistant = {
+    id: nextId(counter, 'asst'),
+    name: `${assistantName.firstName} ${assistantName.lastName}`,
+    personalityDe: 'organisiert bis zur Unheimlichkeit, loyal, kennt jeden Flurfunk; sagt dir auch unbequeme Dinge — freundlich, aber unmissverständlich',
+  };
+
   // ── Kunden ────────────────────────────────────────────────────────
   const rngCust = stream(seed, 'init:customers', 0);
   const segSmb = { id: 'seg_smb', nameDe: 'SMB', baseArpaMonthly: 450, annualContractShare: 0.2 };
@@ -151,7 +159,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
   const split = [0.18, 0.24, 0.27, 0.31]; // jüngste → älteste
   const ageWeeks = [7, 33, 59, 111];
   split.forEach((share, i) => {
-    const churnByAge = [0.052, 0.041, 0.033, 0.026][i] ?? 0.03; // DAS Problem: junge Kohorten churnen massiv
+    const churnByAge = [0.058, 0.045, 0.034, 0.026][i] ?? 0.03; // DAS Problem: junge Kohorten churnen massiv
     cohorts.push({
       id: nextId(counter, 'coh'),
       segmentId: segSmb.id,
@@ -242,6 +250,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
       dsoDays: 38,
       dpoDays: 24,
       cogsRate: 0.22,
+      consecutiveMinCashBreachWeeks: 0,
       budgetsMonthly: {
         marketing: 25_000,
         customerSuccess: 6_000,
@@ -261,7 +270,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
           { count: 18, weeksToDecision: 3 },
         ],
         leadToTrialRate: 0.28,
-        trialWinRate: 0.18,
+        trialWinRate: 0.15,
         recentNewLogos: [],
         recentSmSpend: [],
       },
@@ -271,6 +280,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
     people: {
       employees,
       executives,
+      assistant,
       openRequisitions: [],
       moraleByDept: Object.fromEntries(DEPARTMENTS.map((d) => [d, 58])) as Record<Department, number>,
       attritionModifier: 1.0,
@@ -335,6 +345,8 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
     activeModifiers: [],
     openEvents: [],
     eventCooldowns: {},
+    comms: { messages: [], cooldowns: {} },
+    calendar: { appointments: [] },
     history: [],
     decisionLog: [],
     evaluations: [],
@@ -348,5 +360,43 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
   // Woche-0-Snapshot: Dashboard & Charts haben ab der ersten Sekunde Daten.
   state.history.push(computeKpis(state));
 
+  // Willkommens-Kommunikation: Briefing der Assistentin + Antritts-Mail des CFO.
+  addMessage(state, {
+    from: { name: assistant.name, roleDe: 'Chief of Staff', refId: assistant.id, company: null },
+    subjectDe: `Willkommen bei ${setup.identity.companyName} — dein Antritts-Briefing`,
+    bodyDe: `herzlich willkommen an Bord! Ich bin ${assistant.name}, deine Chief of Staff — ich halte dir Kalender, Inbox und Flurfunk im Griff.\n\nDie Lage in einem Absatz: Das Produkt ist solide, der Umsatz auch (~${Math.round(totalMrrOf(state) / 1000)} k€ MRR) — aber die jungen Kunden-Kohorten kündigen zu schnell, das Engineering schiebt Altlasten vor sich her, und die Kasse reicht bei aktuellem Tempo nicht ewig. Das Board hat dich geholt, um genau das zu drehen.\n\nMein Rat für Woche 1: Sprich mit dem Führungsteam (Chat), sieh dir Kunden & Finanzen an, triff die ersten Entscheidungen — und schließe dann die Woche ab. Ich melde mich jeden Montag mit deinem Briefing.\n\n${assistant.name.split(' ')[0]}`,
+    kind: 'briefing',
+    eventInstanceId: null,
+    delegable: false,
+    suggestedActionType: null,
+    templateId: 'welcome',
+    priority: 'hoch',
+  });
+  addMessage(state, {
+    from: execSender(state, 'cfo'),
+    subjectDe: 'Zahlenwerk zum Amtsantritt (bitte lesen)',
+    bodyDe: `willkommen! Damit wir vom ersten Tag an dieselben Zahlen sehen: Kasse ${Math.round(state.finance.cash / 1000)} k€, Netto-Burn ~${Math.round(netBurnOf(state) / 1000)} k€/Monat, Kreditlinie zu ${Math.round((state.finance.debt.principal / state.finance.debt.creditLine) * 100)} % gezogen, Covenants im Finanzen-Tab. Meine ehrliche Einschätzung: Wir haben Zeit für einen sauberen Turnaround — aber nicht für zwei Anläufe. Ich schicke dir monatlich den Report und melde mich sofort, wenn etwas kippt.`,
+    kind: 'exec',
+    eventInstanceId: null,
+    delegable: false,
+    suggestedActionType: null,
+    templateId: 'welcome-cfo',
+  });
+
+  // Erster Termin: Leadership-Sync am Montag der Woche 1.
+  upkeepCalendar(state);
+
   return state;
+}
+
+// Kleine lokale Helfer (vermeiden Import-Zyklen in init):
+function totalMrrOf(state: CompanyState): number {
+  const coh = state.customers.cohorts.reduce((s, c) => s + (c.logosMonthly + c.logosAnnual) * c.arpaMonthly, 0);
+  const ka = state.customers.keyAccounts.reduce((s, k) => s + (k.status !== 'churned' ? k.mrr : 0), 0);
+  return coh + ka;
+}
+function netBurnOf(state: CompanyState): number {
+  const payroll = state.people.employees.reduce((s, e) => s + e.salaryMonthly, 0) * EMPLOYER_COST_FACTOR;
+  const b = state.finance.budgetsMonthly;
+  return Math.max(0, payroll + b.marketing + b.customerSuccess + b.rndTools + b.gaOther - totalMrrOf(state) * (1 - state.finance.cogsRate));
 }

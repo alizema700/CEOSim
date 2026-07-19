@@ -10,6 +10,7 @@ import type { ActiveModifier, ScheduledEffect } from './effects.js';
 import type { ActiveRandomEvent } from './randomEvents.js';
 import type { KpiSnapshot } from './kpi.js';
 import type { DecisionRecord, Evaluation } from './evaluation.js';
+import type { CalendarState, CommsState } from './comms.js';
 
 /**
  * ═══════════════════════════════════════════════════════════════════
@@ -49,6 +50,11 @@ export interface CompanyState {
   openEvents: ActiveRandomEvent[];
   /** Cooldown-Buchhaltung des Event-Decks: cardId → letzte Trigger-Woche. */
   eventCooldowns: Record<string, WeekIndex>;
+
+  /** Kommunikation (Phase 2): deterministische Inbox-Nachrichten + Cooldowns. */
+  comms: CommsState;
+  /** Kalender (Phase 2): Termine, von der Engine generiert. */
+  calendar: CalendarState;
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];

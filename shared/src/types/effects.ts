@@ -40,7 +40,11 @@ export type EffectPayload =
   | { kind: 'COMPETITOR_PRICE_MOVE'; competitorId: Id; priceIndexDelta: number }
   | { kind: 'KEY_ACCOUNT_HEALTH_DELTA'; accountId: Id; amount: number }
   | { kind: 'PRESS_STORY'; tone: 'positive' | 'neutral' | 'negative'; topicDe: string }
-  | { kind: 'ONE_OFF_COST'; amount: Money; labelDe: string };
+  | { kind: 'ONE_OFF_COST'; amount: Money; labelDe: string }
+  | { kind: 'ONE_OFF_INCOME'; amount: Money; labelDe: string }
+  | { kind: 'DEMAND_SHIFT'; factor: number; weeks: number; sourceDe: string }
+  | { kind: 'DELEGATION_RESULT'; messageId: Id; execId: Id }
+  | { kind: 'DELAYED_SCANDAL'; probability: number; fine: Money; topicDe: string };
 
 /** Zeitlich begrenzter Modifikator auf eine Systemgröße. */
 export interface ActiveModifier {

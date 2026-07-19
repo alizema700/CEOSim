@@ -4,8 +4,11 @@ import type { DecisionRecord, Hypothesis } from '../types/evaluation.js';
 import type { EffectPayload } from '../types/effects.js';
 import { totalMrr, runwayWeeks } from './derive.js';
 import { computeKpis } from './kpis.js';
-import { nextId, schedule as scheduleFx } from './stateHelpers.js';
+import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
+import { executeDelegation } from './comms.js';
+
+export { deptDe };
 
 /**
  * Aktions-Schicht: validiert Spieler-Aktionen und wendet sie an.
@@ -95,6 +98,14 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       const ev = state.openEvents.find((e) => e.instanceId === action.eventInstanceId);
       if (!ev) errors.push('Ereignis nicht gefunden.');
       else if (ev.status !== 'open') errors.push('Ereignis ist bereits entschieden.');
+      break;
+    }
+    case 'DELEGATE_MESSAGE': {
+      const msg = state.comms.messages.find((m) => m.id === action.messageId);
+      if (!msg) errors.push('Nachricht nicht gefunden.');
+      else if (!msg.delegable) errors.push('Diese Nachricht ist nicht delegierbar.');
+      else if (msg.handledWeek !== null) errors.push('Diese Nachricht ist bereits erledigt.');
+      if (!state.people.executives.some((e) => e.role === action.execRole)) errors.push('Diese Führungskraft ist nicht (mehr) an Bord.');
       break;
     }
   }
@@ -222,6 +233,12 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push(...res.analysisDe);
       break;
     }
+    case 'DELEGATE_MESSAGE': {
+      const res = executeDelegation(state, action, decisionId);
+      summary = res.summaryDe;
+      analysis.push(...res.analysisDe);
+      break;
+    }
   }
 
   const kpis = computeKpis(state);
@@ -246,10 +263,4 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
   };
   state.decisionLog.push(record);
   return record;
-}
-
-export function deptDe(d: string): string {
-  return (
-    { engineering: 'Engineering', sales: 'Vertrieb', marketing: 'Marketing', cs: 'Customer Success', ga: 'Verwaltung (G&A)' }[d] ?? d
-  );
 }

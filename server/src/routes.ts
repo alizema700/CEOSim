@@ -13,9 +13,12 @@ import {
   importGame,
   listGames,
   loadState,
+  recordIntent,
   validate,
 } from './gameService.js';
 import { usageSummary } from './llm.js';
+import { appendTurn, getThread, meetingRound, personaReply, resolvePersona } from './personas.js';
+import { getDb } from './db.js';
 
 /**
  * REST-API. Alle Eingaben werden mit zod validiert, BEVOR sie die Engine
@@ -37,6 +40,7 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('RAISE_DEBT'), amount: zMoney.gt(0) }),
   z.object({ type: z.literal('REPAY_DEBT'), amount: zMoney.gt(0) }),
   z.object({ type: z.literal('RESPOND_EVENT'), eventInstanceId: z.string(), optionId: z.string() }),
+  z.object({ type: z.literal('DELEGATE_MESSAGE'), messageId: z.string(), execRole: z.enum(['cto', 'headOfSales', 'headOfCs', 'cfo']) }),
 ]);
 
 const zHypothesis = z
@@ -134,12 +138,88 @@ export function buildRouter(): Router {
     res.status(201).json({ state });
   });
 
+  // ── Kommunikation (Phase 2) ──────────────────────────────────────
+  router.get('/games/:id/messages/status', (req, res) => {
+    const rows = getDb().prepare('SELECT message_id, status FROM message_status WHERE game_id = ?').all(req.params.id) as {
+      message_id: string;
+      status: string;
+    }[];
+    res.json({ status: Object.fromEntries(rows.map((r) => [r.message_id, r.status])) });
+  });
+
+  router.post('/games/:id/messages/:mid/status', (req, res) => {
+    const status = z.enum(['read', 'archived', 'inbox']).parse(req.body.status);
+    getDb()
+      .prepare('INSERT OR REPLACE INTO message_status (game_id, message_id, status) VALUES (?, ?, ?)')
+      .run(req.params.id, req.params.mid, status);
+    res.json({ ok: true });
+  });
+
+  router.get('/games/:id/threads/:key', (req, res) => {
+    res.json({ turns: getThread(req.params.id, req.params.key) });
+  });
+
+  // Freier Dialog mit einer Persona (Sekretärin, Führungsteam, Mail-Antwort).
+  router.post('/games/:id/threads/:key', async (req, res) => {
+    const text = z.string().min(1).max(4000).parse(req.body.text);
+    const gameId = req.params.id;
+    const threadKey = req.params.key;
+    const state = loadState(gameId);
+
+    const persona = resolvePersona(state, threadKey) ?? resolveMailPersona(state, threadKey);
+    if (!persona) {
+      res.status(404).json({ error: 'Unbekannter Gesprächskanal.' });
+      return;
+    }
+    const playerTurn = appendTurn(gameId, threadKey, { author: state.playerProfile.ceoName, authorRole: 'CEO', isPlayer: true, text });
+    const reply = await personaReply(state, persona, threadKey, text);
+    const replyTurn = appendTurn(gameId, threadKey, { author: persona.name, authorRole: persona.roleDe, isPlayer: false, text: reply.text });
+    if (reply.relationshipDelta !== 0 && persona.execId) {
+      recordIntent(gameId, {
+        kind: 'EXEC_RELATIONSHIP',
+        execId: persona.execId,
+        delta: reply.relationshipDelta as -2 | -1 | 0 | 1 | 2,
+        reasonDe: 'Eindruck aus dem Gespräch mit dem CEO',
+      });
+    }
+    res.json({ turns: [playerTurn, replyTurn], relationshipDelta: reply.relationshipDelta });
+  });
+
+  // Meeting-Szene: eine Runde mit mehreren Personas.
+  router.post('/games/:id/meetings/:aptId', async (req, res) => {
+    const text = z.string().min(1).max(4000).parse(req.body.text);
+    const gameId = req.params.id;
+    const state = loadState(gameId);
+    const threadKey = 'meeting:' + req.params.aptId;
+    const playerTurn = appendTurn(gameId, threadKey, { author: state.playerProfile.ceoName, authorRole: 'CEO', isPlayer: true, text });
+    const round = await meetingRound(state, req.params.aptId, text);
+    const turns = [playerTurn, ...round.map((t) => appendTurn(gameId, threadKey, { author: t.speaker, authorRole: t.roleDe, isPlayer: false, text: t.textDe }))];
+    res.json({ turns });
+  });
+
   // ── Einstellungen: Token-Kosten-Dashboard ────────────────────────
   router.get('/settings/llm', (_req, res) => {
     res.json(usageSummary());
   });
 
   return router;
+}
+
+/** Mail-Antwort-Threads (msg:<id>): Gegenseite = Absender der Mail. */
+function resolveMailPersona(state: import('@boardroom/shared').CompanyState, threadKey: string) {
+  if (!threadKey.startsWith('msg:')) return null;
+  const msg = state.comms.messages.find((m) => 'msg:' + m.id === threadKey);
+  if (!msg) return null;
+  const exec = state.people.executives.find((e) => e.id === msg.from.refId);
+  if (exec) return resolvePersona(state, 'dm:' + exec.id);
+  if (msg.from.refId === state.people.assistant.id) return resolvePersona(state, 'dm:assistant');
+  return {
+    name: msg.from.name,
+    roleDe: msg.from.roleDe + (msg.from.company ? ` · ${msg.from.company}` : ''),
+    execId: null,
+    systemDe: `Du spielst „${msg.from.name}“ (${msg.from.roleDe}${msg.from.company ? ', ' + msg.from.company : ''}) in einem CEO-Trainings-Simulator. Kontext eurer Konversation ist diese Nachricht an den CEO: „${msg.subjectDe} — ${msg.bodyDe.slice(0, 500)}“. Bleib in der Rolle, antworte kurz und realistisch auf Deutsch. Erfinde keine Zahlen über die Firma des CEO. Du kannst Forderungen stellen, verhandeln oder dich beschweren — aber Vertragliches entscheidet die Simulation, nicht dieses Gespräch.`,
+    fallbackDe: 'Danke für die schnelle Rückmeldung. Wir melden uns kommende Woche mit Details. (Offline-Modus: Für lebendige Antworten ANTHROPIC_API_KEY hinterlegen.)',
+  };
 }
 
 export function errorHandler(err: unknown, _req: import('express').Request, res: import('express').Response, _next: import('express').NextFunction): void {

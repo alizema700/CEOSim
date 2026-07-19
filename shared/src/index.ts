@@ -22,6 +22,7 @@ export * from './types/actions.js';
 export * from './types/randomEvents.js';
 export * from './types/kpi.js';
 export * from './types/evaluation.js';
+export * from './types/comms.js';
 export * from './types/company.js';
 export * from './types/game.js';
 
@@ -34,6 +35,7 @@ export * from './engine/init.js';
 export * from './engine/derive.js';
 export * from './engine/kpis.js';
 export * from './engine/stateHelpers.js';
+export * from './engine/comms.js';
 export * from './engine/actions.js';
 export * from './engine/eventsDeck.js';
 export * from './engine/board.js';

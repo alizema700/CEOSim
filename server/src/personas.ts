@@ -1,0 +1,182 @@
+import { z } from 'zod';
+import {
+  computeKpis,
+  effectiveMonthlyChurn,
+  runwayWeeks,
+  totalMrr,
+  type CompanyState,
+  type Executive,
+} from '@boardroom/shared';
+import { getDb } from './db.js';
+import { llmJson } from './llm.js';
+
+/**
+ * Persona-Schicht (Phase 2): spielt Führungsteam, Sekretärin und Meeting-
+ * Runden als Gesprächspartner. Reine Erzählung — Zahlen kommen ausschließlich
+ * aus dem State-Auszug, Beziehungseffekte laufen als begrenzte Intents zurück.
+ */
+
+export interface ThreadTurn {
+  author: string;
+  authorRole: string;
+  isPlayer: boolean;
+  text: string;
+  atISO: string;
+}
+
+export function getThread(gameId: string, threadKey: string): ThreadTurn[] {
+  const rows = getDb()
+    .prepare('SELECT author, author_role, is_player, text, at_iso FROM chat_messages WHERE game_id = ? AND thread_key = ? ORDER BY id')
+    .all(gameId, threadKey) as { author: string; author_role: string; is_player: number; text: string; at_iso: string }[];
+  return rows.map((r) => ({ author: r.author, authorRole: r.author_role, isPlayer: r.is_player === 1, text: r.text, atISO: r.at_iso }));
+}
+
+export function appendTurn(gameId: string, threadKey: string, turn: Omit<ThreadTurn, 'atISO'>): ThreadTurn {
+  const atISO = new Date().toISOString();
+  getDb()
+    .prepare('INSERT INTO chat_messages (game_id, thread_key, author, author_role, is_player, text, at_iso) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .run(gameId, threadKey, turn.author, turn.authorRole, turn.isPlayer ? 1 : 0, turn.text, atISO);
+  return { ...turn, atISO };
+}
+
+/** Kompakter, wahrheitsgetreuer State-Auszug für Persona-Prompts. */
+export function stateBriefDe(state: CompanyState): string {
+  const k = computeKpis(state).values;
+  return [
+    `Firma: ${state.identity.companyName} (${state.identity.productPitch || 'B2B-SaaS'}), Woche ${state.meta.week}.`,
+    `Werte: ${state.identity.values.join(', ')} · Motto: „${state.identity.motto}“.`,
+    `MRR ${Math.round(totalMrr(state) / 1000)} k€/M · Cash ${Math.round(state.finance.cash / 1000)} k€ · Runway ${Math.round(runwayWeeks(state))} W · Logo-Churn ${(effectiveMonthlyChurn(state) * 100).toFixed(1)} %/M.`,
+    `Team ${state.people.employees.length} Köpfe · Ø-Zufriedenheit ${Math.round(k.avgSatisfaction)} · Tech-Debt ${Math.round(state.product.techDebt)}/100 · NPS ${Math.round(state.product.nps)}.`,
+    `Board-Vertrauen ${state.ceo.boardTrust}/100. Offene Ereignisse: ${state.openEvents.filter((e) => e.status === 'open').map((e) => e.cardId).join(', ') || 'keine'}.`,
+  ].join('\n');
+}
+
+const zPersonaReply = z.object({
+  replyDe: z.string().min(1).max(2500),
+  relationshipDelta: z.number().int().min(-2).max(2),
+});
+
+export interface PersonaResolved {
+  name: string;
+  roleDe: string;
+  systemDe: string;
+  fallbackDe: string;
+  execId: string | null;
+}
+
+export function resolvePersona(state: CompanyState, threadKey: string): PersonaResolved | null {
+  if (threadKey === 'dm:assistant') {
+    const a = state.people.assistant;
+    return {
+      name: a.name,
+      roleDe: 'Chief of Staff',
+      execId: null,
+      systemDe: `Du bist ${a.name}, Chief of Staff / Sekretärin des CEO in einem Unternehmens-Simulator. Persönlichkeit: ${a.personalityDe}. Du kennst Kalender, Inbox und Flurfunk. Du organisierst, priorisierst, erinnerst an Fristen — und gibst ehrliche Einschätzungen zur Stimmung im Haus. Du triffst KEINE Geschäftsentscheidungen und nennst keine Zahlen, die nicht im Lagebild stehen.`,
+      fallbackDe: 'Notiert! Ich kümmere mich darum und lege dir alles Relevante ins nächste Briefing. Wenn es eilt: Die wichtigsten Punkte stehen im aktuellen Wochen-Briefing in deiner Inbox.',
+    };
+  }
+  const exec = state.people.executives.find((e) => 'dm:' + e.id === threadKey);
+  if (exec) return execPersona(state, exec);
+  return null;
+}
+
+function execPersona(state: CompanyState, exec: Executive): PersonaResolved {
+  const emp = state.people.employees.find((e) => e.id === exec.employeeId);
+  const roleDe = { cto: 'CTO', headOfSales: 'Head of Sales', headOfCs: 'Head of Customer Success', cfo: 'CFO' }[exec.role];
+  const name = emp ? `${emp.firstName} ${emp.lastName}` : roleDe;
+  return {
+    name,
+    roleDe,
+    execId: exec.id,
+    systemDe: `Du bist ${name}, ${roleDe} in einem Unternehmens-Simulator (CEO-Training). Persönlichkeit: ${exec.personalityDe}. Deine Agenda: ${exec.agendaDe} Beziehung zum CEO: ${exec.relationshipToCeo}/100 (unter 40: reserviert-förmlich; über 70: offen, auch mal unbequem ehrlich). Du vertrittst DEINE Abteilungssicht mit eigenen Interessen, widersprichst fachlich fundiert, bleibst aber professionell. Antworte kurz (max. 120 Wörter), auf Deutsch, per Du. Erfinde KEINE Zahlen — nutze nur das Lagebild. Wenn der CEO eine Entscheidung von dir verlangt, erinnere ihn, dass Entscheidungen über das Entscheidungs-Panel laufen.`,
+    fallbackDe: `Verstanden. Lass uns das im nächsten Leadership-Sync vertiefen — ich bereite die Zahlen aus meinem Bereich vor. (${roleDe})`,
+  };
+}
+
+/**
+ * Antwort einer Persona auf eine Spieler-Nachricht. Liefert Antworttext +
+ * begrenztes Beziehungs-Delta (0, wenn LLM nicht verfügbar).
+ */
+export async function personaReply(
+  state: CompanyState,
+  persona: PersonaResolved,
+  threadKey: string,
+  playerText: string,
+): Promise<{ text: string; relationshipDelta: number }> {
+  const history = getThread(state.meta.gameId, threadKey).slice(-10);
+  const historyTxt = history.map((t) => `${t.isPlayer ? 'CEO' : t.author}: ${t.text}`).join('\n');
+  const user = [
+    '=== LAGEBILD (einzige erlaubte Zahlenquelle) ===',
+    stateBriefDe(state),
+    '=== BISHERIGES GESPRÄCH ===',
+    historyTxt || '(neu)',
+    '=== NEUE NACHRICHT DES CEO ===',
+    playerText,
+    '',
+    'Antworte als JSON: {"replyDe": "...", "relationshipDelta": -2..2}. relationshipDelta misst, wie dieses Gespräch eure Arbeitsbeziehung verändert (0 = neutral; nur bei echter Wertschätzung/Brüskierung ±).',
+  ].join('\n');
+
+  const res = await llmJson('persona-chat', persona.systemDe, user, zPersonaReply, 800);
+  if (res) return { text: res.replyDe, relationshipDelta: res.relationshipDelta };
+  return { text: persona.fallbackDe, relationshipDelta: 0 };
+}
+
+const zMeetingTurns = z.object({
+  turns: z.array(z.object({ speaker: z.string().min(1).max(60), textDe: z.string().min(1).max(900) })).min(1).max(5),
+});
+
+/** Meeting-Szene: mehrere Personas antworten in einer Runde. */
+export async function meetingRound(
+  state: CompanyState,
+  appointmentId: string,
+  playerText: string,
+): Promise<{ speaker: string; roleDe: string; textDe: string }[]> {
+  const apt = state.calendar.appointments.find((a) => a.id === appointmentId);
+  if (!apt) throw new Error('Termin nicht gefunden.');
+
+  const participants = apt.kind === 'boardCall'
+    ? [
+        { name: 'Dr. Martina Falk', roleDe: 'Lead-Investorin (Almberg Capital)', flavor: 'renditegetrieben, ungeduldig, fragt nach Zahlen und Zusagen' },
+        { name: 'Prof. Heinrich Adam', roleDe: 'Unabhängiges Board-Mitglied', flavor: 'Governance-Gewissen, fragt nach Prozessen und Risiken' },
+        { name: 'Sven Ostkamp', roleDe: 'Gründer-Vertreter', flavor: 'loyal, kennt jede Altlast, verteidigt das Team' },
+      ]
+    : state.people.executives.map((ex) => {
+        const emp = state.people.employees.find((e) => e.id === ex.employeeId);
+        const roleDe = { cto: 'CTO', headOfSales: 'Head of Sales', headOfCs: 'Head of CS', cfo: 'CFO' }[ex.role];
+        return { name: emp ? `${emp.firstName} ${emp.lastName}` : roleDe, roleDe, flavor: `${ex.personalityDe}; Agenda: ${ex.agendaDe}` };
+      });
+
+  const threadKey = 'meeting:' + appointmentId;
+  const history = getThread(state.meta.gameId, threadKey).slice(-12);
+  const system = `Du inszenierst eine Meeting-Szene in einem CEO-Trainings-Simulator („${apt.titleDe}“). Teilnehmer:\n${participants
+    .map((p) => `- ${p.name} (${p.roleDe}): ${p.flavor}`)
+    .join('\n')}\nRegeln: 1–3 Wortmeldungen pro Runde, unterschiedliche Perspektiven, auch mal Widerspruch untereinander. Kurz und konkret, auf Deutsch. Keine erfundenen Zahlen — nur das Lagebild. Keine Entscheidungen treffen; das tut der CEO im Entscheidungs-Panel.`;
+  const user = [
+    '=== LAGEBILD ===',
+    stateBriefDe(state),
+    `=== AGENDA ===\n${apt.agendaDe.join(' · ')}`,
+    '=== BISHERIGER VERLAUF ===',
+    history.map((t) => `${t.isPlayer ? 'CEO' : t.author}: ${t.text}`).join('\n') || '(Meeting beginnt)',
+    '=== DER CEO SAGT ===',
+    playerText,
+    '',
+    'Antworte als JSON: {"turns": [{"speaker": "Name", "textDe": "..."}]} — speaker exakt aus der Teilnehmerliste.',
+  ].join('\n');
+
+  const res = await llmJson('meeting-scene', system, user, zMeetingTurns, 1100);
+  if (res) {
+    return res.turns.map((t) => ({
+      speaker: t.speaker,
+      roleDe: participants.find((p) => p.name === t.speaker)?.roleDe ?? 'Teilnehmer:in',
+      textDe: t.textDe,
+    }));
+  }
+  const first = participants[0]!;
+  return [
+    {
+      speaker: first.name,
+      roleDe: first.roleDe,
+      textDe: 'Danke für den Punkt — lass uns das anhand der Agenda durchgehen. Aus meiner Sicht ist der wichtigste nächste Schritt, die offenen Themen aus dem Lagebild zu priorisieren. (Offline-Modus: Für lebendige Meetings einen ANTHROPIC_API_KEY hinterlegen.)',
+    },
+  ];
+}

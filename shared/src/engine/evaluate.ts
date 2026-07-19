@@ -74,7 +74,7 @@ function buildCausalChain(state: CompanyState, d: DecisionRecord, now: Record<Kp
       chain.push('Mechanik: Abfindungen einmalig zahlungswirksam; Payroll ↓ ab Folgewoche; Moral- und Reputations-Malus lösten eine verzögerte Kündigungswelle-Wahrscheinlichkeit aus.');
       break;
     case 'SET_MARKETING_BUDGET':
-      chain.push('Mechanik: Leads/Woche ≈ 30 × √(Budget ÷ 25 k€) × Presse-Faktor — Wirkung auf MRR erst nach Trial-Reifung (3 Wochen) und Win-Rate.');
+      chain.push('Mechanik: Leads/Woche ≈ 25 × √(Budget ÷ 25 k€) × Presse-Faktor — Wirkung auf MRR erst nach Trial-Reifung (3 Wochen) und Win-Rate.');
       break;
     case 'SET_CS_BUDGET':
       chain.push('Mechanik: Churn-Multiplikator greift seit 4 Wochen nach Entscheidung; Kohorten-Churn wirkt zinseszinsartig auf den MRR-Pfad.');
@@ -238,6 +238,8 @@ function applySkillGains(state: CompanyState, d: DecisionRecord, grade: Grade): 
       s.leadership = clamp(s.leadership + gain, 0, 100); break;
     case 'RESPOND_EVENT':
       s.krisenmanagement = clamp(s.krisenmanagement + gain, 0, 100); break;
+    case 'DELEGATE_MESSAGE':
+      s.leadership = clamp(s.leadership + gain, 0, 100); break;
     default: break;
   }
   // Werte-Konsistenz zahlt auf Governance ein.

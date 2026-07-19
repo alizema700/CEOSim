@@ -49,6 +49,8 @@ export interface ActiveRandomEvent {
   bodyDe: string;
   /** Kontext-Bindung, z. B. betroffener Key-Account/Mitarbeiter. */
   boundEntityId: Id | null;
+  /** Beim Trigger festgeschriebene Zahlen (z. B. Angebotspreis, Covenant-Lücke). */
+  data: Record<string, number>;
   status: 'open' | 'resolved' | 'autoResolved';
   resolvedWeek: WeekIndex | null;
   chosenOptionId: string | null;

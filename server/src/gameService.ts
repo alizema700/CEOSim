@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import {
   applyAction,
+  applyCommsIntent,
   closeWeek,
   createCompany,
   replayGame,
   runDueEvaluations,
   validateAction,
   totalMrr,
+  type CommsIntent,
   type CompanyState,
   type Evaluation,
   type GameEvent,
@@ -18,6 +20,7 @@ import {
 } from '@boardroom/shared';
 import { getDb } from './db.js';
 import { llmText } from './llm.js';
+import { ensureStateShape } from './migrate.js';
 
 /**
  * GameService: verbindet deterministische Engine mit Persistenz und der
@@ -46,7 +49,7 @@ export function loadState(gameId: string): CompanyState {
     | { snapshot: string }
     | undefined;
   if (!row) throw new HttpError(404, 'Spielstand nicht gefunden.');
-  return JSON.parse(row.snapshot) as CompanyState;
+  return ensureStateShape(JSON.parse(row.snapshot) as CompanyState);
 }
 
 export function createGame(setup: GameSetup): CompanyState {
@@ -106,6 +109,18 @@ export function deleteGame(gameId: string): void {
 
 export function validate(gameId: string, action: PlayerAction) {
   return validateAction(loadState(gameId), action);
+}
+
+/**
+ * Begrenzten Erzählschicht-Intent anwenden UND als Event protokollieren —
+ * Replay wendet den gespeicherten Intent an, ohne das LLM zu brauchen.
+ */
+export function recordIntent(gameId: string, intent: CommsIntent): CompanyState {
+  const state = loadState(gameId);
+  applyCommsIntent(state, intent);
+  appendEvent({ gameId, week: state.meta.week, atISO: nowISO(), type: 'INTENT', payload: { intent } });
+  saveSnapshot(gameId, state);
+  return state;
 }
 
 export function decide(gameId: string, action: PlayerAction, hypothesis: Hypothesis | null) {

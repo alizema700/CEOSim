@@ -20,7 +20,8 @@ export type PlayerAction =
   | AdjustSalariesAction
   | RaiseDebtAction
   | RepayDebtAction
-  | RespondEventAction;
+  | RespondEventAction
+  | DelegateMessageAction;
 
 /**
  * Listenpreis ändern (± %). Sofort: Neugeschäfts-ARPA. Verzögert: Bestand wird
@@ -100,6 +101,17 @@ export interface RespondEventAction {
   type: 'RESPOND_EVENT';
   eventInstanceId: Id;
   optionId: string;
+}
+
+/**
+ * Eine delegierbare Nachricht ans Führungsteam geben („kümmer dich drum").
+ * Ergebnis hängt deterministisch (seed-gesteuert) von Kompetenz & Auslastung
+ * der gewählten Führungskraft ab und kommt nach 1–2 Wochen als Mail zurück.
+ */
+export interface DelegateMessageAction {
+  type: 'DELEGATE_MESSAGE';
+  messageId: Id;
+  execRole: import('./people.js').ExecutiveRole;
 }
 
 /** Ergebnis der Aktions-Validierung durch die Engine. */
