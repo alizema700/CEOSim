@@ -82,6 +82,10 @@ export const api = {
   listPress: (id: string) =>
     http<{ releases: { week: number; title: string; body: string; article: string; verdict: string; pressDelta: number }[] }>(`/games/${id}/press`),
 
+  // ── Phase 5: Fundraising ──
+  fundingOffers: (id: string) =>
+    http<{ offers: import('@boardroom/shared').TermSheetOffer[]; week: number }>(`/games/${id}/funding/offers`),
+
   // ── Phase 4 ──
   listConsultant: (id: string) => http<{ reports: ConsultantReport[] }>(`/games/${id}/consultant`),
   forkGame: (id: string, atWeek: number) => http<{ state: CompanyState }>(`/games/${id}/fork`, { method: 'POST', body: JSON.stringify({ atWeek }) }),

@@ -33,6 +33,9 @@ import { maybeTriggerEvents, autoResolveOverdueEvents, removeEmployee } from './
 import { deptDe, nextId, schedule } from './stateHelpers.js';
 import { addMessage, deliverDelegationResult, generateWeeklyComms, upkeepCalendar } from './comms.js';
 import { projectsMonthlyCost, tickProjects } from './projects.js';
+import { tickCompetitorAgents } from './competitors.js';
+import { applyEquityInjection } from './funding.js';
+import { applyMaIntegration } from './ma.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -75,6 +78,7 @@ export function closeWeek(state: CompanyState): WeekReport {
     oneOffsPaid: 0,
     debtDrawn: 0,
     debtRepaid: 0,
+    equityRaised: 0,
   };
   const cashStart = state.finance.cash;
 
@@ -98,8 +102,9 @@ export function closeWeek(state: CompanyState): WeekReport {
   // ── 5. Finanz-Ledger → Statements ─────────────────────────────────
   const { income, cashflow, balance } = closeLedger(state, ledger, cashStart);
 
-  // ── 6. Markt & Reputation ─────────────────────────────────────────
+  // ── 6. Markt, Reputation & Konkurrenz-Agenten (Phase 5) ───────────
   tickMarketAndReputation(state, occurrences);
+  tickCompetitorAgents(state, occurrences);
 
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);
@@ -152,7 +157,7 @@ type Ledger = {
   annualPrepayCash: number; deferredReleased: number; cogsBooked: number;
   otherOpexBooked: number; apPaid: number; payrollPaid: number;
   interestPaid: number; taxPaid: number; oneOffsPaid: number;
-  debtDrawn: number; debtRepaid: number;
+  debtDrawn: number; debtRepaid: number; equityRaised: number;
 };
 
 // ────────────────────────────────────────────────────────────────────
@@ -329,6 +334,21 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
       }
       break;
     }
+    case 'EQUITY_INJECTION': {
+      // Cash fließt ausschließlich über das Ledger (CFF); Cap Table, Einlage
+      // und Board-Folgen setzt applyEquityInjection.
+      ledger.equityRaised += fx.round.amount;
+      applyEquityInjection(state, fx.round, fx.esopTopUp);
+      occ.push({
+        icon: '💎',
+        textDe: `Finanzierungsrunde geschlossen: ${fx.round.investorName} investiert ${k(fx.round.amount)} @ ${(fx.round.preMoney / 1_000_000).toLocaleString('de-DE', { maximumFractionDigits: 1 })} M€ pre-money (${(fx.round.newInvestorShare * 100).toFixed(1)} % Verwässerung).`,
+        severity: 'good',
+      });
+      break;
+    }
+    case 'MA_INTEGRATION':
+      applyMaIntegration(state, fx.targetId, occ);
+      break;
   }
 }
 
@@ -633,7 +653,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   const cfoNet =
     ledger.collections + ledger.annualPrepayCash - ledger.payrollPaid - ledger.apPaid -
     ledger.interestPaid - ledger.taxPaid - ledger.oneOffsPaid;
-  const cffNet = ledger.debtDrawn - ledger.debtRepaid;
+  const cffNet = ledger.debtDrawn - ledger.debtRepaid + ledger.equityRaised;
   f.cash = cashStart + cfoNet + cffNet;
 
   // Eigenkapital fortschreiben
@@ -662,6 +682,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
     financing: {
       debtDrawn: toCents(ledger.debtDrawn),
       debtRepaid: toCents(-ledger.debtRepaid),
+      equityRaised: toCents(ledger.equityRaised),
       net: toCents(cffNet),
     },
     netChange: toCents(cfoNet + cffNet),

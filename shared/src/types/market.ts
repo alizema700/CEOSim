@@ -16,6 +16,10 @@ export interface MarketState {
   /** Makro-Nachfrageindex (1.0 = normal; Abschwung-Events senken ihn). */
   demandIndex: number;
   competitors: Competitor[];
+  /** Cooldowns der Konkurrenz-Agenten-Züge (Phase 5): zugId → Woche. */
+  agentCooldowns: Record<string, number>;
+  /** M&A-Kaufziele (Phase 5), deterministisch aus dem Seed erzeugt. */
+  maTargets: import('./funding.js').MaTarget[];
 }
 
 export interface Competitor {

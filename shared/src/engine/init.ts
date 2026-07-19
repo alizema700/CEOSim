@@ -15,6 +15,7 @@ import { accountName, personName, ROLE_TITLES } from './names.js';
 import { gaussian, intBetween, stream } from './rng.js';
 import { computeKpis } from './kpis.js';
 import { addMessage, execSender, upkeepCalendar } from './comms.js';
+import { generateMaTargets } from './ma.js';
 
 /**
  * Spielinitialisierung: baut aus GameSetup + Seed den Start-CompanyState.
@@ -330,6 +331,8 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
           aggressiveness: 0.35,
         },
       ],
+      agentCooldowns: {},
+      maTargets: generateMaTargets(seed, counter),
     },
     reputation: { customers: 55, press: 50, laborMarket: 52, investors: 54 },
     ceo: {
@@ -349,6 +352,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
     calendar: { appointments: [] },
     projects: [],
     pressLog: [],
+    funding: { rounds: [], investorBoardSeat: false, ventureDebtTaken: false },
     history: [],
     decisionLog: [],
     evaluations: [],

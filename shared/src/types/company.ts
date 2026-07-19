@@ -60,6 +60,8 @@ export interface CompanyState {
   projects: Project[];
   /** Medienspiegel: alle Presse-Ereignisse (Phase 3). */
   pressLog: PressLogEntry[];
+  /** Fundraising-Historie (Phase 5). */
+  funding: import('./funding.js').FundingState;
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];

@@ -87,6 +87,19 @@ function buildCausalChain(state: CompanyState, d: DecisionRecord, now: Record<Kp
     case 'REPAY_DEBT':
       chain.push('Mechanik: Cash und Schuldenstand bewegten sich gegenläufig; die Zinslast läuft mit 8 % p. a. wöchentlich durch die GuV.');
       break;
+    case 'ACCEPT_TERM_SHEET':
+      chain.push('Mechanik: Der Zufluss lief als Finanzierungs-Cashflow (kein Umsatz!); Verwässerung = Betrag ÷ Post-Money, ESOP-Top-up PRE-Money traf nur die Altgesellschafter.');
+      chain.push('Langfrist-Hebel: Liquidation Preference und Board-Rechte wirken erst beim Exit bzw. in Krisen — genau dann, wenn du sie nicht mehr verhandeln kannst.');
+      break;
+    case 'RAISE_VENTURE_DEBT':
+      chain.push('Mechanik: Kreditlinie ↑ und Sofort-Draw; der Blended-Zins stieg Richtung 13 % p. a. auf das Neuvolumen — Runway gegen Zinslast getauscht, ohne Anteile abzugeben.');
+      break;
+    case 'MA_ACQUIRE':
+      chain.push('Mechanik: Kaufpreis einmalig durch die GuV (vereinfachtes Modell ohne Goodwill); ab Folgewoche kamen Kohorte, Team und Tech-Debt des Ziels dazu — inklusive der Red Flags, die sich als geplante Folge-Effekte materialisieren.');
+      break;
+    case 'MA_DUE_DILIGENCE':
+      chain.push('Mechanik: 15 k€ Einmalkosten gegen Information — die Red Flags des Ziels sind seitdem sichtbar und der Kaufpreis wurde ggf. nachverhandelt.');
+      break;
     default:
       break;
   }
@@ -178,6 +191,53 @@ function gradeProcess(state: CompanyState, d: DecisionRecord): Grade {
       reasons.push('Auf das Ereignis wurde aktiv reagiert statt es auszusitzen.');
       break;
     }
+    case 'ACCEPT_TERM_SHEET': {
+      if (runwayAtDecision > 35) {
+        timing += 20; risk += 10;
+        reasons.push('Geld aufgenommen, als es noch nicht nötig war: Fundraising aus der Stärke — beste Verhandlungsposition, echte Wahlfreiheit.');
+      } else if (runwayAtDecision < 16) {
+        timing -= 20;
+        reasons.push('Fundraising mit dem Rücken zur Wand: Bei unter 16 Wochen Runway diktiert der Investor die Terms — der Zeitpunkt hat Geld gekostet.');
+      }
+      if (d.action.offer.liquidationPref === '1x-participating') {
+        risk -= 10;
+        reasons.push('Participating Preference akzeptiert: Die höhere Schlagzeilen-Bewertung wurde mit einer Exit-Hypothek bezahlt — ein klassischer Anfängertausch.');
+      } else {
+        risk += 10;
+        reasons.push('Saubere 1x non-participating Preference: Beim Exit zählt, was im Vertrag steht, nicht was in der Presse stand.');
+      }
+      break;
+    }
+    case 'RAISE_VENTURE_DEBT': {
+      if (runwayAtDecision >= 16 && runwayAtDecision <= 45) {
+        timing += 15;
+        reasons.push('Venture Debt als Brücke im richtigen Fenster: genug Substanz für die Tilgung, echter Bedarf an Puffer.');
+      }
+      risk += 5;
+      reasons.push('Fremdkapital statt Verwässerung gewählt — funktioniert, solange der Plan die Zinslast trägt.');
+      break;
+    }
+    case 'MA_DUE_DILIGENCE': {
+      info += 20; risk += 10;
+      reasons.push('Erst prüfen, dann kaufen: Due Diligence ist gekaufte Information — die billigste Versicherung im M&A-Geschäft.');
+      break;
+    }
+    case 'MA_ACQUIRE': {
+      const targetId = d.action.targetId;
+      const t = state.market.maTargets.find((x) => x.id === targetId);
+      if (t?.ddDone) {
+        info += 20; risk += 10;
+        reasons.push('Kauf nach Due Diligence: Die Altlasten waren bekannt und im Preis verhandelt — informierte Wette statt Blindflug.');
+      } else {
+        info -= 25; risk -= 25;
+        reasons.push('Kauf OHNE Due Diligence: Jede versteckte Altlast wurde ungeprüft mitgekauft. Selbst wenn es gut geht, war der Prozess fahrlässig (vgl. HP/Autonomy).');
+      }
+      if (runwayAtDecision < 26) {
+        timing -= 15;
+        reasons.push('Akquisition bei knappem Runway: Integrationskosten und Kaufpreis konkurrieren direkt mit der eigenen Zahlungsfähigkeit.');
+      }
+      break;
+    }
     default:
       break;
   }
@@ -242,6 +302,11 @@ function applySkillGains(state: CompanyState, d: DecisionRecord, grade: Grade): 
     case 'DELEGATE_MESSAGE':
       s.leadership = clamp(s.leadership + gain, 0, 100); break;
     case 'START_PROJECT':
+      s.strategie = clamp(s.strategie + gain, 0, 100); break;
+    case 'ACCEPT_TERM_SHEET': case 'RAISE_VENTURE_DEBT':
+      s.finanzen = clamp(s.finanzen + gain, 0, 100);
+      s.governance = clamp(s.governance + gain * 0.5, 0, 100); break;
+    case 'MA_DUE_DILIGENCE': case 'MA_ACQUIRE':
       s.strategie = clamp(s.strategie + gain, 0, 100); break;
     default: break;
   }

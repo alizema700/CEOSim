@@ -1,4 +1,4 @@
-import { CONSULTANT_FEE, type ActionValidation, type PlayerAction } from '../types/actions.js';
+import { CONSULTANT_FEE, MA_DD_FEE, type ActionValidation, type PlayerAction } from '../types/actions.js';
 import type { CompanyState } from '../types/company.js';
 import type { DecisionRecord, Hypothesis } from '../types/evaluation.js';
 import type { EffectPayload } from '../types/effects.js';
@@ -8,6 +8,8 @@ import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
 import { clampClassification, startProject } from './projects.js';
+import { buildRound, generateTermSheets, validateTermSheet, validateVentureDebt, applyVentureDebtTerms } from './funding.js';
+import { maTarget } from './ma.js';
 
 export { deptDe };
 
@@ -123,12 +125,53 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       if (runwayWeeks(state) < 13) warnings.push('Berater in der Liquiditätskrise? Die Analyse, die du brauchst, steht vermutlich schon im Dashboard.');
       break;
     }
+    case 'ACCEPT_TERM_SHEET': {
+      errors.push(...validateTermSheet(state, action.offer));
+      if (action.offer.liquidationPref === '1x-participating') {
+        warnings.push('Participating Preference: Beim Exit kassiert der Investor Einsatz UND prozentualen Anteil — bei mittleren Exits geht das massiv zu Lasten der Gründer.');
+      }
+      if (action.offer.boardSeat) {
+        warnings.push('Board-Seat mit Vetorechten: Das Board wird fordernder — deine Fehlertoleranz sinkt spürbar.');
+      }
+      break;
+    }
+    case 'RAISE_VENTURE_DEBT': {
+      errors.push(...validateVentureDebt(state, action.amount));
+      break;
+    }
+    case 'MA_DUE_DILIGENCE': {
+      const t = state.market.maTargets.find((x) => x.id === action.targetId);
+      if (!t) errors.push('Kaufziel nicht gefunden.');
+      else {
+        if (t.status !== 'available') errors.push('Dieses Ziel steht nicht (mehr) zum Verkauf.');
+        if (t.ddDone) errors.push('Die Due Diligence liegt bereits vor (siehe Strategie → M&A).');
+      }
+      if (f.cash < MA_DD_FEE * 2) errors.push(`Die Due Diligence kostet ${fmt(MA_DD_FEE)} — dafür ist die Kasse zu knapp.`);
+      break;
+    }
+    case 'MA_ACQUIRE': {
+      const t = state.market.maTargets.find((x) => x.id === action.targetId);
+      if (!t) errors.push('Kaufziel nicht gefunden.');
+      else {
+        if (t.status !== 'available') errors.push('Dieses Ziel steht nicht (mehr) zum Verkauf.');
+        if (t.askPrice > f.cash * 0.85) {
+          errors.push(`Kaufpreis ${fmt(t.askPrice)} übersteigt 85 % der Kasse (${fmt(f.cash)}) — ohne frisches Kapital nicht darstellbar.`);
+        }
+        if (!t.ddDone) warnings.push('Kauf OHNE Due Diligence: Du übernimmst alle versteckten Altlasten ungeprüft. Die DD ist fast immer gut investiertes Geld.');
+        if (runwayWeeks(state) < 20) warnings.push('Akquisition bei unter 20 Wochen Runway: Integrationen kosten Cash UND Management-Aufmerksamkeit.');
+      }
+      break;
+    }
   }
   return { ok: errors.length === 0, errorsDe: errors, warningsDe: warnings };
 }
 
 function fmt(v: number): string {
   return `${Math.round(v / 1000)} k€`;
+}
+
+function fmtM(v: number): string {
+  return `${(v / 1_000_000).toLocaleString('de-DE', { maximumFractionDigits: 1 })} M€`;
 }
 
 function schedule(state: CompanyState, delayWeeks: number, sourceDe: string, sourceId: string | null, effect: EffectPayload): void {
@@ -268,6 +311,61 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       schedule(state, 0, `Berater-Engagement (${topicDe})`, decisionId, { kind: 'ONE_OFF_COST', amount: CONSULTANT_FEE, labelDe: `Berater-Honorar: ${topicDe}` });
       summary = `Berater beauftragt: ${topicDe} (${fmt(CONSULTANT_FEE)})`;
       analysis.push('Der Report liegt in Kürze unter Strategie → Berater. Didaktischer Hinweis: Berater liefern Struktur und Vergleichswissen — die Verantwortung für die Entscheidung bleibt bei dir.');
+      break;
+    }
+    case 'ACCEPT_TERM_SHEET': {
+      // Anti-Manipulation: nicht das eingereichte Objekt verwenden, sondern das
+      // deterministisch regenerierte Angebot mit derselben ID (Validierung hat
+      // die Existenz bereits geprüft).
+      const offer = generateTermSheets(state).find((o) => o.id === action.offer.id) ?? action.offer;
+      const round = buildRound(state, offer);
+      schedule(state, 0, `Finanzierungsrunde W${week}`, decisionId, { kind: 'EQUITY_INJECTION', round, esopTopUp: offer.esopTopUp });
+      const keepFactor = (1 - offer.esopTopUp) * (1 - round.newInvestorShare);
+      summary = `Term Sheet angenommen: ${offer.investorName} — ${fmt(offer.amount)} @ ${fmtM(offer.preMoney)} pre-money`;
+      analysis.push(
+        `Verwässerung: Der Investor erhält ${(round.newInvestorShare * 100).toFixed(1)} %` +
+          (offer.esopTopUp > 0 ? `, zusätzlich ${(offer.esopTopUp * 100).toFixed(0)} % ESOP-Top-up PRE-Money` : '') +
+          ` — dein Anteil sinkt von ${(state.ceo.equityShare * 100).toFixed(1)} % auf ~${(state.ceo.equityShare * keepFactor * 100).toFixed(1)} %.`,
+      );
+      analysis.push(`Liquidation Preference: ${offer.liquidationPref === '1x-participating' ? '1x PARTICIPATING — der Investor bekommt beim Exit erst den Einsatz zurück und ist danach nochmal prozentual dabei.' : '1x non-participating — marktüblich fair.'}`);
+      analysis.push('Der Cash-Zufluss wird beim Wochenabschluss als Finanzierungs-Cashflow gebucht; der Cap Table ist ab dann aktualisiert (Finanzen-Tab).');
+      if (offer.boardSeat) analysis.push('Der neue Board-Seat erhöht den Erwartungsdruck: Wachstum wird ab jetzt härter getrackt.');
+      break;
+    }
+    case 'RAISE_VENTURE_DEBT': {
+      applyVentureDebtTerms(state, action.amount);
+      schedule(state, 0, `Venture Debt W${week}`, decisionId, { kind: 'DEBT_DRAW', amount: action.amount });
+      summary = `Venture Debt aufgenommen: ${fmt(action.amount)}`;
+      analysis.push(`Kreditlinie +${fmt(action.amount)}; Blended-Zins jetzt ${(state.finance.debt.annualRate * 100).toFixed(2)} % p. a. — teurer als die Hausbank, dafür ohne Verwässerung.`);
+      analysis.push('Merke: Venture Debt verlängert den Runway, ersetzt aber keine Equity-Story — die Tilgung muss aus dem Geschäft kommen.');
+      break;
+    }
+    case 'MA_DUE_DILIGENCE': {
+      const t = maTarget(state, action.targetId);
+      t.ddDone = true;
+      // Befunde rechtfertigen einen Preisabschlag (vereinfachte Nachverhandlung).
+      const severitySum = t.redFlags.reduce((s, fl) => s + fl.severity, 0);
+      const discount = Math.min(0.2, severitySum * 0.04);
+      if (discount > 0) t.askPrice = Math.round((t.askPrice * (1 - discount)) / 10_000) * 10_000;
+      schedule(state, 0, `Due Diligence ${t.name}`, decisionId, { kind: 'ONE_OFF_COST', amount: MA_DD_FEE, labelDe: `Due Diligence: ${t.name}` });
+      summary = `Due Diligence: ${t.name} (${fmt(MA_DD_FEE)})`;
+      analysis.push(
+        t.redFlags.length > 0
+          ? `Der Bericht liegt vor — ${t.redFlags.length} Befund(e): ${t.redFlags.map((fl) => fl.labelDe).join(' · ')}`
+          : 'Der Bericht ist unauffällig — saubere Bücher.',
+      );
+      if (discount > 0) analysis.push(`Die Befunde haben den Kaufpreis in der Nachverhandlung um ${(discount * 100).toFixed(0)} % auf ${fmt(t.askPrice)} gedrückt — DD zahlt sich doppelt aus: Wissen + Hebel.`);
+      break;
+    }
+    case 'MA_ACQUIRE': {
+      const t = maTarget(state, action.targetId);
+      t.status = 'acquired';
+      schedule(state, 0, `Übernahme ${t.name}`, decisionId, { kind: 'ONE_OFF_COST', amount: t.askPrice, labelDe: `Kaufpreis ${t.name}` });
+      schedule(state, 1, `Übernahme ${t.name}`, decisionId, { kind: 'MA_INTEGRATION', targetId: t.id });
+      summary = `Übernahme: ${t.name} für ${fmt(t.askPrice)}`;
+      analysis.push('Der Kaufpreis wird diese Woche zahlungswirksam (vereinfachte Buchung als Einmalaufwand durch die GuV — kein Goodwill-Ansatz in diesem Modell).');
+      analysis.push(`Integration ab Woche ${week + 1}: ~${fmt(t.mrr)} MRR und ${t.employees} Mitarbeitende kommen an Bord — mit Kulturrisiko und ${t.ddDone ? 'den bekannten DD-Befunden' : 'allen UNGEPRÜFTEN Altlasten'}.`);
+      analysis.push('Realitäts-Check: Die meisten Übernahmen scheitern nicht am Kaufpreis, sondern an der Integration (vgl. Fall-Bibliothek: Daimler-Chrysler, HP/Autonomy).');
       break;
     }
   }

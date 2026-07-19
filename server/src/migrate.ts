@@ -1,4 +1,4 @@
-import type { CompanyState } from '@boardroom/shared';
+import { generateMaTargets, type CompanyState } from '@boardroom/shared';
 
 /**
  * Sanfte Snapshot-Migration: füllt Felder auf, die neuere Engine-Versionen
@@ -25,5 +25,9 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   }
   if (!s.projects) s.projects = [];
   if (!s.pressLog) s.pressLog = [];
+  // Phase 5: Fundraising, Konkurrenz-Agenten, M&A-Ziele
+  if (!s.funding) s.funding = { rounds: [], investorBoardSeat: false, ventureDebtTaken: false };
+  if (!s.market.agentCooldowns) s.market.agentCooldowns = {};
+  if (!s.market.maTargets) s.market.maTargets = generateMaTargets(s.meta.seed, s);
   return state;
 }

@@ -44,7 +44,11 @@ export type EffectPayload =
   | { kind: 'ONE_OFF_INCOME'; amount: Money; labelDe: string }
   | { kind: 'DEMAND_SHIFT'; factor: number; weeks: number; sourceDe: string }
   | { kind: 'DELEGATION_RESULT'; messageId: Id; execId: Id }
-  | { kind: 'DELAYED_SCANDAL'; probability: number; fine: Money; topicDe: string };
+  | { kind: 'DELAYED_SCANDAL'; probability: number; fine: Money; topicDe: string }
+  /** Eigenkapital-Zufluss aus akzeptiertem Term Sheet (Phase 5). */
+  | { kind: 'EQUITY_INJECTION'; round: import('./funding.js').FundingRound; esopTopUp: number }
+  /** Integration eines gekauften Unternehmens (Phase 5). */
+  | { kind: 'MA_INTEGRATION'; targetId: Id };
 
 /** Zeitlich begrenzter Modifikator auf eine Systemgröße. */
 export interface ActiveModifier {

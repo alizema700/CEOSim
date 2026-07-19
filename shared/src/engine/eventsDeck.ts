@@ -299,6 +299,7 @@ export const EVENT_CARDS: RandomEventCard[] = [
     minWeek: 16,
     options: [
       { id: 'accept', labelDe: 'Annehmen — verkaufen und Exit realisieren', immediateEffects: [], scheduledEffects: [], processQualityHint: 'defensible' },
+      { id: 'counter', labelDe: 'Nachverhandeln — höherer Preis oder kein Deal', immediateEffects: [], scheduledEffects: [], processQualityHint: 'defensible' },
       { id: 'explore', labelDe: 'Gespräche führen, Optionen offenhalten (Leak-Risiko)', immediateEffects: [], scheduledEffects: [], processQualityHint: 'defensible' },
       {
         id: 'decline',
@@ -771,6 +772,41 @@ function applyOption(
         state.meta.status = 'exited';
         state.meta.endReasonDe = `Exit: Verkauf an ${state.market.competitors.find((c) => c.id === instance.boundEntityId)?.name ?? 'einen Wettbewerber'} für ${(price / 1_000_000).toLocaleString('de-DE', { maximumFractionDigits: 1 })} M€. Dein Anteil (${(state.ceo.equityShare * 100).toFixed(0)} %): ${((price * state.ceo.equityShare) / 1_000_000).toLocaleString('de-DE', { maximumFractionDigits: 2 })} M€ vor Steuern.`;
         analysis.push('Exit realisiert. Ob es der richtige Zeitpunkt war, zeigt das Post-Mortem — Verkaufen ist auch eine Fähigkeit.');
+      } else if (option.id === 'counter') {
+        // BATNA-Poker: 50/50, ob der Käufer nachlegt oder abspringt.
+        const rng = stream(state.meta.seed, 'ma-counter', week, state.idCounter);
+        const comp = state.market.competitors.find((c) => c.id === instance.boundEntityId);
+        if (rng() < 0.5) {
+          const uplift = 1.1 + rng() * 0.05; // +10–15 %
+          const newPrice = Math.round(((instance.data.priceEur ?? 0) * uplift) / 100_000) * 100_000;
+          const improved: ActiveRandomEvent = {
+            instanceId: nextId(state, 'ev'),
+            cardId: 'ACQUISITION_OFFER',
+            triggeredWeek: week,
+            bodyDe: `${comp?.name ?? 'Der Interessent'} hat nachgelegt: Das verbesserte Angebot liegt bei ${(newPrice / 1_000_000).toLocaleString('de-DE', { maximumFractionDigits: 1 })} M€ für 100 % der Anteile („final offer", 3 Wochen gültig). Der M&A-Berater der Gegenseite schreibt dazu: „Mehr gibt das Board nicht frei."`,
+            boundEntityId: instance.boundEntityId,
+            data: { priceEur: newPrice },
+            status: 'open',
+            resolvedWeek: null,
+            chosenOptionId: null,
+          };
+          state.openEvents.push(improved);
+          addMessage(state, {
+            from: { name: 'CEO', roleDe: 'M&A-Anfrage', refId: instance.boundEntityId, company: comp?.name ?? null },
+            subjectDe: 'Verbessertes Übernahmeangebot („final offer")',
+            bodyDe: improved.bodyDe,
+            kind: 'event',
+            eventInstanceId: improved.instanceId,
+            delegable: false,
+            suggestedActionType: null,
+            templateId: 'event:ACQUISITION_OFFER',
+            priority: 'hoch',
+          });
+          analysis.push(`Das Pokern hat sich gelohnt: ${comp?.name ?? 'Der Käufer'} legt auf ${(newPrice / 1_000_000).toLocaleString('de-DE', { maximumFractionDigits: 1 })} M€ nach (+${((uplift - 1) * 100).toFixed(0)} %). Das neue Angebot liegt als eigenes Ereignis in der Inbox.`);
+        } else {
+          state.reputation.investors = clamp(state.reputation.investors + 1, 0, 100);
+          analysis.push('Der Käufer zieht zurück: „Dann eben nicht." Nachverhandeln ist immer eine Wette auf die eigene BATNA — diesmal war seine Alternative besser als deine. Das Board respektiert immerhin das Selbstbewusstsein.');
+        }
       } else if (option.id === 'explore') {
         const rng = stream(state.meta.seed, 'ma-leak', week, state.idCounter);
         if (rng() < 0.25) {

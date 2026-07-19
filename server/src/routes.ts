@@ -1,6 +1,6 @@
 import { Router, json } from 'express';
 import { z } from 'zod';
-import type { GameSetup, PlayerAction } from '@boardroom/shared';
+import { generateTermSheets, type CompanyState, type GameSetup, type PlayerAction } from '@boardroom/shared';
 import {
   closeGameWeek,
   compareFamily,
@@ -68,6 +68,26 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
       }),
     }),
   }),
+  // Phase 5: Fundraising & M&A. Das Term Sheet wird engine-seitig zusätzlich
+  // gegen die deterministische Regenerierung validiert (Manipulationsschutz).
+  z.object({
+    type: z.literal('ACCEPT_TERM_SHEET'),
+    offer: z.object({
+      id: z.string(),
+      investorName: z.string().max(80),
+      investorStyleDe: z.string().max(300),
+      amount: z.number().positive(),
+      preMoney: z.number().positive(),
+      liquidationPref: z.enum(['1x', '1x-participating']),
+      boardSeat: z.boolean(),
+      esopTopUp: z.number().min(0).max(0.2),
+      validWeek: z.number().int().min(0),
+      noteDe: z.string().max(600),
+    }),
+  }),
+  z.object({ type: z.literal('RAISE_VENTURE_DEBT'), amount: zMoney.gt(0) }),
+  z.object({ type: z.literal('MA_DUE_DILIGENCE'), targetId: z.string() }),
+  z.object({ type: z.literal('MA_ACQUIRE'), targetId: z.string() }),
 ]);
 
 const zHypothesis = z
@@ -100,6 +120,24 @@ const zSetup: z.ZodType<GameSetup> = z.object({
   seed: z.number().int().optional(),
 });
 
+/**
+ * Didaktik-Schutz (Phase 5): Versteckte Red Flags von M&A-Zielen verlassen
+ * den Server erst nach Due Diligence (oder nach dem Kauf — dann als
+ * „das hast du dir eingekauft"-Feedback). Der Original-State bleibt unberührt.
+ */
+function toClientState(state: CompanyState): CompanyState {
+  if (state.market.maTargets.every((t) => t.ddDone || t.status !== 'available' || t.redFlags.length === 0)) {
+    return state;
+  }
+  return {
+    ...state,
+    market: {
+      ...state.market,
+      maTargets: state.market.maTargets.map((t) => (t.ddDone || t.status !== 'available' ? t : { ...t, redFlags: [] })),
+    },
+  };
+}
+
 export function buildRouter(): Router {
   const router = Router();
   router.use(json({ limit: '10mb' }));
@@ -116,12 +154,12 @@ export function buildRouter(): Router {
   router.post('/games', (req, res) => {
     const setup = zSetup.parse(req.body);
     const state = createGame(setup);
-    res.status(201).json({ state });
+    res.status(201).json({ state: toClientState(state) });
   });
 
   router.get('/games/:id', (req, res) => {
     const state = loadState(req.params.id);
-    res.json({ state, evaluations: evaluationsWithNarratives(req.params.id, state) });
+    res.json({ state: toClientState(state), evaluations: evaluationsWithNarratives(req.params.id, state) });
   });
 
   router.delete('/games/:id', (req, res) => {
@@ -148,15 +186,15 @@ export function buildRouter(): Router {
     if (action.type === 'HIRE_CONSULTANT') {
       const report = await generateConsultantReport(state, action.topic);
       saveConsultantReport(req.params.id, report);
-      res.status(201).json({ record, state, consultantReport: report });
+      res.status(201).json({ record, state: toClientState(state), consultantReport: report });
       return;
     }
-    res.status(201).json({ record, state });
+    res.status(201).json({ record, state: toClientState(state) });
   });
 
   router.post('/games/:id/close-week', async (req, res) => {
     const { report, evaluations, state } = await closeGameWeek(req.params.id);
-    res.json({ report, evaluations, state });
+    res.json({ report, evaluations, state: toClientState(state) });
   });
 
   // ── Export / Import (Spielstände als JSON) ───────────────────────
@@ -169,7 +207,7 @@ export function buildRouter(): Router {
   router.post('/games/import', (req, res) => {
     const events = z.array(z.any()).min(1).parse(req.body.events);
     const state = importGame(events);
-    res.status(201).json({ state });
+    res.status(201).json({ state: toClientState(state) });
   });
 
   // ── Kommunikation (Phase 2) ──────────────────────────────────────
@@ -256,7 +294,7 @@ export function buildRouter(): Router {
       scandalProb: outcome.scandalProb,
       scandalTopicDe: outcome.scandalTopicDe,
     });
-    res.status(201).json({ outcome, state: newState });
+    res.status(201).json({ outcome, state: toClientState(newState) });
   });
 
   router.get('/games/:id/press', (req, res) => {
@@ -271,6 +309,14 @@ export function buildRouter(): Router {
     res.json({ classification });
   });
 
+  // ── Phase 5: Fundraising ─────────────────────────────────────────
+  // Term Sheets sind deterministisch (Seed + Woche + State) — kein POST nötig,
+  // Annahme läuft als ACCEPT_TERM_SHEET über /actions.
+  router.get('/games/:id/funding/offers', (req, res) => {
+    const state = loadState(req.params.id);
+    res.json({ offers: generateTermSheets(state), week: state.meta.week });
+  });
+
   // ── Phase 4: Berater, Fork-Labor, Journal ────────────────────────
   router.get('/games/:id/consultant', (req, res) => {
     res.json({ reports: listConsultantReports(req.params.id) });
@@ -279,7 +325,7 @@ export function buildRouter(): Router {
   router.post('/games/:id/fork', (req, res) => {
     const atWeek = z.number().int().min(0).parse(req.body.atWeek);
     const state = forkGame(req.params.id, atWeek);
-    res.status(201).json({ state });
+    res.status(201).json({ state: toClientState(state) });
   });
 
   router.get('/games/:id/compare', (req, res) => {

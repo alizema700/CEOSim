@@ -105,6 +105,8 @@ export interface CashFlowStatement {
   financing: {
     debtDrawn: Money;
     debtRepaid: Money;
+    /** Eigenkapital-Zufluss aus Finanzierungsrunden (Phase 5). */
+    equityRaised: Money;
     net: Money;
   };
   netChange: Money;

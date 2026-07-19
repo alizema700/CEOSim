@@ -24,6 +24,7 @@ export * from './types/kpi.js';
 export * from './types/evaluation.js';
 export * from './types/comms.js';
 export * from './types/strategy.js';
+export * from './types/funding.js';
 export * from './types/company.js';
 export * from './types/game.js';
 
@@ -46,6 +47,9 @@ export * from './engine/invariants.js';
 export * from './engine/evaluate.js';
 export * from './engine/replay.js';
 export * from './engine/precedents.js';
+export * from './engine/funding.js';
+export * from './engine/ma.js';
+export * from './engine/competitors.js';
 
 // ── Kuratierte Daten (Phase 4) ───────────────────────────────────────
 export * from './data/precedents.js';

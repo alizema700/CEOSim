@@ -23,7 +23,11 @@ export type PlayerAction =
   | RespondEventAction
   | DelegateMessageAction
   | StartProjectAction
-  | HireConsultantAction;
+  | HireConsultantAction
+  | AcceptTermSheetAction
+  | RaiseVentureDebtAction
+  | MaDueDiligenceAction
+  | MaAcquireAction;
 
 /**
  * Listenpreis ändern (± %). Sofort: Neugeschäfts-ARPA. Verzögert: Bestand wird
@@ -137,6 +141,35 @@ export interface HireConsultantAction {
 }
 
 export const CONSULTANT_FEE = 25_000;
+
+/**
+ * Term Sheet annehmen (Phase 5). Das Angebot wird gegen die deterministische
+ * Regenerierung validiert — manipulierte Angebote fliegen auf.
+ */
+export interface AcceptTermSheetAction {
+  type: 'ACCEPT_TERM_SHEET';
+  offer: import('./funding.js').TermSheetOffer;
+}
+
+/** Venture Debt: schneller, teurer Fremdkapital-Puffer (Phase 5). */
+export interface RaiseVentureDebtAction {
+  type: 'RAISE_VENTURE_DEBT';
+  amount: number;
+}
+
+/** Due Diligence auf ein Kaufziel (deckt Red Flags auf; kostet Beratung). */
+export interface MaDueDiligenceAction {
+  type: 'MA_DUE_DILIGENCE';
+  targetId: string;
+}
+
+/** Kaufziel übernehmen (Integration mit Kulturrisiko & Red-Flag-Folgen). */
+export interface MaAcquireAction {
+  type: 'MA_ACQUIRE';
+  targetId: string;
+}
+
+export const MA_DD_FEE = 15_000;
 
 /** Ergebnis der Aktions-Validierung durch die Engine. */
 export interface ActionValidation {

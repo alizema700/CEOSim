@@ -26,10 +26,12 @@ export function updateBoardTrust(state: CompanyState): { delta: number; drivers:
   else if (runway < 26) add(-1.0, `Runway unter 26 Wochen (${Math.round(runway)}).`);
   else if (runway > 60) add(+0.4, 'Komfortabler Runway (> 60 Wochen).');
 
+  // Ein Investor mit Board-Seat (Phase 5) hebt die Wachstums-Messlatte.
+  const growthBar = state.funding.investorBoardSeat ? 0.018 : 0.012;
   const growth = mrrGrowthMonthly(state);
   if (state.history.length >= 5) {
-    if (growth >= 0.012) add(+1.2, `MRR wächst ${(growth * 100).toFixed(1)} %/Monat — über Plan (1,2 %).`);
-    else if (growth >= 0.004) add(+0.5, `MRR wächst leicht (${(growth * 100).toFixed(1)} %/Monat).`);
+    if (growth >= growthBar) add(+1.2, `MRR wächst ${(growth * 100).toFixed(1)} %/Monat — über Plan (${(growthBar * 100).toFixed(1).replace('.', ',')} %).`);
+    else if (growth >= 0.004) add(+0.5, `MRR wächst leicht (${(growth * 100).toFixed(1)} %/Monat)${state.funding.investorBoardSeat ? ' — dem neuen Investor reicht das nicht' : ''}.`);
     else if (growth <= -0.006) add(-1.5, `MRR schrumpft (${(growth * 100).toFixed(1)} %/Monat).`);
   }
 
