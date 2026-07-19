@@ -28,6 +28,7 @@ export type View =
   | 'legal'
   | 'press'
   | 'strategy'
+  | 'learn'
   | 'settings';
 
 interface BoardroomStore {

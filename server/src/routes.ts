@@ -3,19 +3,23 @@ import { z } from 'zod';
 import type { GameSetup, PlayerAction } from '@boardroom/shared';
 import {
   closeGameWeek,
+  compareFamily,
   createGame,
   decide,
   deleteGame,
   evaluationsWithNarratives,
   exportGame,
+  forkGame,
   getReports,
   HttpError,
   importGame,
+  journalMarkdown,
   listGames,
   loadState,
   recordIntent,
   validate,
 } from './gameService.js';
+import { generateConsultantReport, listConsultantReports, saveConsultantReport } from './consultantService.js';
 import { usageSummary } from './llm.js';
 import { appendTurn, getThread, meetingRound, personaReply, resolvePersona } from './personas.js';
 import { classifyIdea, classifyPress, listPressReleases, savePressRelease } from './pressService.js';
@@ -42,6 +46,7 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('REPAY_DEBT'), amount: zMoney.gt(0) }),
   z.object({ type: z.literal('RESPOND_EVENT'), eventInstanceId: z.string(), optionId: z.string() }),
   z.object({ type: z.literal('DELEGATE_MESSAGE'), messageId: z.string(), execRole: z.enum(['cto', 'headOfSales', 'headOfCs', 'cfo']) }),
+  z.object({ type: z.literal('HIRE_CONSULTANT'), topic: z.enum(['churn', 'pricing', 'market', 'costs']) }),
   z.object({
     type: z.literal('START_PROJECT'),
     classification: z.object({
@@ -135,10 +140,17 @@ export function buildRouter(): Router {
     res.json({ validation: validate(req.params.id, action) });
   });
 
-  router.post('/games/:id/actions', (req, res) => {
+  router.post('/games/:id/actions', async (req, res) => {
     const action = zAction.parse(req.body.action);
     const hypothesis = zHypothesis.parse(req.body.hypothesis ?? null);
     const { record, state } = decide(req.params.id, action, hypothesis);
+    // Berater-Engagement: Report direkt erzeugen (Erzählschicht, DB-only).
+    if (action.type === 'HIRE_CONSULTANT') {
+      const report = await generateConsultantReport(state, action.topic);
+      saveConsultantReport(req.params.id, report);
+      res.status(201).json({ record, state, consultantReport: report });
+      return;
+    }
     res.status(201).json({ record, state });
   });
 
@@ -257,6 +269,28 @@ export function buildRouter(): Router {
     const state = loadState(req.params.id);
     const classification = await classifyIdea(state, text);
     res.json({ classification });
+  });
+
+  // ── Phase 4: Berater, Fork-Labor, Journal ────────────────────────
+  router.get('/games/:id/consultant', (req, res) => {
+    res.json({ reports: listConsultantReports(req.params.id) });
+  });
+
+  router.post('/games/:id/fork', (req, res) => {
+    const atWeek = z.number().int().min(0).parse(req.body.atWeek);
+    const state = forkGame(req.params.id, atWeek);
+    res.status(201).json({ state });
+  });
+
+  router.get('/games/:id/compare', (req, res) => {
+    res.json(compareFamily(req.params.id));
+  });
+
+  router.get('/games/:id/journal.md', (req, res) => {
+    const md = journalMarkdown(req.params.id);
+    res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="lernjournal-${req.params.id}.md"`);
+    res.send(md);
   });
 
   // ── Einstellungen: Token-Kosten-Dashboard ────────────────────────

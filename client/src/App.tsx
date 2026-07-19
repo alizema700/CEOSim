@@ -18,6 +18,7 @@ import { ProductView } from './views/ProductView.js';
 import { LegalView } from './views/LegalView.js';
 import { PressView } from './views/PressView.js';
 import { StrategyView } from './views/StrategyView.js';
+import { LearnView } from './views/LearnView.js';
 import { Modal } from './components/ui.js';
 
 export function App() {
@@ -49,6 +50,7 @@ export function App() {
       {view === 'legal' && <LegalView />}
       {view === 'press' && <PressView />}
       {view === 'strategy' && <StrategyView />}
+      {view === 'learn' && <LearnView />}
       {view === 'settings' && <SettingsView />}
       <WeekReportModal />
       <BriefingModal />

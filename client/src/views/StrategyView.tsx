@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { IdeaClassification } from '@boardroom/shared';
+import { CONSULTANT_FEE } from '@boardroom/shared';
 import { useStore } from '../store.js';
-import { api } from '../api.js';
+import { api, type ConsultantReport } from '../api.js';
 import { Bar, Modal, Panel } from '../components/ui.js';
 import { eur, pct } from '../format.js';
 
@@ -71,6 +72,8 @@ export function StrategyView() {
             ))}
           </Panel>
         )}
+
+        <ConsultantPanel />
       </div>
 
       <Panel title={`Laufende Projekte (${running.length}/5)`}>
@@ -98,8 +101,12 @@ export function StrategyView() {
         </p>
       </Panel>
 
+      <div className="lg:col-span-2">
+        <ReportsList />
+      </div>
+
       {preview && (
-        <Modal title="Klassifikation deiner Idee — Entscheidung liegt bei dir" onClose={() => setPreview(null)} wide>
+        <Modal title="Klassifikation deiner Idee — die Entscheidung liegt bei dir" onClose={() => setPreview(null)} wide>
           <div className="mb-1 text-sm font-bold">{preview.titleDe}</div>
           <div className="mb-3 text-[10px] uppercase tracking-wider text-dim">{preview.categoryDe}</div>
           <div className="mb-3 grid grid-cols-2 gap-x-6 gap-y-1 text-xs md:grid-cols-4">
@@ -149,5 +156,78 @@ export function StrategyView() {
         </Modal>
       )}
     </div>
+  );
+}
+
+/** KI-Unternehmensberater: buchbar pro Engagement — kostet echtes (Spiel-)Geld. */
+function ConsultantPanel() {
+  const { state, act, busy } = useStore();
+  const [topic, setTopic] = useState<'churn' | 'pricing' | 'market' | 'costs'>('churn');
+  if (!state) return null;
+  const topics = [
+    ['churn', 'Churn-Kohorten-Deepdive'],
+    ['pricing', 'Pricing-Studie'],
+    ['market', 'Markteintritts-Optionen'],
+    ['costs', 'Kostenstruktur-Analyse'],
+  ] as const;
+  return (
+    <Panel title={`🎩 Berater buchen (${eur(CONSULTANT_FEE)} pro Engagement)`}>
+      <div className="mb-2 flex flex-wrap gap-1.5">
+        {topics.map(([id, label]) => (
+          <button key={id} className={`chip ${topic === id ? 'chip-on' : ''}`} onClick={() => setTopic(id)}>
+            {label}
+          </button>
+        ))}
+      </div>
+      <button className="btn w-full" disabled={busy} onClick={() => void act({ type: 'HIRE_CONSULTANT', topic }, null)}>
+        Engagement beauftragen
+      </button>
+      <p className="mt-2 text-[10px] text-dim">
+        Gute Struktur, echte Zahlen — aber nicht unfehlbar: Der Berater läuft auch mal Moden nach. Blind übernehmen ist keine
+        Strategie; challengen schon.
+      </p>
+    </Panel>
+  );
+}
+
+function ReportsList() {
+  const { state } = useStore();
+  const [reports, setReports] = useState<ConsultantReport[]>([]);
+  useEffect(() => {
+    if (!state) return;
+    void api.listConsultant(state.meta.gameId).then((r) => setReports(r.reports)).catch(() => setReports([]));
+  }, [state]);
+  if (!state || reports.length === 0) return null;
+  return (
+    <Panel title={`Berater-Reports (${reports.length})`}>
+      <div className="space-y-3">
+        {reports.map((r, i) => (
+          <details key={i} className="rounded border border-line bg-panel2 p-3" open={i === 0}>
+            <summary className="cursor-pointer text-xs font-bold hover:text-accent">
+              {r.titleDe} <span className="ml-1 font-normal text-dim">(W{r.week})</span>
+            </summary>
+            <div className="mt-2 grid gap-2 md:grid-cols-2">
+              {r.slides.map((s, j) => (
+                <div key={j} className="rounded border border-line bg-bg p-2">
+                  <div className="mb-1 text-[10px] font-bold uppercase tracking-wider text-accent">{s.titleDe}</div>
+                  <ul className="space-y-0.5 text-[11px] leading-relaxed">
+                    {s.bulletsDe.map((b, k) => (
+                      <li key={k}>· {b}</li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+            <div className="mt-2 rounded border border-good/40 bg-good/5 p-2 text-[11px]">
+              <div className="mb-1 text-[10px] uppercase tracking-wider text-good">Empfehlungen</div>
+              {r.recommendationsDe.map((rec, k) => (
+                <p key={k}>→ {rec}</p>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[10px] text-warn">⚠ {r.caveatDe}</p>
+          </details>
+        ))}
+      </div>
+    </Panel>
   );
 }

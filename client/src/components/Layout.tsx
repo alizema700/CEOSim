@@ -21,7 +21,7 @@ const NAV: { view: View | null; label: string; icon: string; phase?: number; bad
   { view: 'legal', label: t('nav_legal'), icon: '§' },
   { view: 'press', label: t('nav_press'), icon: '🗞' },
   { view: 'strategy', label: t('nav_strategy'), icon: '♟' },
-  { view: null, label: t('nav_learn'), icon: '🎓', phase: 4 },
+  { view: 'learn', label: t('nav_learn'), icon: '🎓' },
   { view: 'settings', label: t('nav_settings'), icon: '⚒' },
 ];
 

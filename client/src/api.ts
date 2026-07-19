@@ -81,7 +81,24 @@ export const api = {
     }),
   listPress: (id: string) =>
     http<{ releases: { week: number; title: string; body: string; article: string; verdict: string; pressDelta: number }[] }>(`/games/${id}/press`),
+
+  // ── Phase 4 ──
+  listConsultant: (id: string) => http<{ reports: ConsultantReport[] }>(`/games/${id}/consultant`),
+  forkGame: (id: string, atWeek: number) => http<{ state: CompanyState }>(`/games/${id}/fork`, { method: 'POST', body: JSON.stringify({ atWeek }) }),
+  compareFamily: (id: string) =>
+    http<{ games: { gameId: string; name: string; forkWeek: number | null; status: string; history: { week: number; mrr: number; cash: number; boardTrust: number }[] }[] }>(
+      `/games/${id}/compare`,
+    ),
 };
+
+export interface ConsultantReport {
+  titleDe: string;
+  topic: string;
+  week: number;
+  slides: { titleDe: string; bulletsDe: string[] }[];
+  recommendationsDe: string[];
+  caveatDe: string;
+}
 
 export interface ThreadTurn {
   author: string;

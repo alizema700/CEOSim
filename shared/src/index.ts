@@ -45,3 +45,8 @@ export * from './engine/tick.js';
 export * from './engine/invariants.js';
 export * from './engine/evaluate.js';
 export * from './engine/replay.js';
+export * from './engine/precedents.js';
+
+// ── Kuratierte Daten (Phase 4) ───────────────────────────────────────
+export * from './data/precedents.js';
+export * from './data/glossary.js';

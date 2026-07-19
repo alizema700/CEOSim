@@ -87,6 +87,23 @@ function migrate(d: DatabaseSync): void {
     );
     CREATE INDEX IF NOT EXISTS idx_chat_thread ON chat_messages(game_id, thread_key, id);
 
+    -- Berater-Reports (Phase 4).
+    CREATE TABLE IF NOT EXISTS consultant_reports (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      game_id     TEXT NOT NULL,
+      week        INTEGER NOT NULL,
+      topic       TEXT NOT NULL,
+      report_json TEXT NOT NULL,
+      at_iso      TEXT NOT NULL
+    );
+
+    -- Was-wäre-wenn-Labor (Phase 4): Fork-Stammbaum.
+    CREATE TABLE IF NOT EXISTS forks (
+      game_id        TEXT PRIMARY KEY,
+      parent_game_id TEXT NOT NULL,
+      fork_week      INTEGER NOT NULL
+    );
+
     -- Pressemitteilungen + simuliertes Medienecho (Phase 3).
     CREATE TABLE IF NOT EXISTS press_releases (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,

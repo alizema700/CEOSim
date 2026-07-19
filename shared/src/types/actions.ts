@@ -22,7 +22,8 @@ export type PlayerAction =
   | RepayDebtAction
   | RespondEventAction
   | DelegateMessageAction
-  | StartProjectAction;
+  | StartProjectAction
+  | HireConsultantAction;
 
 /**
  * Listenpreis ändern (± %). Sofort: Neugeschäfts-ARPA. Verzögert: Bestand wird
@@ -124,6 +125,18 @@ export interface StartProjectAction {
   type: 'START_PROJECT';
   classification: import('./strategy.js').IdeaClassification;
 }
+
+/**
+ * KI-Unternehmensberater buchen (Phase 4): kostet 25 k€ pro Engagement,
+ * liefert einen Slide-Report. Didaktik: gut, aber nicht unfehlbar —
+ * Beratern nicht blind glauben.
+ */
+export interface HireConsultantAction {
+  type: 'HIRE_CONSULTANT';
+  topic: 'churn' | 'pricing' | 'market' | 'costs';
+}
+
+export const CONSULTANT_FEE = 25_000;
 
 /** Ergebnis der Aktions-Validierung durch die Engine. */
 export interface ActionValidation {

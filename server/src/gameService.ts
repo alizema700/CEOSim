@@ -225,3 +225,116 @@ export class HttpError extends Error {
     super(message);
   }
 }
+
+// ── Was-wäre-wenn-Labor (Phase 4) ────────────────────────────────────
+
+/**
+ * Fork: Events bis einschließlich des atWeek-ten Wochenabschlusses replayen
+ * und als NEUEN Spielstand speichern. Gleicher Seed ⇒ ab dem Fork-Punkt
+ * unterscheiden sich Verläufe NUR durch andere Entscheidungen.
+ */
+export function forkGame(gameId: string, atWeek: number): CompanyState {
+  const { events } = exportGame(gameId);
+  const original = loadState(gameId);
+  if (atWeek < 0 || atWeek >= original.meta.week) throw new HttpError(400, `Fork-Woche muss zwischen 0 und ${original.meta.week - 1} liegen.`);
+
+  const sliced: GameEvent[] = [];
+  let closed = 0;
+  for (const ev of events) {
+    if (closed >= atWeek && ev.type !== 'GAME_CREATED') break;
+    sliced.push(ev);
+    if (ev.type === 'WEEK_CLOSED') closed++;
+  }
+  const { state, reports } = replayGame(sliced);
+  const newId = 'game_' + randomUUID().slice(0, 8);
+  state.meta.gameId = newId;
+  state.identity.companyName = `${original.identity.companyName.replace(/ \(Fork W\d+.*\)$/, '')} (Fork W${atWeek})`;
+  const createdAt = nowISO();
+  const db = getDb();
+  db.prepare('INSERT INTO games (game_id, created_at, updated_at, snapshot) VALUES (?, ?, ?, ?)').run(newId, createdAt, createdAt, JSON.stringify(state));
+  for (const ev of sliced) appendEvent({ ...ev, gameId: newId });
+  for (const report of reports) {
+    db.prepare('INSERT OR REPLACE INTO week_reports (game_id, week, report) VALUES (?, ?, ?)').run(newId, report.week, JSON.stringify(report));
+  }
+  const rootId = findRoot(gameId);
+  db.prepare('INSERT INTO forks (game_id, parent_game_id, fork_week) VALUES (?, ?, ?)').run(newId, rootId, atWeek);
+  return state;
+}
+
+function findRoot(gameId: string): string {
+  const row = getDb().prepare('SELECT parent_game_id FROM forks WHERE game_id = ?').get(gameId) as { parent_game_id: string } | undefined;
+  return row ? findRoot(row.parent_game_id) : gameId;
+}
+
+/** Vergleichsdaten: Original + alle Forks derselben Familie (Chart-Overlay). */
+export function compareFamily(gameId: string): {
+  games: { gameId: string; name: string; forkWeek: number | null; status: string; history: { week: number; mrr: number; cash: number; boardTrust: number }[] }[];
+} {
+  const rootId = findRoot(gameId);
+  const db = getDb();
+  const forkRows = db.prepare('SELECT game_id, fork_week FROM forks WHERE parent_game_id = ?').all(rootId) as { game_id: string; fork_week: number }[];
+  const members: { id: string; forkWeek: number | null }[] = [{ id: rootId, forkWeek: null }, ...forkRows.map((r) => ({ id: r.game_id, forkWeek: r.fork_week }))];
+
+  const games = members
+    .map((m) => {
+      try {
+        const s = loadState(m.id);
+        return {
+          gameId: m.id,
+          name: s.identity.companyName,
+          forkWeek: m.forkWeek,
+          status: s.meta.status,
+          history: s.history.map((h) => ({
+            week: h.week,
+            mrr: Math.round(h.values.mrr),
+            cash: Math.round(h.values.workingCapital + 0) /* Platzhalter unten ersetzt */,
+            boardTrust: Math.round(h.values.boardTrust),
+          })),
+        };
+      } catch {
+        return null;
+      }
+    })
+    .filter((g): g is NonNullable<typeof g> => g !== null);
+
+  // Cash aus Snapshots ziehen (History trägt kein Cash-Feld — Runway/WC schon).
+  for (const g of games) {
+    const s = loadState(g.gameId);
+    // Cash-Verlauf aus Wochenberichten:
+    const reports = getReports(g.gameId);
+    const cashByWeek = new Map(reports.map((r) => [r.week + 1, Math.round(r.cashFlow.cashEnd)]));
+    g.history = g.history.map((h) => ({ ...h, cash: cashByWeek.get(h.week) ?? Math.round(s.finance.cash) }));
+  }
+  return { games };
+}
+
+/** Lern-Journal als Markdown (Phase 4) — automatisch geführt, exportierbar. */
+export function journalMarkdown(gameId: string): string {
+  const s = loadState(gameId);
+  const lines: string[] = [
+    `# Lern-Journal — ${s.identity.companyName}`,
+    ``,
+    `CEO: ${s.playerProfile.ceoName} · Szenario: ${s.meta.scenarioId} · Schwierigkeit: ${s.meta.difficulty} · Seed: ${s.meta.seed}`,
+    `Stand: Woche ${s.meta.week} · Status: ${s.meta.status}`,
+    ``,
+    `## Lektionen aus Bewertungen`,
+    ``,
+  ];
+  for (const ev of s.evaluations) {
+    const d = s.decisionLog.find((x) => x.id === ev.decisionId);
+    lines.push(`### Woche ${d?.week ?? '?'} → ${ev.week}: ${d?.summaryDe ?? ev.decisionId} (Note ${ev.grade.overall})`);
+    lines.push(`- **Lektion:** ${ev.lessonDe}`);
+    lines.push(`- **Hypothese:** ${ev.hypothesisReview.verdict} — ${ev.hypothesisReview.commentDe}`);
+    for (const p of ev.precedents) lines.push(`- **Präzedenzfall:** ${p.titleDe} — ${p.relevanceDe}`);
+    lines.push('');
+  }
+  lines.push(`## Ereignis-Historie`);
+  lines.push('');
+  for (const ev of s.openEvents) {
+    lines.push(`- W${ev.triggeredWeek}: ${ev.cardId} → ${ev.status}${ev.chosenOptionId ? ` (${ev.chosenOptionId})` : ''}`);
+  }
+  lines.push('', `## Medienspiegel`, '');
+  for (const p of s.pressLog) lines.push(`- W${p.week} [${p.tone}] ${p.topicDe}`);
+  lines.push('', '---', '_Automatisch geführt von Boardroom — Simulations-Inhalte, keine echte Beratung._');
+  return lines.join('\n');
+}

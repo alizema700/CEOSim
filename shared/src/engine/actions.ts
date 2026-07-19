@@ -1,4 +1,4 @@
-import type { ActionValidation, PlayerAction } from '../types/actions.js';
+import { CONSULTANT_FEE, type ActionValidation, type PlayerAction } from '../types/actions.js';
 import type { CompanyState } from '../types/company.js';
 import type { DecisionRecord, Hypothesis } from '../types/evaluation.js';
 import type { EffectPayload } from '../types/effects.js';
@@ -116,6 +116,11 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       if (runwayWeeks(state) < 16 && c.costOneOff + c.costMonthly * 3 > 30_000) {
         warnings.push('Runway unter 16 Wochen — jedes Experiment konkurriert jetzt direkt mit der Zahlungsfähigkeit.');
       }
+      break;
+    }
+    case 'HIRE_CONSULTANT': {
+      if (f.cash < CONSULTANT_FEE * 2) errors.push(`Ein Engagement kostet ${fmt(CONSULTANT_FEE)} — dafür ist die Kasse zu knapp.`);
+      if (runwayWeeks(state) < 13) warnings.push('Berater in der Liquiditätskrise? Die Analyse, die du brauchst, steht vermutlich schon im Dashboard.');
       break;
     }
   }
@@ -256,6 +261,13 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push(`Erfolgswahrscheinlichkeit laut Klassifikation: ${(c.successProb * 100).toFixed(0)} % — Auflösung in Woche ${week + c.durationWeeks}, seed-gesteuert.`);
       analysis.push(`Begründung: ${c.rationaleDe}`);
       if (c.comparablesDe.length > 0) analysis.push(`Vergleichsfälle: ${c.comparablesDe.join(' · ')}`);
+      break;
+    }
+    case 'HIRE_CONSULTANT': {
+      const topicDe = { churn: 'Churn-Kohorten-Deepdive', pricing: 'Pricing-Studie', market: 'Markteintritts-Optionen', costs: 'Kostenstruktur-Analyse' }[action.topic];
+      schedule(state, 0, `Berater-Engagement (${topicDe})`, decisionId, { kind: 'ONE_OFF_COST', amount: CONSULTANT_FEE, labelDe: `Berater-Honorar: ${topicDe}` });
+      summary = `Berater beauftragt: ${topicDe} (${fmt(CONSULTANT_FEE)})`;
+      analysis.push('Der Report liegt in Kürze unter Strategie → Berater. Didaktischer Hinweis: Berater liefern Struktur und Vergleichswissen — die Verantwortung für die Entscheidung bleibt bei dir.');
       break;
     }
   }

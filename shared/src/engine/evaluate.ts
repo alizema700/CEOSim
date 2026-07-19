@@ -4,6 +4,7 @@ import type { DecisionRecord, Evaluation, Grade } from '../types/evaluation.js';
 import type { KpiId } from '../types/kpi.js';
 import { computeKpis } from './kpis.js';
 import { nextId } from './stateHelpers.js';
+import { findPrecedents } from './precedents.js';
 
 /**
  * Outcome-Bewertung einer Entscheidung (fällig 4 Wochen nach der Entscheidung).
@@ -38,7 +39,7 @@ export function evaluateDecision(state: CompanyState, decision: DecisionRecord):
     hypothesisReview,
     grade,
     llmAnalysisDe: null,
-    precedents: [], // Phase 4: Fall-Bibliothek mit semantischer Suche
+    precedents: findPrecedents(state, decision, grade.criteria.werteKonsistenz < 50),
     lessonDe,
   };
   state.evaluations.push(evaluation);
