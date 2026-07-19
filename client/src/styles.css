@@ -1,0 +1,82 @@
+@import 'tailwindcss';
+
+/* ── Boardroom Terminal-Theme ─────────────────────────────────────────
+   Dunkles Bloomberg/Terminal-Design. Zahlen IMMER monospace + tabular. */
+
+@theme {
+  --color-bg: #0a0e14;
+  --color-panel: #10151f;
+  --color-panel2: #161d2b;
+  --color-line: #223047;
+  --color-ink: #d5deed;
+  --color-dim: #7d8ba3;
+  --color-accent: #38bdf8;
+  --color-good: #34d399;
+  --color-warn: #fbbf24;
+  --color-bad: #f87171;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.panel {
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 6px;
+}
+
+.panel-title {
+  @apply px-3 py-2 text-[11px] uppercase tracking-widest text-dim border-b border-line;
+}
+
+.btn {
+  @apply px-3 py-1.5 rounded border border-line bg-panel2 text-ink text-xs hover:border-accent hover:text-accent transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer;
+}
+
+.btn-primary {
+  @apply px-3 py-1.5 rounded border text-xs transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer border-accent/60 text-accent bg-accent/10 hover:bg-accent/20;
+}
+
+.btn-danger {
+  @apply px-3 py-1.5 rounded border border-line bg-panel2 text-ink text-xs transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer hover:border-bad hover:text-bad;
+}
+
+.input {
+  @apply w-full bg-panel2 border border-line rounded px-2 py-1.5 text-xs text-ink outline-none focus:border-accent;
+}
+
+.chip {
+  @apply px-2 py-1 rounded border border-line text-xs cursor-pointer select-none hover:border-accent;
+}
+
+.chip-on {
+  @apply border-accent text-accent bg-accent/10;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}

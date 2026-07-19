@@ -13,6 +13,7 @@ import { LOCATIONS } from './scenarios/locations.js';
 import { DIFFICULTIES } from './scenarios/difficulty.js';
 import { accountName, personName, ROLE_TITLES } from './names.js';
 import { gaussian, intBetween, stream } from './rng.js';
+import { computeKpis } from './kpis.js';
 
 /**
  * Spielinitialisierung: baut aus GameSetup + Seed den Start-CompanyState.
@@ -343,6 +344,9 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
   // Payroll-Plausibilität absichern (Invariante: > 0).
   const payroll = employees.reduce((s, e) => s + e.salaryMonthly, 0) * EMPLOYER_COST_FACTOR;
   if (payroll <= 0) throw new Error('Init: Payroll darf nicht 0 sein');
+
+  // Woche-0-Snapshot: Dashboard & Charts haben ab der ersten Sekunde Daten.
+  state.history.push(computeKpis(state));
 
   return state;
 }

@@ -2,7 +2,7 @@
 
 exports[`Golden-Master (Seed 20260105, 25 Wochen, 4 Entscheidungen) > Endzustand entspricht dem eingefrorenen Master 1`] = `
 {
-  "boardTrust": 35.2,
+  "boardTrust": 36.4,
   "cash": 309465,
   "customers": 285,
   "debt": 450000,
