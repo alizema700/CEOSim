@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Builds
+dist/
+build/
+*.tsbuildinfo
+
+# Lokale Daten (Spielstände, SQLite, LLM-Cache)
+data/
+*.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+
+# Umgebungsvariablen (API-Keys!)
+.env
+.env.local
+
+# Sonstiges
+coverage/
+.DS_Store
+*.log
