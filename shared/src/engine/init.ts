@@ -347,6 +347,8 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
     eventCooldowns: {},
     comms: { messages: [], cooldowns: {} },
     calendar: { appointments: [] },
+    projects: [],
+    pressLog: [],
     history: [],
     decisionLog: [],
     evaluations: [],

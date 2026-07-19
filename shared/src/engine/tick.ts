@@ -32,6 +32,7 @@ import { updateBoardTrust } from './board.js';
 import { maybeTriggerEvents, autoResolveOverdueEvents, removeEmployee } from './eventsDeck.js';
 import { deptDe, nextId, schedule } from './stateHelpers.js';
 import { addMessage, deliverDelegationResult, generateWeeklyComms, upkeepCalendar } from './comms.js';
+import { projectsMonthlyCost, tickProjects } from './projects.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -87,8 +88,9 @@ export function closeWeek(state: CompanyState): WeekReport {
   // ── 2. Personal ───────────────────────────────────────────────────
   tickPeople(state, ledger, occurrences);
 
-  // ── 3. Produkt ────────────────────────────────────────────────────
+  // ── 3. Produkt & Projekte ─────────────────────────────────────────
   tickProduct(state, occurrences);
+  tickProjects(state, occurrences);
 
   // ── 4. Kunden ─────────────────────────────────────────────────────
   tickCustomers(state, ledger, occurrences);
@@ -281,6 +283,7 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
     case 'PRESS_STORY': {
       const dRep = fx.tone === 'positive' ? 4 : fx.tone === 'negative' ? -5 : 0;
       state.reputation.press = clamp(state.reputation.press + dRep, 0, 100);
+      state.pressLog.push({ week, tone: fx.tone, topicDe: fx.topicDe });
       occ.push({
         icon: '🗞️',
         textDe: `Presse (${fx.tone === 'positive' ? 'wohlwollend' : fx.tone === 'negative' ? 'kritisch' : 'neutral'}): ${fx.topicDe}`,
@@ -577,7 +580,8 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   // COGS & Nicht-Personal-OpEx → AP, Zahlung nach DPO
   ledger.cogsBooked = ledger.revenueRecognized * f.cogsRate;
   const b = f.budgetsMonthly;
-  const otherOpexMonthly = b.marketing + b.customerSuccess + b.rndTools + b.gaOther + officeCostMonthly(state);
+  const projectsCostM = projectsMonthlyCost(state);
+  const otherOpexMonthly = b.marketing + b.customerSuccess + b.rndTools + b.gaOther + officeCostMonthly(state) + projectsCostM;
   ledger.otherOpexBooked = otherOpexMonthly * wf;
   f.accountsPayable += ledger.cogsBooked + ledger.otherOpexBooked;
   const payRate = Math.min(1, 7 / f.dpoDays);
@@ -598,7 +602,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
     salesMarketing: { payroll: payrollByDept.sales + payrollByDept.marketing, other: b.marketing * wf },
     rnd: { payroll: payrollByDept.engineering, other: b.rndTools * wf },
     customerSuccess: { payroll: payrollByDept.cs, other: b.customerSuccess * wf },
-    ga: { payroll: payrollByDept.ga + ceoPay, other: (b.gaOther + officeCostMonthly(state)) * wf },
+    ga: { payroll: payrollByDept.ga + ceoPay, other: (b.gaOther + officeCostMonthly(state) + projectsCostM) * wf },
   };
   const opexTotal = Object.values(opex).reduce((s, o) => s + o.payroll + o.other, 0);
   const grossProfit = ledger.revenueRecognized - ledger.cogsBooked;

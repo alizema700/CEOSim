@@ -83,8 +83,24 @@ export interface Appointment {
 }
 
 /**
- * Begrenzte Intents aus LLM-Gesprächen — werden als GameEvent protokolliert
- * und von der Engine validiert & angewendet (nie direkt vom LLM).
+ * Begrenzte Intents aus der Erzählschicht — werden als GameEvent protokolliert
+ * und von der Engine validiert, geklemmt & angewendet (nie direkt vom LLM).
  */
 export type CommsIntent =
-  | { kind: 'EXEC_RELATIONSHIP'; execId: Id; delta: -2 | -1 | 0 | 1 | 2; reasonDe: string };
+  | { kind: 'EXEC_RELATIONSHIP'; execId: Id; delta: -2 | -1 | 0 | 1 | 2; reasonDe: string }
+  /** Anwaltskosten pro Chat-Runde (lehrt: Anwaltszeit gezielt einsetzen). */
+  | { kind: 'LEGAL_BILLING'; amount: number; topicDe: string }
+  /** Eindruck aus dem Board-Meeting (±3 max pro Meeting-Runde). */
+  | { kind: 'BOARD_TRUST'; delta: number; reasonDe: string }
+  /** Bewertetes Ergebnis einer Pressemitteilung (alle Werte gedeckelt). */
+  | {
+      kind: 'PRESS_RELEASE_OUTCOME';
+      titleDe: string;
+      /** −6 .. +6 auf Presse-Reputation. */
+      pressDelta: number;
+      /** 1.0 .. 1.15 Lead-Faktor für 6 Wochen. */
+      leadFactor: number;
+      /** Falls Claims übertrieben waren: Risiko, dass es auffliegt. */
+      scandalProb: number; // 0 .. 0.5
+      scandalTopicDe: string;
+    };

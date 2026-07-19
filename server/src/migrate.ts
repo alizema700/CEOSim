@@ -23,5 +23,7 @@ export function ensureStateShape(state: CompanyState): CompanyState {
     if (m.templateId === undefined) m.templateId = null;
     if (m.handledWeek === undefined) m.handledWeek = null;
   }
+  if (!s.projects) s.projects = [];
+  if (!s.pressLog) s.pressLog = [];
   return state;
 }

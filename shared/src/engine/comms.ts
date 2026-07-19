@@ -406,5 +406,39 @@ export function applyCommsIntent(state: CompanyState, intent: CommsIntent): void
       ex.relationshipToCeo = clamp(ex.relationshipToCeo + delta, 0, 100);
       break;
     }
+    case 'LEGAL_BILLING': {
+      const amount = clamp(Math.round(intent.amount), 0, 5_000);
+      if (amount > 0) {
+        schedule(state, 0, 'Anwaltskanzlei', null, { kind: 'ONE_OFF_COST', amount, labelDe: `Kanzlei-Honorar: ${intent.topicDe.slice(0, 60)}` }, 'system');
+      }
+      break;
+    }
+    case 'BOARD_TRUST': {
+      const delta = clamp(Math.round(intent.delta), -3, 3);
+      if (delta !== 0) {
+        state.ceo.boardTrust = clamp(state.ceo.boardTrust + delta, 0, 100);
+        state.ceo.trustLog.push({ week: state.meta.week, delta, reasonDe: intent.reasonDe.slice(0, 160) });
+      }
+      break;
+    }
+    case 'PRESS_RELEASE_OUTCOME': {
+      const w = state.meta.week;
+      const pressDelta = clamp(Math.round(intent.pressDelta), -6, 6);
+      state.reputation.press = clamp(state.reputation.press + pressDelta, 0, 100);
+      state.pressLog.push({
+        week: w,
+        tone: pressDelta > 1 ? 'positive' : pressDelta < -1 ? 'negative' : 'neutral',
+        topicDe: `Medienecho auf PM „${intent.titleDe.slice(0, 70)}“`,
+      });
+      const leadFactor = clamp(intent.leadFactor, 1.0, 1.15);
+      if (leadFactor > 1.001) {
+        state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'leadGen', factor: leadFactor, startWeek: w, endWeek: w + 6, sourceDe: `PM „${intent.titleDe.slice(0, 40)}“` });
+      }
+      const prob = clamp(intent.scandalProb, 0, 0.5);
+      if (prob > 0.01) {
+        schedule(state, 5, `PM „${intent.titleDe.slice(0, 40)}“`, null, { kind: 'DELAYED_SCANDAL', probability: prob, fine: 15_000, topicDe: intent.scandalTopicDe.slice(0, 120) || 'Übertriebene PR-Claims widerlegt' }, 'system');
+      }
+      break;
+    }
   }
 }

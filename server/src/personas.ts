@@ -65,6 +65,15 @@ export interface PersonaResolved {
 }
 
 export function resolvePersona(state: CompanyState, threadKey: string): PersonaResolved | null {
+  if (threadKey === 'legal') {
+    return {
+      name: 'Dr. Katharina Brandt',
+      roleDe: 'Kanzlei Brandt & Kollegen',
+      execId: null,
+      systemDe: `Du bist Dr. Katharina Brandt, Partnerin der (fiktiven) Wirtschaftskanzlei Brandt & Kollegen, in einem CEO-TRAININGS-SIMULATOR. Du berätst den CEO simuliert zu Arbeitsrecht (Kündigungen, Abmahnungen), Vertragsrecht (AGB, SLAs), Gesellschaftsrecht (Beschlüsse, Satzung), DSGVO, M&A-Due-Diligence und Kapitalmarktthemen — als AUSBILDUNGSINHALT. Stil: präzise, strukturiert (kurze nummerierte Punkte), nennt typische Fristen/Risiken/Optionen und was die Gegenseite tun könnte; empfiehlt bei Detailfragen weitere Prüfung. Du erinnerst gelegentlich charmant daran, dass jede Antwort Honorar kostet („Die Uhr läuft, Herr/Frau CEO."). WICHTIG: Beginne JEDE Antwort mit dem Kürzel „[Simulierte Ausbildungs-Beratung — keine echte Rechtsberatung]“. Erfinde keine konkreten Paragraphen-Zitate mit Detailinhalt; bleib bei allgemein bekannten Konzepten (z. B. 72h-Meldefrist Art. 33 DSGVO, KSchG-Grundsätze).`,
+      fallbackDe: '[Simulierte Ausbildungs-Beratung — keine echte Rechtsberatung]\n\nDanke für Ihre Anfrage. Kurzeinordnung folgt schriftlich; für die Detailprüfung brauchen wir die Unterlagen. Drei Punkte vorab: (1) Fristen notieren und wahren, (2) nichts Schriftliches ohne Gegenlesen herausgeben, (3) Kommunikation intern bündeln. Wir melden uns. — Brandt (Offline-Modus: Für ausführliche simulierte Beratung ANTHROPIC_API_KEY hinterlegen; das Honorar wurde dennoch gebucht — Anwaltszeit kostet.)',
+    };
+  }
   if (threadKey === 'dm:assistant') {
     const a = state.people.assistant;
     return {
@@ -123,14 +132,22 @@ export async function personaReply(
 
 const zMeetingTurns = z.object({
   turns: z.array(z.object({ speaker: z.string().min(1).max(60), textDe: z.string().min(1).max(900) })).min(1).max(5),
+  boardTrustDelta: z.number().int().min(-3).max(3).optional(),
+  trustReasonDe: z.string().max(160).optional(),
 });
+
+export interface MeetingRoundResult {
+  turns: { speaker: string; roleDe: string; textDe: string }[];
+  boardTrustDelta: number;
+  trustReasonDe: string | null;
+}
 
 /** Meeting-Szene: mehrere Personas antworten in einer Runde. */
 export async function meetingRound(
   state: CompanyState,
   appointmentId: string,
   playerText: string,
-): Promise<{ speaker: string; roleDe: string; textDe: string }[]> {
+): Promise<MeetingRoundResult> {
   const apt = state.calendar.appointments.find((a) => a.id === appointmentId);
   if (!apt) throw new Error('Termin nicht gefunden.');
 
@@ -147,10 +164,15 @@ export async function meetingRound(
       });
 
   const threadKey = 'meeting:' + appointmentId;
+  const isBoard = apt.kind === 'boardCall';
   const history = getThread(state.meta.gameId, threadKey).slice(-12);
   const system = `Du inszenierst eine Meeting-Szene in einem CEO-Trainings-Simulator („${apt.titleDe}“). Teilnehmer:\n${participants
     .map((p) => `- ${p.name} (${p.roleDe}): ${p.flavor}`)
-    .join('\n')}\nRegeln: 1–3 Wortmeldungen pro Runde, unterschiedliche Perspektiven, auch mal Widerspruch untereinander. Kurz und konkret, auf Deutsch. Keine erfundenen Zahlen — nur das Lagebild. Keine Entscheidungen treffen; das tut der CEO im Entscheidungs-Panel.`;
+    .join('\n')}\nRegeln: 1–3 Wortmeldungen pro Runde, unterschiedliche Perspektiven, auch mal Widerspruch untereinander. Kurz und konkret, auf Deutsch. Keine erfundenen Zahlen — nur das Lagebild. Keine Entscheidungen treffen; das tut der CEO im Entscheidungs-Panel.${
+    isBoard
+      ? ' ZUSÄTZLICH: Bewerte nach jeder CEO-Aussage, wie sie beim Board ankommt: boardTrustDelta −3..+3 (0 = neutral; nur bei substanziellen Zusagen/Klarheit positiv, bei Ausweichen/Widersprüchen negativ) + trustReasonDe (max 1 Satz).'
+      : ''
+  }`;
   const user = [
     '=== LAGEBILD ===',
     stateBriefDe(state),
@@ -160,23 +182,31 @@ export async function meetingRound(
     '=== DER CEO SAGT ===',
     playerText,
     '',
-    'Antworte als JSON: {"turns": [{"speaker": "Name", "textDe": "..."}]} — speaker exakt aus der Teilnehmerliste.',
+    `Antworte als JSON: {"turns": [{"speaker": "Name", "textDe": "..."}]${isBoard ? ', "boardTrustDelta": n, "trustReasonDe": "..."' : ''}} — speaker exakt aus der Teilnehmerliste.`,
   ].join('\n');
 
-  const res = await llmJson('meeting-scene', system, user, zMeetingTurns, 1100);
+  const res = await llmJson('meeting-scene', system, user, zMeetingTurns, 1200);
   if (res) {
-    return res.turns.map((t) => ({
-      speaker: t.speaker,
-      roleDe: participants.find((p) => p.name === t.speaker)?.roleDe ?? 'Teilnehmer:in',
-      textDe: t.textDe,
-    }));
+    return {
+      turns: res.turns.map((t) => ({
+        speaker: t.speaker,
+        roleDe: participants.find((p) => p.name === t.speaker)?.roleDe ?? 'Teilnehmer:in',
+        textDe: t.textDe,
+      })),
+      boardTrustDelta: isBoard ? (res.boardTrustDelta ?? 0) : 0,
+      trustReasonDe: res.trustReasonDe ?? null,
+    };
   }
   const first = participants[0]!;
-  return [
-    {
-      speaker: first.name,
-      roleDe: first.roleDe,
-      textDe: 'Danke für den Punkt — lass uns das anhand der Agenda durchgehen. Aus meiner Sicht ist der wichtigste nächste Schritt, die offenen Themen aus dem Lagebild zu priorisieren. (Offline-Modus: Für lebendige Meetings einen ANTHROPIC_API_KEY hinterlegen.)',
-    },
-  ];
+  return {
+    turns: [
+      {
+        speaker: first.name,
+        roleDe: first.roleDe,
+        textDe: 'Danke für den Punkt — lass uns das anhand der Agenda durchgehen. Aus meiner Sicht ist der wichtigste nächste Schritt, die offenen Themen aus dem Lagebild zu priorisieren. (Offline-Modus: Für lebendige Meetings einen ANTHROPIC_API_KEY hinterlegen.)',
+      },
+    ],
+    boardTrustDelta: 0,
+    trustReasonDe: null,
+  };
 }

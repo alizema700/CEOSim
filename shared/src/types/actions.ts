@@ -21,7 +21,8 @@ export type PlayerAction =
   | RaiseDebtAction
   | RepayDebtAction
   | RespondEventAction
-  | DelegateMessageAction;
+  | DelegateMessageAction
+  | StartProjectAction;
 
 /**
  * Listenpreis ändern (± %). Sofort: Neugeschäfts-ARPA. Verzögert: Bestand wird
@@ -112,6 +113,16 @@ export interface DelegateMessageAction {
   type: 'DELEGATE_MESSAGE';
   messageId: Id;
   execRole: import('./people.js').ExecutiveRole;
+}
+
+/**
+ * Freie Idee als Projekt starten (Ideen-System, Phase 3). Die Klassifikation
+ * stammt vom LLM (oder Fallback), wurde vom Spieler bestätigt und wandert
+ * vollständig ins Event-Log — die Engine klemmt alle Werte zusätzlich.
+ */
+export interface StartProjectAction {
+  type: 'START_PROJECT';
+  classification: import('./strategy.js').IdeaClassification;
 }
 
 /** Ergebnis der Aktions-Validierung durch die Engine. */

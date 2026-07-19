@@ -240,6 +240,8 @@ function applySkillGains(state: CompanyState, d: DecisionRecord, grade: Grade): 
       s.krisenmanagement = clamp(s.krisenmanagement + gain, 0, 100); break;
     case 'DELEGATE_MESSAGE':
       s.leadership = clamp(s.leadership + gain, 0, 100); break;
+    case 'START_PROJECT':
+      s.strategie = clamp(s.strategie + gain, 0, 100); break;
     default: break;
   }
   // Werte-Konsistenz zahlt auf Governance ein.

@@ -87,6 +87,19 @@ function migrate(d: DatabaseSync): void {
     );
     CREATE INDEX IF NOT EXISTS idx_chat_thread ON chat_messages(game_id, thread_key, id);
 
+    -- Pressemitteilungen + simuliertes Medienecho (Phase 3).
+    CREATE TABLE IF NOT EXISTS press_releases (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      game_id     TEXT NOT NULL,
+      week        INTEGER NOT NULL,
+      title       TEXT NOT NULL,
+      body        TEXT NOT NULL,
+      article     TEXT NOT NULL,
+      verdict     TEXT NOT NULL,
+      press_delta INTEGER NOT NULL,
+      at_iso      TEXT NOT NULL
+    );
+
     -- Token-Kosten-Tracking für das Dashboard in den Einstellungen.
     CREATE TABLE IF NOT EXISTS llm_usage (
       id            INTEGER PRIMARY KEY AUTOINCREMENT,

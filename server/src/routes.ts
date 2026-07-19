@@ -18,6 +18,7 @@ import {
 } from './gameService.js';
 import { usageSummary } from './llm.js';
 import { appendTurn, getThread, meetingRound, personaReply, resolvePersona } from './personas.js';
+import { classifyIdea, classifyPress, listPressReleases, savePressRelease } from './pressService.js';
 import { getDb } from './db.js';
 
 /**
@@ -41,6 +42,27 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('REPAY_DEBT'), amount: zMoney.gt(0) }),
   z.object({ type: z.literal('RESPOND_EVENT'), eventInstanceId: z.string(), optionId: z.string() }),
   z.object({ type: z.literal('DELEGATE_MESSAGE'), messageId: z.string(), execRole: z.enum(['cto', 'headOfSales', 'headOfCs', 'cfo']) }),
+  z.object({
+    type: z.literal('START_PROJECT'),
+    classification: z.object({
+      titleDe: z.string().min(3).max(80),
+      categoryDe: z.string().min(2).max(30),
+      costOneOff: z.number().min(0).max(500_000),
+      costMonthly: z.number().min(0).max(100_000),
+      durationWeeks: z.number().min(1).max(26),
+      successProb: z.number().min(0.05).max(0.95),
+      rationaleDe: z.string().max(1200),
+      riskDe: z.string().max(600),
+      comparablesDe: z.array(z.string().max(300)).max(3),
+      effects: z.object({
+        leadGenFactor: z.number().min(1).max(1.3).optional(),
+        churnFactor: z.number().min(0.85).max(1).optional(),
+        moraleDelta: z.number().min(-5).max(8).optional(),
+        pressDelta: z.number().min(-3).max(6).optional(),
+        npsDelta: z.number().min(-5).max(8).optional(),
+      }),
+    }),
+  }),
 ]);
 
 const zHypothesis = z
@@ -182,10 +204,16 @@ export function buildRouter(): Router {
         reasonDe: 'Eindruck aus dem Gespräch mit dem CEO',
       });
     }
-    res.json({ turns: [playerTurn, replyTurn], relationshipDelta: reply.relationshipDelta });
+    // Anwalts-Chat: jede Runde kostet Honorar (lehrt, Anwaltszeit gezielt einzusetzen).
+    let billedEur = 0;
+    if (threadKey === 'legal') {
+      billedEur = 450;
+      recordIntent(gameId, { kind: 'LEGAL_BILLING', amount: billedEur, topicDe: text.slice(0, 60) });
+    }
+    res.json({ turns: [playerTurn, replyTurn], relationshipDelta: reply.relationshipDelta, billedEur });
   });
 
-  // Meeting-Szene: eine Runde mit mehreren Personas.
+  // Meeting-Szene: eine Runde mit mehreren Personas (Board-Runden bewegen Vertrauen).
   router.post('/games/:id/meetings/:aptId', async (req, res) => {
     const text = z.string().min(1).max(4000).parse(req.body.text);
     const gameId = req.params.id;
@@ -193,8 +221,42 @@ export function buildRouter(): Router {
     const threadKey = 'meeting:' + req.params.aptId;
     const playerTurn = appendTurn(gameId, threadKey, { author: state.playerProfile.ceoName, authorRole: 'CEO', isPlayer: true, text });
     const round = await meetingRound(state, req.params.aptId, text);
-    const turns = [playerTurn, ...round.map((t) => appendTurn(gameId, threadKey, { author: t.speaker, authorRole: t.roleDe, isPlayer: false, text: t.textDe }))];
-    res.json({ turns });
+    const turns = [playerTurn, ...round.turns.map((t) => appendTurn(gameId, threadKey, { author: t.speaker, authorRole: t.roleDe, isPlayer: false, text: t.textDe }))];
+    if (round.boardTrustDelta !== 0) {
+      recordIntent(gameId, { kind: 'BOARD_TRUST', delta: round.boardTrustDelta, reasonDe: round.trustReasonDe ?? 'Eindruck aus dem Board-Meeting' });
+    }
+    res.json({ turns, boardTrustDelta: round.boardTrustDelta });
+  });
+
+  // ── Presse-Modul (Phase 3) ───────────────────────────────────────
+  router.post('/games/:id/press', async (req, res) => {
+    const { titleDe, bodyDe } = z.object({ titleDe: z.string().min(3).max(140), bodyDe: z.string().min(20).max(4000) }).parse(req.body);
+    const gameId = req.params.id;
+    const state = loadState(gameId);
+    if (state.meta.status !== 'active') throw new HttpError(409, 'Das Spiel ist beendet.');
+    const outcome = await classifyPress(state, titleDe, bodyDe);
+    savePressRelease(gameId, state.meta.week, titleDe, bodyDe, outcome);
+    const newState = recordIntent(gameId, {
+      kind: 'PRESS_RELEASE_OUTCOME',
+      titleDe,
+      pressDelta: outcome.pressDelta,
+      leadFactor: outcome.leadFactor,
+      scandalProb: outcome.scandalProb,
+      scandalTopicDe: outcome.scandalTopicDe,
+    });
+    res.status(201).json({ outcome, state: newState });
+  });
+
+  router.get('/games/:id/press', (req, res) => {
+    res.json({ releases: listPressReleases(req.params.id) });
+  });
+
+  // ── Ideen-System (Phase 3): klassifizieren — Start läuft über /actions ──
+  router.post('/games/:id/ideas', async (req, res) => {
+    const text = z.string().min(5).max(2000).parse(req.body.text);
+    const state = loadState(req.params.id);
+    const classification = await classifyIdea(state, text);
+    res.json({ classification });
   });
 
   // ── Einstellungen: Token-Kosten-Dashboard ────────────────────────

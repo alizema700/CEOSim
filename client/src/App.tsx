@@ -15,6 +15,9 @@ import { InboxView } from './views/InboxView.js';
 import { ChatView } from './views/ChatView.js';
 import { CalendarView } from './views/CalendarView.js';
 import { ProductView } from './views/ProductView.js';
+import { LegalView } from './views/LegalView.js';
+import { PressView } from './views/PressView.js';
+import { StrategyView } from './views/StrategyView.js';
 import { Modal } from './components/ui.js';
 
 export function App() {
@@ -43,6 +46,9 @@ export function App() {
       {view === 'customers' && <CustomersView />}
       {view === 'product' && <ProductView />}
       {view === 'market' && <MarketView />}
+      {view === 'legal' && <LegalView />}
+      {view === 'press' && <PressView />}
+      {view === 'strategy' && <StrategyView />}
       {view === 'settings' && <SettingsView />}
       <WeekReportModal />
       <BriefingModal />

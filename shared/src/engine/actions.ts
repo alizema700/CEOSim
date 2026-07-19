@@ -7,6 +7,7 @@ import { computeKpis } from './kpis.js';
 import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
+import { clampClassification, startProject } from './projects.js';
 
 export { deptDe };
 
@@ -106,6 +107,15 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       else if (!msg.delegable) errors.push('Diese Nachricht ist nicht delegierbar.');
       else if (msg.handledWeek !== null) errors.push('Diese Nachricht ist bereits erledigt.');
       if (!state.people.executives.some((e) => e.role === action.execRole)) errors.push('Diese Führungskraft ist nicht (mehr) an Bord.');
+      break;
+    }
+    case 'START_PROJECT': {
+      const c = clampClassification(action.classification);
+      if (state.projects.filter((p) => p.status === 'running').length >= 5) errors.push('Maximal 5 Projekte parallel — Fokus ist auch eine Entscheidung.');
+      if (c.costOneOff > f.cash * 0.6) errors.push(`Die Einmalkosten (${fmt(c.costOneOff)}) würden über 60 % der Kasse binden.`);
+      if (runwayWeeks(state) < 16 && c.costOneOff + c.costMonthly * 3 > 30_000) {
+        warnings.push('Runway unter 16 Wochen — jedes Experiment konkurriert jetzt direkt mit der Zahlungsfähigkeit.');
+      }
       break;
     }
   }
@@ -237,6 +247,15 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       const res = executeDelegation(state, action, decisionId);
       summary = res.summaryDe;
       analysis.push(...res.analysisDe);
+      break;
+    }
+    case 'START_PROJECT': {
+      const c = clampClassification(action.classification);
+      const project = startProject(state, c, decisionId);
+      summary = `Projekt gestartet: „${project.titleDe}“ (${fmt(c.costOneOff)} einmalig + ${fmt(c.costMonthly)}/M, ${c.durationWeeks} Wochen)`;
+      analysis.push(`Erfolgswahrscheinlichkeit laut Klassifikation: ${(c.successProb * 100).toFixed(0)} % — Auflösung in Woche ${week + c.durationWeeks}, seed-gesteuert.`);
+      analysis.push(`Begründung: ${c.rationaleDe}`);
+      if (c.comparablesDe.length > 0) analysis.push(`Vergleichsfälle: ${c.comparablesDe.join(' · ')}`);
       break;
     }
   }

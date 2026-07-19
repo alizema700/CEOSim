@@ -11,6 +11,7 @@ import type { ActiveRandomEvent } from './randomEvents.js';
 import type { KpiSnapshot } from './kpi.js';
 import type { DecisionRecord, Evaluation } from './evaluation.js';
 import type { CalendarState, CommsState } from './comms.js';
+import type { PressLogEntry, Project } from './strategy.js';
 
 /**
  * ═══════════════════════════════════════════════════════════════════
@@ -55,6 +56,10 @@ export interface CompanyState {
   comms: CommsState;
   /** Kalender (Phase 2): Termine, von der Engine generiert. */
   calendar: CalendarState;
+  /** Projekte aus dem Ideen-System (Phase 3). */
+  projects: Project[];
+  /** Medienspiegel: alle Presse-Ereignisse (Phase 3). */
+  pressLog: PressLogEntry[];
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];

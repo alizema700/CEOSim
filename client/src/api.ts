@@ -69,7 +69,18 @@ export const api = {
       body: JSON.stringify({ text }),
     }),
   sendMeeting: (id: string, aptId: string, text: string) =>
-    http<{ turns: ThreadTurn[] }>(`/games/${id}/meetings/${aptId}`, { method: 'POST', body: JSON.stringify({ text }) }),
+    http<{ turns: ThreadTurn[]; boardTrustDelta?: number }>(`/games/${id}/meetings/${aptId}`, { method: 'POST', body: JSON.stringify({ text }) }),
+
+  // ── Phase 3 ──
+  classifyIdea: (id: string, text: string) =>
+    http<{ classification: import('@boardroom/shared').IdeaClassification }>(`/games/${id}/ideas`, { method: 'POST', body: JSON.stringify({ text }) }),
+  publishPress: (id: string, titleDe: string, bodyDe: string) =>
+    http<{ outcome: { articleDe: string; verdictDe: string; pressDelta: number; scandalProb: number }; state: CompanyState }>(`/games/${id}/press`, {
+      method: 'POST',
+      body: JSON.stringify({ titleDe, bodyDe }),
+    }),
+  listPress: (id: string) =>
+    http<{ releases: { week: number; title: string; body: string; article: string; verdict: string; pressDelta: number }[] }>(`/games/${id}/press`),
 };
 
 export interface ThreadTurn {

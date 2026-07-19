@@ -18,9 +18,9 @@ const NAV: { view: View | null; label: string; icon: string; phase?: number; bad
   { view: 'product', label: t('nav_product'), icon: '⚙' },
   { view: 'market', label: t('nav_market'), icon: '⚔' },
   { view: 'finance', label: t('nav_finance'), icon: '€' },
-  { view: null, label: t('nav_legal'), icon: '§', phase: 3 },
-  { view: null, label: t('nav_press'), icon: '🗞', phase: 3 },
-  { view: null, label: t('nav_strategy'), icon: '♟', phase: 3 },
+  { view: 'legal', label: t('nav_legal'), icon: '§' },
+  { view: 'press', label: t('nav_press'), icon: '🗞' },
+  { view: 'strategy', label: t('nav_strategy'), icon: '♟' },
   { view: null, label: t('nav_learn'), icon: '🎓', phase: 4 },
   { view: 'settings', label: t('nav_settings'), icon: '⚒' },
 ];
