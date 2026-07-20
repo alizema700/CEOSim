@@ -1,20 +1,30 @@
 @import 'tailwindcss';
 
-/* ── Boardroom Terminal-Theme ─────────────────────────────────────────
-   Dunkles Bloomberg/Terminal-Design. Zahlen IMMER monospace + tabular. */
+/* ═══ BOARDROOM · Editorial-Theme ("Die Morgenlage") ═══════════════════
+   Ein Wirtschafts-Feuilleton statt Terminal: warmes Zeitungspapier,
+   Instrument Serif für Schlagzeilen, Spline Sans Mono für Zahlen
+   (immer tabular), sparsame Farben, harte Kanten, feine Trennlinien.
+   Die ganze App erbt dieses System über die Tokens & Basisklassen. */
 
 @theme {
-  --color-bg: #0a0e14;
-  --color-panel: #10151f;
-  --color-panel2: #161d2b;
-  --color-line: #223047;
-  --color-ink: #d5deed;
-  --color-dim: #7d8ba3;
-  --color-accent: #38bdf8;
-  --color-good: #34d399;
-  --color-warn: #fbbf24;
-  --color-bad: #f87171;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --color-bg: #faf9f6; /* Zeitungspapier (warmes Off-White) */
+  --color-panel: #fffdf8; /* Karten — Hauch heller als Papier */
+  --color-panel2: #efece3; /* Insets, Inputs, Balken-Spuren */
+  --color-line: #ddd9d0; /* warme Haarlinie */
+  --color-line2: #e7e3da; /* noch feineres Raster */
+  --color-ink: #171a1c; /* Beinahe-Schwarz (Überschriften) */
+  --color-ink2: #3a4046; /* Fließtext */
+  --color-dim: #6b7178; /* Labels, Sekundäres */
+  --color-faint: #a3a8ad; /* Fußzeilen, Achsen */
+  --color-accent: #2f7f79; /* Petrol (Links, Fokus) */
+  --color-good: #2e8558; /* Grün (positiv) */
+  --color-warn: #a8781f; /* Bernstein (Warnung) */
+  --color-bad: #c2453d; /* Zinnober (Krise) */
+  --color-purple: #6d5bd0; /* Markt/Board-Akzent */
+
+  --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: 'Spline Sans Mono', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --font-serif: 'Instrument Serif', Georgia, 'Times New Roman', serif;
 }
 
 html,
@@ -26,56 +36,201 @@ body,
 body {
   background: var(--color-bg);
   color: var(--color-ink);
-  font-family: var(--font-mono);
-  font-size: 13px;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
+/* Zahlen: immer Mono + tabellarisch (Bloomberg-Erbe, editorial verpackt). */
 .num {
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.01em;
+  letter-spacing: 0.01em;
 }
 
+/* Kicker-Label: das kleine Mono-Etikett über jeder Rubrik. */
+.kicker {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+}
+
+/* Serifen-Schlagzeile. */
+.serif {
+  font-family: var(--font-serif);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+}
+
+/* Redaktionelle Rubrik-Regel (2 px Tinte oben). */
+.rule-top {
+  border-top: 2px solid var(--color-ink);
+}
+
+/* Vertikale Haarlinie als Spalte im Zeitungsraster. */
+.hair {
+  background: var(--color-line);
+}
+
+/* Editorialer Textlink mit Unterstrich. */
+.edlink {
+  color: var(--color-ink);
+  border-bottom: 1px solid var(--color-ink);
+  padding-bottom: 2px;
+  cursor: pointer;
+  transition: border-color 0.12s, color 0.12s;
+}
+.edlink:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+/* ── Karten & Titel ─────────────────────────────────────────────────── */
 .panel {
   background: var(--color-panel);
   border: 1px solid var(--color-line);
-  border-radius: 6px;
+  border-radius: 2px;
 }
 
 .panel-title {
-  @apply px-3 py-2 text-[11px] uppercase tracking-widest text-dim border-b border-line;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-dim);
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--color-line);
+}
+
+/* ── Buttons (harte Kanten, redaktionell) ───────────────────────────── */
+.btn,
+.btn-primary,
+.btn-danger {
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  padding: 8px 15px;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.btn:disabled,
+.btn-primary:disabled,
+.btn-danger:disabled {
+  opacity: 0.4;
+  pointer-events: none;
 }
 
 .btn {
-  @apply px-3 py-1.5 rounded border border-line bg-panel2 text-ink text-xs hover:border-accent hover:text-accent transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer;
+  border: 1px solid var(--color-line);
+  background: var(--color-panel);
+  color: var(--color-ink);
+}
+.btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 .btn-primary {
-  @apply px-3 py-1.5 rounded border text-xs transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer border-accent/60 text-accent bg-accent/10 hover:bg-accent/20;
+  border: 1px solid var(--color-ink);
+  background: var(--color-ink);
+  color: var(--color-bg);
+}
+.btn-primary:hover {
+  background: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .btn-danger {
-  @apply px-3 py-1.5 rounded border border-line bg-panel2 text-ink text-xs transition-colors disabled:opacity-40 disabled:pointer-events-none cursor-pointer hover:border-bad hover:text-bad;
+  border: 1px solid var(--color-line);
+  background: var(--color-panel);
+  color: var(--color-ink);
+}
+.btn-danger:hover {
+  border-color: var(--color-bad);
+  color: var(--color-bad);
 }
 
+/* ── Formularfelder ─────────────────────────────────────────────────── */
 .input {
-  @apply w-full bg-panel2 border border-line rounded px-2 py-1.5 text-xs text-ink outline-none focus:border-accent;
+  width: 100%;
+  background: var(--color-panel);
+  border: 1px solid var(--color-line);
+  border-radius: 2px;
+  padding: 8px 11px;
+  font-family: var(--font-sans);
+  font-size: 13px;
+  color: var(--color-ink);
+  outline: none;
+  transition: border-color 0.12s;
+}
+.input:focus {
+  border-color: var(--color-accent);
+}
+.input::placeholder {
+  color: var(--color-faint);
 }
 
+/* ── Chips (Mono-Etiketten, umschaltbar) ────────────────────────────── */
 .chip {
-  @apply px-2 py-1 rounded border border-line text-xs cursor-pointer select-none hover:border-accent;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.03em;
+  padding: 5px 11px;
+  border: 1px solid var(--color-line);
+  border-radius: 2px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--color-dim);
+  background: var(--color-panel);
+  transition: border-color 0.12s, color 0.12s;
 }
-
+.chip:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
 .chip-on {
-  @apply border-accent text-accent bg-accent/10;
+  border-color: var(--color-ink);
+  color: var(--color-ink);
+  background: var(--color-bg);
+  font-weight: 600;
 }
 
+/* ── EKG-Puls im Ticker ─────────────────────────────────────────────── */
+@keyframes ekg {
+  to {
+    stroke-dashoffset: -100;
+  }
+}
+.ekg-line {
+  stroke-dasharray: 35 65;
+  animation: ekg 2.6s linear infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ekg-line {
+    animation: none;
+    stroke-dasharray: none;
+  }
+}
+
+/* ── Scrollbar (hell, dezent) ───────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 9px;
+  height: 9px;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-line);
-  border-radius: 4px;
+  background: #cfc9bd;
+  border-radius: 5px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #b9b2a3;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
