@@ -3,10 +3,10 @@ import type { CompanyState } from '../types/company.js';
 import type { MaTarget } from '../types/funding.js';
 import type { Occurrence } from '../types/game.js';
 import { gaussian, intBetween, pick, stream, type Rng } from './rng.js';
-import { personName, ROLE_TITLES } from './names.js';
+import { personaBits, personName, ROLE_TITLES } from './names.js';
 import { nextId, schedule } from './stateHelpers.js';
 import { addMessage, assistantSender } from './comms.js';
-import { LOCATIONS } from './scenarios/locations.js';
+import { locationOf } from './derive.js';
 
 /**
  * M&A-Zukäufe (Phase 5): 2 Kaufziele mit versteckten Red Flags.
@@ -90,7 +90,7 @@ export function applyMaIntegration(state: CompanyState, targetId: string, occ: O
   });
 
   // Team kommt mit (benannte Menschen, gedrückte Stimmung — Übernahme!)
-  const loc = LOCATIONS[state.identity.locationId];
+  const loc = locationOf(state);
   const SAL: Record<string, number> = { junior: 3900, mid: 5100, senior: 6600 };
   for (let i = 0; i < t.employees; i++) {
     const { firstName, lastName } = personName(rng);
@@ -108,6 +108,7 @@ export function applyMaIntegration(state: CompanyState, targetId: string, occ: O
       keyPerson: false,
       hiredWeek: week,
       rampWeeksRemaining: 4,
+      ...personaBits(rng, seniority),
     });
   }
 

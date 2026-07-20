@@ -1,10 +1,19 @@
 import { DEPARTMENTS, WEEKS_PER_MONTH, type Department } from '../types/common.js';
 import type { CompanyState } from '../types/company.js';
+import type { LocationId, LocationProfile } from '../types/identity.js';
 import { EMPLOYER_COST_FACTOR } from '../types/people.js';
 import type { ModifierTarget } from '../types/effects.js';
 import { LOCATIONS } from './scenarios/locations.js';
 
 /** Reine Selektoren — lesen den State, verändern nie etwas. */
+
+/**
+ * Aktives Standortprofil (Phase 7): das beim Spielstart fixierte Profil;
+ * Alt-Spielstände fallen auf die Kern-Presets zurück.
+ */
+export function locationOf(state: CompanyState): LocationProfile {
+  return state.identity.location ?? LOCATIONS[state.identity.locationId as LocationId] ?? LOCATIONS.muenchen;
+}
 
 export function cohortMrr(state: CompanyState): number {
   return state.customers.cohorts.reduce(
@@ -47,8 +56,7 @@ export function payrollMonthlyTotal(state: CompanyState): number {
 }
 
 export function officeCostMonthly(state: CompanyState): number {
-  const loc = LOCATIONS[state.identity.locationId];
-  return (headcount(state) + 1) * loc.officeCostPerEmployeeMonthly;
+  return (headcount(state) + 1) * locationOf(state).officeCostPerEmployeeMonthly;
 }
 
 /** Monatliche OpEx (Personal + Sachkosten + Büro), ohne COGS. */

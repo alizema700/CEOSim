@@ -9,9 +9,9 @@ import type { GameSetup } from '../types/game.js';
 import type { Employee, Executive, ExecutiveRole } from '../types/people.js';
 import { EMPLOYER_COST_FACTOR } from '../types/people.js';
 import type { CustomerCohort, KeyAccount } from '../types/customers.js';
-import { LOCATIONS } from './scenarios/locations.js';
+import { resolveLocationProfile } from './scenarios/locations.js';
 import { DIFFICULTIES } from './scenarios/difficulty.js';
-import { accountName, personName, ROLE_TITLES } from './names.js';
+import { accountName, personaBits, personName, ROLE_TITLES } from './names.js';
 import { gaussian, intBetween, stream } from './rng.js';
 import { computeKpis } from './kpis.js';
 import { addMessage, execSender, upkeepCalendar } from './comms.js';
@@ -28,6 +28,7 @@ import { initialIpoState } from '../types/ipo.js';
  */
 
 const SENIORITY_SALARY: Record<Seniority, Money> = {
+  werkstudent: 1650,
   junior: 3900,
   mid: 5100,
   senior: 6600,
@@ -105,7 +106,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
    * die einzige Uhr, die zählt.
    */
   const dz = setup.scenarioId === 'distressed';
-  const loc = LOCATIONS[setup.identity.locationId];
+  const loc = resolveLocationProfile(setup.identity.locationId, setup.identity.location);
   const diff = DIFFICULTIES[setup.difficulty];
   const counter = { idCounter: 0 };
 
@@ -132,6 +133,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
         keyPerson: seniority === 'lead' || (seniority === 'senior' && rngPeople() < 0.4),
         hiredWeek: -intBetween(rngPeople, 20, 200),
         rampWeeksRemaining: 0,
+        ...personaBits(rngPeople, seniority),
       });
     }
   }
@@ -233,7 +235,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
       endReasonDe: null,
       createdAtISO,
     },
-    identity: setup.identity,
+    identity: { ...setup.identity, location: loc },
     playerProfile: setup.playerProfile,
     capTable: [
       { id: 'cap_founders', holder: 'Altgesellschafter (Gründer)', kind: 'founder', share: 0.52 },

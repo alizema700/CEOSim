@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import type { DifficultyId, GameSetup, LocationId, PlayerSkillArea, ScenarioId } from '@boardroom/shared';
-import { DIFFICULTIES, LOCATIONS } from '@boardroom/shared';
+import { CITY_PRESETS, DIFFICULTIES, LOCATIONS, profileForCity, type LocationProfile } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { eur, pct } from '../format.js';
 
@@ -44,7 +44,7 @@ export function WizardView() {
   const [values, setValues] = useState<string[]>(['Menschen zuerst', 'Ehrlichkeit']);
   const [customValue, setCustomValue] = useState('');
   const [motto, setMotto] = useState('');
-  const [locationId, setLocationId] = useState<LocationId>('muenchen');
+  const [locProfile, setLocProfile] = useState<LocationProfile>(LOCATIONS.muenchen);
   const [ceoName, setCeoName] = useState('');
   const [strengths, setStrengths] = useState<PlayerSkillArea[]>([]);
   const [weaknesses, setWeaknesses] = useState<PlayerSkillArea[]>([]);
@@ -77,7 +77,8 @@ export function WizardView() {
         vision: vision.trim(),
         values,
         motto: motto.trim(),
-        locationId,
+        locationId: locProfile.id,
+        location: locProfile,
       },
       playerProfile: { ceoName: ceoName.trim(), strengths, weaknesses },
       ...(seed.trim() !== '' && Number.isFinite(Number(seed)) ? { seed: Number(seed) } : {}),
@@ -217,23 +218,25 @@ export function WizardView() {
       )}
 
       {step === 3 && (
-        <div className="space-y-2">
-          <h2 className="mb-3 text-lg font-bold">Wo sitzt der Hauptsitz?</h2>
-          {Object.values(LOCATIONS).map((l) => (
-            <button key={l.id} onClick={() => setLocationId(l.id)} className={`panel w-full p-4 text-left transition-colors hover:border-accent/60 ${locationId === l.id ? 'border-accent' : ''}`}>
-              <div className="flex items-baseline justify-between">
-                <span className="text-sm font-bold">{l.nameDe}</span>
-                <span className="text-[10px] text-dim">{l.country}</span>
-              </div>
-              <div className="num mt-1 grid grid-cols-2 gap-x-4 text-[11px] text-dim md:grid-cols-5">
-                <span>Lohnniveau ×{l.payrollIndex.toLocaleString('de-DE')}</span>
-                <span>Talentpool {pct(l.talentPool, 0)}</span>
-                <span>Steuer {pct(l.taxRate, 0)}</span>
-                <span>Regulierung: {l.regulationDensity}</span>
-                <span>Büro {eur(l.officeCostPerEmployeeMonthly, false)}/MA/M</span>
-              </div>
-            </button>
-          ))}
+        <div className="space-y-3">
+          <h2 className="mb-1 text-lg font-bold">Wo sitzt der Hauptsitz?</h2>
+          <p className="text-xs text-dim">
+            Stadt auf der Karte anklicken — oder unten eine BELIEBIGE Stadt eintippen: Der Standort-Analyst schätzt dann
+            deterministisch ein Profil (gleiche Stadt ⇒ immer gleiche Bedingungen). Der Standort prägt Gehälter, Talentpool,
+            Steuern, Regulierung und Bürokosten — für das ganze Spiel.
+          </p>
+          <CityMap selected={locProfile} onSelect={setLocProfile} />
+          <FreeCityInput onSelect={setLocProfile} />
+          <div className="panel p-3">
+            <div className="kicker text-[9.5px]">Gewählt: {locProfile.nameDe} · {locProfile.country}</div>
+            <div className="num mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-[11.5px] md:grid-cols-5">
+              <span>Lohnniveau ×{locProfile.payrollIndex.toLocaleString('de-DE')}</span>
+              <span>Talentpool {pct(locProfile.talentPool, 0)}</span>
+              <span>Steuer {pct(locProfile.taxRate, 0)}</span>
+              <span>Regulierung: {locProfile.regulationDensity}</span>
+              <span>Büro {eur(locProfile.officeCostPerEmployeeMonthly, false)}/MA/M</span>
+            </div>
+          </div>
         </div>
       )}
 
@@ -277,7 +280,7 @@ export function WizardView() {
           <div className="panel space-y-1.5 p-4 text-xs">
             <div><span className="text-dim">Szenario: </span>{SCENARIOS.find((s) => s.id === scenarioId)?.title}</div>
             <div><span className="text-dim">Schwierigkeit: </span>{DIFFICULTIES[difficulty].nameDe}</div>
-            <div><span className="text-dim">Unternehmen: </span>{logoEmoji} {companyName} · {LOCATIONS[locationId].nameDe}</div>
+            <div><span className="text-dim">Unternehmen: </span>{logoEmoji} {companyName} · {locProfile.nameDe}</div>
             <div><span className="text-dim">Werte: </span>{values.join(' · ')}</div>
             <div><span className="text-dim">Motto: </span>„{motto}"</div>
             <div><span className="text-dim">CEO: </span>{ceoName}</div>
@@ -307,6 +310,99 @@ export function WizardView() {
           </button>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Standort-Karte (Phase 7) ──────────────────────────────────────────
+// Redaktioneller Karten-Look: Punktraster-Gitter statt Fake-Küstenlinien,
+// Europa als Zoom (dichteste Städteliste) + Welt daneben.
+const CITY_COORDS: Record<string, { x: number; y: number; eu?: boolean }> = {
+  // Europa-Zoom: viewBox 0 0 400 300 (ca. 10°W–25°O / 62°N–36°N)
+  london: { x: 105, y: 92, eu: true },
+  amsterdam: { x: 162, y: 78, eu: true },
+  hamburg: { x: 196, y: 62, eu: true },
+  berlin: { x: 232, y: 76, eu: true },
+  warschau: { x: 300, y: 84, eu: true },
+  koeln: { x: 172, y: 96, eu: true },
+  frankfurt: { x: 188, y: 110, eu: true },
+  paris: { x: 132, y: 118, eu: true },
+  muenchen: { x: 214, y: 128, eu: true },
+  wien: { x: 262, y: 122, eu: true },
+  zuerich: { x: 190, y: 134, eu: true },
+  stockholm: { x: 262, y: 30, eu: true },
+  lissabon: { x: 42, y: 208, eu: true },
+  // Welt: viewBox 0 0 500 260 (equirektangular grob)
+  newyork: { x: 147, y: 92 },
+  austin: { x: 114, y: 112 },
+  telaviv: { x: 298, y: 105 },
+  bangalore: { x: 358, y: 138 },
+  singapur: { x: 394, y: 160 },
+};
+
+function CityMap({ selected, onSelect }: { selected: LocationProfile; onSelect: (p: LocationProfile) => void }) {
+  const euCities = CITY_PRESETS.filter((c) => CITY_COORDS[c.id]?.eu);
+  const worldCities = CITY_PRESETS.filter((c) => CITY_COORDS[c.id] && !CITY_COORDS[c.id]!.eu);
+  return (
+    <div className="grid gap-3 md:grid-cols-[3fr_2fr]">
+      <MapPanel titleDe="Europa" viewW={400} viewH={300} cities={euCities} selected={selected} onSelect={onSelect} labelAll />
+      <MapPanel titleDe="Welt" viewW={500} viewH={260} cities={worldCities} selected={selected} onSelect={onSelect} labelAll />
+    </div>
+  );
+}
+
+function MapPanel({ titleDe, viewW, viewH, cities, selected, onSelect, labelAll }: {
+  titleDe: string; viewW: number; viewH: number; cities: LocationProfile[];
+  selected: LocationProfile; onSelect: (p: LocationProfile) => void; labelAll?: boolean;
+}) {
+  const grid: React.ReactNode[] = [];
+  for (let gx = 20; gx < viewW; gx += 40) grid.push(<line key={'v' + gx} x1={gx} y1={0} x2={gx} y2={viewH} stroke="#e7e3da" strokeWidth="0.7" strokeDasharray="1 5" />);
+  for (let gy = 20; gy < viewH; gy += 40) grid.push(<line key={'h' + gy} x1={0} y1={gy} x2={viewW} y2={gy} stroke="#e7e3da" strokeWidth="0.7" strokeDasharray="1 5" />);
+  return (
+    <div className="panel p-2">
+      <div className="kicker px-1 pb-1 text-[9px]">{titleDe}</div>
+      <svg viewBox={`0 0 ${viewW} ${viewH}`} className="block w-full" style={{ background: '#fffdf8' }}>
+        {grid}
+        {cities.map((c) => {
+          const pos = CITY_COORDS[c.id]!;
+          const active = selected.id === c.id;
+          return (
+            <g key={c.id} className="cursor-pointer" onClick={() => onSelect(c)}>
+              {/* großzügige unsichtbare Klickfläche */}
+              <circle cx={pos.x} cy={pos.y} r={14} fill="transparent" />
+              {active && <circle cx={pos.x} cy={pos.y} r={9} fill="none" stroke="#2f7f79" strokeWidth="1.5" />}
+              <circle cx={pos.x} cy={pos.y} r={active ? 5 : 3.5} fill={active ? '#2f7f79' : '#171a1c'} />
+              {(labelAll || active) && (
+                <text x={pos.x + 9} y={pos.y + 3.5} fontSize={11} fontFamily="Spline Sans Mono" fill={active ? '#2f7f79' : '#6b7178'}>
+                  {c.nameDe}
+                </text>
+              )}
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+/** Freie Stadt: Analyst schätzt ein deterministisches Profil. */
+function FreeCityInput({ onSelect }: { onSelect: (p: LocationProfile) => void }) {
+  const [city, setCity] = useState('');
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        className="input max-w-xs"
+        placeholder="Andere Stadt … (z. B. „Tokio“, „Kapstadt“, „Leipzig“)"
+        value={city}
+        maxLength={40}
+        onChange={(e) => setCity(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && city.trim().length >= 2) onSelect(profileForCity(city));
+        }}
+      />
+      <button className="btn" disabled={city.trim().length < 2} onClick={() => onSelect(profileForCity(city))}>
+        🧭 Standort-Analyst schätzen lassen
+      </button>
     </div>
   );
 }

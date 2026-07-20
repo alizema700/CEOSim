@@ -21,14 +21,22 @@ export interface CompanyIdentity {
   /** 2–4 gewählte Unternehmenswerte (z. B. "Menschen zuerst"). */
   values: string[];
   motto: string;
-  locationId: LocationId;
+  /** Standort-Kennung: Preset-Stadt ODER freie Stadt (Phase 7: Weltkarte). */
+  locationId: string;
+  /**
+   * Aufgelöstes Standortprofil (Phase 7). Wird beim Spielstart fixiert —
+   * Presets aus der Städteliste, freie Städte deterministisch geschätzt.
+   * Optional nur wegen Alt-Spielständen; locationOf() hat Fallback.
+   */
+  location?: LocationProfile;
 }
 
+/** Historische Kern-Presets (Phase 1). Neue Städte laufen über CITY_PRESETS/frei. */
 export type LocationId = 'muenchen' | 'berlin' | 'zuerich' | 'austin';
 
 /** Standort-Parameter — beeinflussen Payroll, Hiring, Steuern, Bürokosten. */
 export interface LocationProfile {
-  id: LocationId;
+  id: string;
   nameDe: string;
   country: string;
   /** Multiplikator auf Basisgehälter (1.0 = Referenz München). */

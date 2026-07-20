@@ -61,6 +61,8 @@ export interface PersonaResolved {
   roleDe: string;
   systemDe: string;
   fallbackDe: string;
+  /** Optionaler Fallback-Pool (Phase 7): rotiert pro Gesprächsrunde, damit Offline-Antworten nicht identisch klingen. */
+  fallbackPoolDe?: string[];
   execId: string | null;
 }
 
@@ -98,7 +100,54 @@ export function resolvePersona(state: CompanyState, threadKey: string): PersonaR
   }
   const exec = state.people.executives.find((e) => 'dm:' + e.id === threadKey);
   if (exec) return execPersona(state, exec);
+  // Phase 7: JEDE Mitarbeiter:in ist ansprechbar — Persona aus dem Steckbrief.
+  const emp = state.people.employees.find((e) => 'dm:' + e.id === threadKey);
+  if (emp) return employeePersona(state, emp);
   return null;
+}
+
+/** Chat-Persona für normale Mitarbeitende — Ton aus Steckbrief + Stimmung. */
+function employeePersona(state: CompanyState, emp: CompanyState['people']['employees'][number]): PersonaResolved {
+  const name = `${emp.firstName} ${emp.lastName}`;
+  const mood = emp.satisfaction < 40 ? 'frustriert und vorsichtig' : emp.satisfaction < 60 ? 'neutral bis abwartend' : 'motiviert und offen';
+  const tenureYears = Math.max(0, (state.meta.week - emp.hiredWeek) / 52).toFixed(1);
+  return {
+    name,
+    roleDe: emp.roleTitleDe,
+    execId: null,
+    systemDe: `Du bist ${name} (${emp.age}), ${emp.roleTitleDe} in der Abteilung ${emp.dept} eines Unternehmens-Simulators (CEO-Training). Persönlichkeit: ${emp.personalityDe}. Hobby: ${emp.hobbyDe}. Stärke: ${emp.strengthDe}. Betriebszugehörigkeit: ~${tenureYears} Jahre. Aktuelle Stimmung: ${mood} (Zufriedenheit ${Math.round(emp.satisfaction)}/100). Der CEO schreibt dir direkt — das ist für dich ${emp.satisfaction < 50 ? 'eher ungewohnt, du bleibst höflich-distanziert' : 'okay, du freust dich über das Interesse'}. Sprich aus DEINER Arbeitsebene (konkrete Alltagsbeobachtungen, keine Vorstandsperspektive), auf Deutsch, per Du, max. 90 Wörter, IN DEINEM CHARAKTER. Erfinde keine Firmen-Zahlen — nutze nur das Lagebild. Über Gehalt sprichst du ehrlich, aber ohne Forderungskatalog.`,
+    fallbackDe: `Danke, dass du fragst! Bei uns in ${emp.dept} ist gerade gut zu tun. Wenn du Details brauchst, sag Bescheid.`,
+    fallbackPoolDe: employeeFallbacks(emp, mood),
+  };
+}
+
+function employeeFallbacks(emp: CompanyState['people']['employees'][number], mood: string): string[] {
+  const dept: Record<string, string[]> = {
+    engineering: [
+      `Kurzer Stand von mir: Der Sprint läuft, aber die Altlasten im Code bremsen uns mehr, als man von außen sieht. Wenn du einmal mit reinschauen willst — jederzeit.`,
+      `Ehrlich? ${mood.startsWith('frustriert') ? 'Die Stimmung war schon besser. Zu viele Baustellen parallel.' : 'Läuft ordentlich gerade.'} Was mir helfen würde: weniger Kontextwechsel, mehr Fokuszeit.`,
+      `Schön, dass du direkt fragst. Aus Engineering-Sicht: Deploy-Zeiten sind unser größter Zeitfresser. Mein Hobby (${emp.hobbyDe}) hält mich derweil geerdet. 🙂`,
+    ],
+    sales: [
+      `Pipeline-Gefühl von der Front: Interessenten gibt es, aber die Abschlüsse ziehen sich. Zwei, drei gute Referenzkunden würden Wunder wirken.`,
+      `Danke der Nachfrage! ${mood.startsWith('motiviert') ? 'Ich bin heiß auf das Quartal.' : 'Ich kämpfe mich durch, ehrlich gesagt.'} Wenn du mal bei einem Kundentermin dabei sein willst — Türen auf.`,
+      `Direkt von der Vertriebsfront: Der Wettbewerb ist laut geworden. Uns hilft jedes Argument aus dem Produkt. Sag mir, was ich versprechen darf — und was nicht.`,
+    ],
+    marketing: [
+      `Kampagnen laufen, aber ohne größeres Budget bleibt es Handarbeit. Eine echte Kundenstory würde mehr bringen als drei Anzeigen.`,
+      `Schön, von dir zu hören! Content-Plan steht, die Leads kommen ${mood.startsWith('frustriert') ? 'zäher als geplant' : 'ganz ordentlich'}. Feedback jederzeit willkommen.`,
+    ],
+    cs: [
+      `Vom Support-Radar: Die Ticket-Themen wiederholen sich — Onboarding und zwei alte Bugs. Wenn Engineering da Zeit findet, wird es spürbar ruhiger.`,
+      `Danke fürs Fragen! Die Kunden sind ${mood.startsWith('motiviert') ? 'überwiegend zufrieden' : 'gemischter Stimmung'}, aber Antwortzeiten sind unser Engpass. Jede zusätzliche Hand hilft.`,
+    ],
+    ga: [
+      `Aus dem Backoffice: Rechnungen, Verträge, Ablage — unspektakulär, aber im Griff. Zwei Prozesse würde ich gern automatisieren, wenn ich darf.`,
+      `Alles im Rahmen bei mir. ${mood.startsWith('frustriert') ? 'Etwas viel auf einmal gerade, ehrlich gesagt.' : 'Die Zahlen sind gepflegt, die Ordner sortiert.'} Was brauchst du?`,
+    ],
+  };
+  const pool = dept[emp.dept] ?? dept.ga!;
+  return pool.map((t) => t + ' (Offline-Modus: Mit API-Key antworte ich frei in meinem Charakter.)');
 }
 
 function execPersona(state: CompanyState, exec: Executive): PersonaResolved {
@@ -139,6 +188,10 @@ export async function personaReply(
 
   const res = await llmJson('persona-chat', persona.systemDe, user, zPersonaReply, 800);
   if (res) return { text: res.replyDe, relationshipDelta: res.relationshipDelta };
+  // Offline: aus dem Fallback-Pool rotieren, damit Wiederholungen nicht identisch klingen.
+  if (persona.fallbackPoolDe && persona.fallbackPoolDe.length > 0) {
+    return { text: persona.fallbackPoolDe[history.length % persona.fallbackPoolDe.length]!, relationshipDelta: 0 };
+  }
   return { text: persona.fallbackDe, relationshipDelta: 0 };
 }
 

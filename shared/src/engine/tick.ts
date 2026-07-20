@@ -12,10 +12,11 @@ import { EMPLOYER_COST_FACTOR } from '../types/people.js';
 import type { Alert, Occurrence, WeekReport } from '../types/game.js';
 import type { EffectPayload } from '../types/effects.js';
 import { gaussian, intBetween, stream } from './rng.js';
-import { personName, ROLE_TITLES } from './names.js';
-import { LOCATIONS } from './scenarios/locations.js';
+
+import { personaBits, personName, ROLE_TITLES } from './names.js';
 import {
   avgSatisfaction,
+  locationOf,
   cohortMrr,
   currentVelocity,
   headcount,
@@ -168,26 +169,30 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
   switch (fx.kind) {
     case 'HIRES_ARRIVE': {
       const rng = stream(state.meta.seed, 'hire', week, state.idCounter);
-      const loc = LOCATIONS[state.identity.locationId];
-      const SAL: Record<string, number> = { junior: 3900, mid: 5100, senior: 6600, lead: 8200 };
+      const loc = locationOf(state);
+      const SAL: Record<string, number> = { werkstudent: 1650, junior: 3900, mid: 5100, senior: 6600, lead: 8200 };
       for (let i = 0; i < fx.count; i++) {
         const { firstName, lastName } = personName(rng);
+        const specialist = fx.specialistRoleDe?.trim();
         state.people.employees.push({
           id: nextId(state, 'emp'),
           firstName, lastName,
           dept: fx.dept,
-          roleTitleDe: ROLE_TITLES[fx.dept]?.[fx.seniority] ?? 'Mitarbeiter:in',
+          roleTitleDe: specialist || (ROLE_TITLES[fx.dept]?.[fx.seniority] ?? 'Mitarbeiter:in'),
           seniority: fx.seniority,
-          salaryMonthly: Math.round(SAL[fx.seniority]! * loc.payrollIndex * gaussian(rng, 1, 0.04)),
-          performance: Math.round(gaussian(rng, 70, 10)),
+          // Spezialrollen (Quant, ML, Kryptographie …) kosten ~15 % Aufschlag.
+          salaryMonthly: Math.round(SAL[fx.seniority]! * (specialist ? 1.15 : 1) * loc.payrollIndex * gaussian(rng, 1, 0.04)),
+          performance: Math.round(gaussian(rng, fx.seniority === 'werkstudent' ? 58 : 70, 10) + (specialist ? 4 : 0)),
           satisfaction: 72,
-          attritionRiskWeekly: 0.0035,
+          // Werkstudierende fluktuieren stärker (Studienende, Praktikawechsel).
+          attritionRiskWeekly: fx.seniority === 'werkstudent' ? 0.007 : 0.0035,
           keyPerson: false,
           hiredWeek: week,
-          rampWeeksRemaining: 6,
+          rampWeeksRemaining: fx.seniority === 'werkstudent' ? 3 : 6,
+          ...personaBits(rng, fx.seniority),
         });
         ledger.oneOffsPaid += fx.costPerHire;
-        occ.push({ icon: '👋', textDe: `${firstName} ${lastName} startet in ${deptDe(fx.dept)} (${fx.seniority}).`, severity: 'good' });
+        occ.push({ icon: '👋', textDe: `${firstName} ${lastName} startet als ${specialist || (ROLE_TITLES[fx.dept]?.[fx.seniority] ?? fx.seniority)} in ${deptDe(fx.dept)}.`, severity: 'good' });
       }
       break;
     }
@@ -356,6 +361,27 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
     case 'MA_INTEGRATION':
       applyMaIntegration(state, fx.targetId, occ);
       break;
+    case 'EMPLOYEE_RAISE': {
+      const e = state.people.employees.find((x) => x.id === fx.employeeId);
+      if (e) {
+        e.salaryMonthly = Math.round(e.salaryMonthly * (1 + fx.pct));
+        e.satisfaction = clamp(e.satisfaction + 10 + fx.pct * 40, 0, 100);
+        e.attritionRiskWeekly = Math.max(0.0015, e.attritionRiskWeekly * 0.8);
+        occ.push({ icon: '💶', textDe: `${e.firstName} ${e.lastName}: Gehalt +${(fx.pct * 100).toFixed(0)} % — Bindung und Stimmung steigen.`, severity: 'good' });
+        // Neid-Effekt: große Sprünge sprechen sich in der Abteilung herum.
+        if (fx.pct > 0.12) {
+          for (const k of state.people.employees) {
+            if (k.dept === e.dept && k.id !== e.id) k.satisfaction = clamp(k.satisfaction - 2, 0, 100);
+          }
+          occ.push({ icon: '🗣️', textDe: `Die Erhöhung von ${e.firstName} ${e.lastName} spricht sich in ${deptDe(e.dept)} herum — Kolleg:innen rechnen nach.`, severity: 'warn' });
+        }
+      }
+      break;
+    }
+    case 'CEO_SALARY_SET':
+      state.ceo.salaryMonthly = fx.monthlyAmount;
+      occ.push({ icon: '🏛️', textDe: `Aufsichtsrat wirksam: CEO-Vergütung jetzt ${k(fx.monthlyAmount)}/Monat.`, severity: 'info' });
+      break;
     case 'IPO_LISTING': {
       // Bruttoerlös über CFF (Ledger), Fees als Einmalaufwand durch die GuV,
       // Einlage ins Eigenkapital — Bilanz-Identität hält konstruktionsbedingt.
@@ -379,7 +405,7 @@ function tickPeople(state: CompanyState, ledger: Ledger, occ: Occurrence[]): voi
       state.people.openRequisitions = state.people.openRequisitions.filter((r) => r.id !== req.id);
       applyEffect(
         state,
-        { kind: 'HIRES_ARRIVE', dept: req.dept, seniority: req.seniority, count: req.count, costPerHire: req.costPerHire },
+        { kind: 'HIRES_ARRIVE', dept: req.dept, seniority: req.seniority, count: req.count, costPerHire: req.costPerHire, specialistRoleDe: req.specialistRoleDe },
         `Ausschreibung W${req.openedWeek}`,
         ledger,
         occ,
@@ -645,8 +671,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   const ebitda = grossProfit - opexTotal;
   const ebt = ebitda - ledger.oneOffsPaid - ledger.interestPaid;
   // Steuern nur auf positives Ergebnis UND wenn Verlustvorträge aufgebraucht (vereinfachtes Modell).
-  const loc = LOCATIONS[state.identity.locationId];
-  const tax = ebt > 0 && f.retainedEarnings > 0 ? ebt * loc.taxRate : 0;
+  const tax = ebt > 0 && f.retainedEarnings > 0 ? ebt * locationOf(state).taxRate : 0;
   ledger.taxPaid = tax;
   const netIncome = ebt - tax;
 

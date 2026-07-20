@@ -228,6 +228,33 @@ function gradeProcess(state: CompanyState, d: DecisionRecord): Grade {
       reasons.push('Erst prüfen, dann kaufen: Due Diligence ist gekaufte Information — die billigste Versicherung im M&A-Geschäft.');
       break;
     }
+    case 'ADJUST_EMPLOYEE_SALARY': {
+      const emp = state.people.employees.find((e) => e.id === (d.action as { employeeId: string }).employeeId);
+      if (emp?.keyPerson) {
+        timing += 10; risk += 10;
+        reasons.push('Gezielte Bindung einer Schlüsselperson — deutlich billiger als ihr Abgang (Wissensverlust, Nachbesetzung, Velocity).');
+      }
+      if (d.action.pct > 0.15) {
+        risk -= 10;
+        reasons.push('Sehr großer Einzelsprung: löst Nachzieh-Erwartungen in der Abteilung aus — die wahren Kosten sind höher als die eine Erhöhung.');
+      }
+      break;
+    }
+    case 'SET_CEO_SALARY': {
+      const raising = !d.summaryDe.includes('gesenkt');
+      if (d.summaryDe.includes('gesenkt')) {
+        values += 20; comms += 10;
+        reasons.push('Eigenes Gehalt zuerst: Verzicht des CEO ist das glaubwürdigste Sparsignal, das es gibt.');
+      } else if (raising && runwayAtDecision < 30) {
+        values -= 15; timing -= 15;
+        reasons.push('Eigene Erhöhung bei knappem Runway: Selbst wenn der Aufsichtsrat zustimmt — das Team rechnet mit.');
+      }
+      if (d.summaryDe.includes('LEHNT AB')) {
+        info -= 10;
+        reasons.push('Ein absehbar chancenloser Antrag beim Aufsichtsrat kostet Vertrauen — Gremien-Timing gehört zum Handwerk.');
+      }
+      break;
+    }
     case 'IPO_SELECT_BANK': {
       if (runwayAtDecision > 40) {
         timing += 15;
@@ -345,6 +372,10 @@ function applySkillGains(state: CompanyState, d: DecisionRecord, grade: Grade): 
     case 'IPO_SELECT_BANK': case 'IPO_PRICE':
       s.finanzen = clamp(s.finanzen + gain, 0, 100);
       s.governance = clamp(s.governance + gain * 0.7, 0, 100); break;
+    case 'ADJUST_EMPLOYEE_SALARY':
+      s.leadership = clamp(s.leadership + gain, 0, 100); break;
+    case 'SET_CEO_SALARY':
+      s.governance = clamp(s.governance + gain, 0, 100); break;
     default: break;
   }
   // Werte-Konsistenz zahlt auf Governance ein.

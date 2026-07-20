@@ -39,6 +39,12 @@ export interface Employee {
   hiredWeek: WeekIndex;
   /** Wochen bis volle Produktivität nach Einstellung. */
   rampWeeksRemaining: number;
+  /** ── Steckbrief (Phase 7): jede Person ist ein Mensch ── */
+  age: number;
+  /** Kurzcharakteristik — steuert auch den Ton der Chat-Persona. */
+  personalityDe: string;
+  hobbyDe: string;
+  strengthDe: string;
 }
 
 /** Führungskraft = Employee-Verweis + Persona-Daten für die LLM-Ebene. */
@@ -67,6 +73,8 @@ export interface Requisition {
   dept: Department;
   seniority: Seniority;
   count: number;
+  /** Freie Spezialrolle (Phase 7), z. B. „Quant", „Machine-Learning-Ingenieurin". */
+  specialistRoleDe?: string;
   openedWeek: WeekIndex;
   /** Erwartete Restwochen bis Besetzung (sinkt wöchentlich, moduliert durch Arbeitsmarkt-Reputation & Talentpool). */
   expectedWeeksToFill: number;

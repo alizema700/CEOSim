@@ -1,4 +1,4 @@
-import { generateMaTargets, initialIpoState, type CompanyState } from '@boardroom/shared';
+import { fnv1a, generateMaTargets, initialIpoState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
 
 /**
  * Sanfte Snapshot-Migration: füllt Felder auf, die neuere Engine-Versionen
@@ -31,5 +31,14 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   if (!s.market.maTargets) s.market.maTargets = generateMaTargets(s.meta.seed, s);
   // Phase 6: IPO-Prozess
   if (!s.ipo) s.ipo = initialIpoState();
+  // Phase 7: Steckbrief-Felder (deterministisch aus der Personal-ID) + Standortprofil
+  for (const e of s.people.employees) {
+    if (typeof e.age !== 'number') {
+      Object.assign(e, personaBits(stream(s.meta.seed, 'persona-migrate', 0, fnv1a(e.id)), e.seniority));
+    }
+  }
+  if (!s.identity.location) {
+    s.identity.location = resolveLocationProfile(s.identity.locationId);
+  }
   return state;
 }

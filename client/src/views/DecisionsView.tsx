@@ -14,7 +14,7 @@ import { eur } from '../format.js';
  */
 
 const DEPTS: Department[] = ['engineering', 'sales', 'marketing', 'cs', 'ga'];
-const SENIORITIES: Seniority[] = ['junior', 'mid', 'senior', 'lead'];
+const SENIORITIES: Seniority[] = ['werkstudent', 'junior', 'mid', 'senior', 'lead'];
 
 export function DecisionsView() {
   const { state, act, busy, hypothesisMode, lastDecision } = useStore();
@@ -164,6 +164,7 @@ function HiringCard({ onSubmit, busy }: { onSubmit: SubmitFn; busy: boolean }) {
   const [dept, setDept] = useState<Department>('engineering');
   const [seniority, setSeniority] = useState<Seniority>('mid');
   const [count, setCount] = useState(1);
+  const [specialist, setSpecialist] = useState('');
   return (
     <Panel title="👋 Einstellen">
       <p className="mb-2 text-[11px] text-dim">Time-to-Fill hängt an Arbeitsmarkt-Reputation & Standort-Talentpool. Kosten erst ab Besetzung.</p>
@@ -175,11 +176,23 @@ function HiringCard({ onSubmit, busy }: { onSubmit: SubmitFn; busy: boolean }) {
           {SENIORITIES.map((s) => <option key={s} value={s}>{s}</option>)}
         </select>
       </div>
-      <div className="mb-3 flex items-center gap-2">
+      <div className="mb-2 flex items-center gap-2">
         <span className="text-xs text-dim">Anzahl</span>
         <input className="input w-20" type="number" min={1} max={10} value={count} onChange={(e) => setCount(Number(e.target.value))} />
       </div>
-      <button className="btn w-full" disabled={busy} onClick={() => void onSubmit({ type: 'START_HIRING', dept, seniority, count })}>
+      <input
+        className="input mb-1"
+        placeholder="Spezialrolle (optional): „Quant“, „ML-Ingenieurin“, „Kryptograph“ …"
+        value={specialist}
+        maxLength={40}
+        onChange={(e) => setSpecialist(e.target.value)}
+      />
+      <p className="mb-3 text-[10px] text-dim">Spezialrollen: ~+15 % Gehalt, +2 Wochen Suche — dafür Profil-Titel & etwas stärkere Performance. Werkstudent:innen: günstig, aber höhere Fluktuation.</p>
+      <button
+        className="btn w-full"
+        disabled={busy}
+        onClick={() => void onSubmit({ type: 'START_HIRING', dept, seniority, count, ...(specialist.trim().length >= 3 ? { specialistRoleDe: specialist.trim() } : {}) })}
+      >
         Stelle(n) ausschreiben
       </button>
     </Panel>

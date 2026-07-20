@@ -47,7 +47,8 @@ export const DEPARTMENTS: readonly Department[] = [
   'ga',
 ] as const;
 
-export type Seniority = 'junior' | 'mid' | 'senior' | 'lead';
+/** 'werkstudent' = HiWi/Werkstudierende: günstig, Teilzeit-Produktivität, höhere Fluktuation (Studienende). */
+export type Seniority = 'werkstudent' | 'junior' | 'mid' | 'senior' | 'lead';
 
 /** Reputations-Dimensionen — jede beeinflusst andere Subsysteme. */
 export type ReputationDimension = 'customers' | 'press' | 'laborMarket' | 'investors';

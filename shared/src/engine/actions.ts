@@ -8,6 +8,7 @@ import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
 import { clampClassification, startProject } from './projects.js';
+import { stream } from './rng.js';
 import { buildRound, generateTermSheets, validateTermSheet, validateVentureDebt, applyVentureDebtTerms } from './funding.js';
 import { maTarget } from './ma.js';
 import { IPO_BANKS, ipoBank, ipoEligibility, subscriptionRatioFor } from './ipo.js';
@@ -173,6 +174,31 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       if (f.cash < IPO_PREP_COST * 2) errors.push(`Prospekt, Audit & Anwälte kosten ~${fmt(IPO_PREP_COST)} — dafür ist die Kasse zu knapp.`);
       break;
     }
+    case 'ADJUST_EMPLOYEE_SALARY': {
+      const emp = state.people.employees.find((e) => e.id === action.employeeId);
+      if (!emp) errors.push('Mitarbeiter:in nicht (mehr) im Unternehmen.');
+      if (action.pct < 0.01 || action.pct > 0.25) errors.push('Individuelle Erhöhung: 1–25 %.');
+      if (action.pct > 0.15) warnings.push('Über 15 % sprechen sich herum — Kolleg:innen mit ähnlicher Rolle werden nachziehen wollen (Neid-Effekt).');
+      if (runwayWeeks(state) < 16) warnings.push('Gehaltserhöhungen bei unter 16 Wochen Runway senden ein gemischtes Signal.');
+      break;
+    }
+    case 'SET_CEO_SALARY': {
+      if (action.monthlyAmount < 8_000 || action.monthlyAmount > 45_000) errors.push('CEO-Gehalt: 8–45 k€/Monat (Marktband dieser Unternehmensgröße).');
+      if (action.monthlyAmount > state.ceo.salaryMonthly && runwayWeeks(state) < 13) {
+        errors.push('Mitten in der Liquiditätskrise setzt der Aufsichtsrat dafür nicht einmal eine Sitzung an.');
+      }
+      if (action.monthlyAmount > state.ceo.salaryMonthly * 1.2) {
+        warnings.push('Mehr als +20 % auf einmal: Das Board wird fragen, welcher Meilenstein das rechtfertigt.');
+      }
+      break;
+    }
+    case 'CREATE_APPOINTMENT': {
+      if (action.titleDe.trim().length < 3 || action.titleDe.length > 80) errors.push('Titel: 3–80 Zeichen.');
+      if (action.week < state.meta.week || action.week > state.meta.week + 12) errors.push('Termine nur in dieser bis +12 Wochen.');
+      if (!Number.isInteger(action.weekday) || action.weekday < 0 || action.weekday > 4) errors.push('Wochentag: Montag–Freitag.');
+      if (action.agendaDe.length > 5 || action.agendaDe.some((a) => a.length > 120)) errors.push('Max. 5 Agenda-Punkte à 120 Zeichen.');
+      break;
+    }
     case 'IPO_PRICE': {
       const ipo = state.ipo;
       if (ipo.status !== 'roadshow') errors.push('Pricing ist nur während der Roadshow möglich.');
@@ -237,20 +263,28 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       break;
     }
     case 'START_HIRING': {
-      const baseFill = { junior: 5, mid: 7, senior: 10, lead: 13 }[action.seniority];
+      const baseFill = { werkstudent: 3, junior: 5, mid: 7, senior: 10, lead: 13 }[action.seniority];
+      const specialist = action.specialistRoleDe?.trim().slice(0, 40) || undefined;
+      // Spezialrollen sind rarer am Markt: +2 Wochen Suchzeit.
       const repFactor = 1 + (55 - state.reputation.laborMarket) / 100;
+      const fill = Math.max(2, Math.round(baseFill * repFactor) + (specialist ? 2 : 0));
       state.people.openRequisitions.push({
         id: nextId(state, 'req'),
         dept: action.dept,
         seniority: action.seniority,
         count: action.count,
+        specialistRoleDe: specialist,
         openedWeek: week,
-        expectedWeeksToFill: Math.max(2, Math.round(baseFill * repFactor)),
-        costPerHire: action.seniority === 'lead' ? 18_000 : action.seniority === 'senior' ? 12_000 : 7_000,
+        expectedWeeksToFill: fill,
+        costPerHire: action.seniority === 'lead' ? 18_000 : action.seniority === 'senior' ? 12_000 : action.seniority === 'werkstudent' ? 1_500 : 7_000,
       });
-      summary = `${action.count}× ${action.seniority} in ${deptDe(action.dept)} ausgeschrieben`;
-      analysis.push(`Time-to-Fill ≈ ${Math.max(2, Math.round(baseFill * repFactor))} Wochen (Arbeitsmarkt-Reputation ${state.reputation.laborMarket}/100 wirkt als Faktor ${repFactor.toFixed(2)}).`);
-      analysis.push('Kosten entstehen erst bei Besetzung: Recruiting-Fee einmalig, danach laufende Payroll mit ~6 Wochen Einarbeitung (50 % Produktivität).');
+      summary = `${action.count}× ${specialist ?? action.seniority} in ${deptDe(action.dept)} ausgeschrieben`;
+      analysis.push(`Time-to-Fill ≈ ${fill} Wochen (Arbeitsmarkt-Reputation ${state.reputation.laborMarket}/100 wirkt als Faktor ${repFactor.toFixed(2)}${specialist ? '; Spezialrolle: +2 Wochen Suche, ~+15 % Gehalt' : ''}).`);
+      analysis.push(
+        action.seniority === 'werkstudent'
+          ? 'Werkstudierende: günstig und motiviert, aber geringere Kapazität und höhere Fluktuation (Studienende) — gut für Support-Spitzen, kein Ersatz für Senior-Erfahrung.'
+          : 'Kosten entstehen erst bei Besetzung: Recruiting-Fee einmalig, danach laufende Payroll mit ~6 Wochen Einarbeitung (50 % Produktivität).',
+      );
       break;
     }
     case 'LAYOFF': {
@@ -392,6 +426,72 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push('Realitäts-Check: Die meisten Übernahmen scheitern nicht am Kaufpreis, sondern an der Integration (vgl. Fall-Bibliothek: Daimler-Chrysler, HP/Autonomy).');
       break;
     }
+    case 'ADJUST_EMPLOYEE_SALARY': {
+      const emp = state.people.employees.find((e) => e.id === action.employeeId)!;
+      schedule(state, 0, `Gehaltsanpassung ${emp.firstName} ${emp.lastName} W${week}`, decisionId, {
+        kind: 'EMPLOYEE_RAISE', employeeId: action.employeeId, pct: action.pct,
+      });
+      summary = `Gehalt ${emp.firstName} ${emp.lastName} (${emp.roleTitleDe}): +${(action.pct * 100).toFixed(0)} %`;
+      analysis.push(`Neues Gehalt ab dieser Woche: ~${fmt(Math.round(emp.salaryMonthly * (1 + action.pct)))}/Monat (Arbeitgeberkosten ×1,22). Zufriedenheit und Bindung dieser Person steigen sofort.`);
+      if (action.pct > 0.12) analysis.push('Ab ~12 % spricht sich die Erhöhung in der Abteilung herum — rechne mit Nachzieh-Erwartungen.');
+      break;
+    }
+    case 'SET_CEO_SALARY': {
+      // Deterministische Aufsichtsrats-Entscheidung: Vertrauen + Lage + Sprunghöhe.
+      const current = state.ceo.salaryMonthly;
+      const raisePct = action.monthlyAmount / current - 1;
+      const rng = stream(state.meta.seed, 'ceo-salary', week);
+      if (raisePct <= 0) {
+        schedule(state, 0, `CEO-Vergütung W${week}`, decisionId, { kind: 'CEO_SALARY_SET', monthlyAmount: action.monthlyAmount });
+        summary = `CEO-Gehalt gesenkt: ${fmt(current)} → ${fmt(action.monthlyAmount)}/Monat`;
+        if (raisePct <= -0.1) {
+          state.ceo.boardTrust = Math.min(100, state.ceo.boardTrust + 2);
+          state.ceo.trustLog.push({ week, delta: 2, reasonDe: 'CEO verzichtet auf eigenes Gehalt — das Board registriert das Signal.' });
+          analysis.push('Gehaltsverzicht in der Krise ist ein starkes Signal nach innen und außen — das Board honoriert es (+2 Vertrauen).');
+        } else {
+          analysis.push('Der Aufsichtsrat winkt die Senkung ohne Diskussion durch.');
+        }
+      } else {
+        const threshold = 55 + raisePct * 120; // +10 % braucht ~67 Vertrauen, +25 % ~85
+        const jitter = (rng() - 0.5) * 8;
+        const approved = state.ceo.boardTrust + jitter >= threshold;
+        if (approved) {
+          schedule(state, 0, `CEO-Vergütung W${week}`, decisionId, { kind: 'CEO_SALARY_SET', monthlyAmount: action.monthlyAmount });
+          const grudge = runwayWeeks(state) < 40 ? Math.min(3, Math.round(raisePct * 12)) : 0;
+          if (grudge > 0) {
+            state.ceo.boardTrust = Math.max(0, state.ceo.boardTrust - grudge);
+            state.ceo.trustLog.push({ week, delta: -grudge, reasonDe: `Aufsichtsrat genehmigt CEO-Gehaltserhöhung (+${(raisePct * 100).toFixed(0)} %) — murrend, solange der Runway nicht komfortabel ist.` });
+          }
+          summary = `Aufsichtsrat GENEHMIGT: CEO-Gehalt ${fmt(current)} → ${fmt(action.monthlyAmount)}/Monat`;
+          analysis.push(`Der Vergütungsausschuss stimmt zu${grudge > 0 ? `, vermerkt aber Bedenken im Protokoll (−${grudge} Vertrauen)` : ''}. Wirksam ab dieser Woche.`);
+        } else {
+          state.ceo.boardTrust = Math.max(0, state.ceo.boardTrust - 2);
+          state.ceo.trustLog.push({ week, delta: -2, reasonDe: `Aufsichtsrat LEHNT CEO-Gehaltserhöhung ab (beantragt: +${(raisePct * 100).toFixed(0)} %).` });
+          summary = `Aufsichtsrat LEHNT AB: CEO-Gehalt bleibt bei ${fmt(current)}/Monat`;
+          analysis.push(`Begründung des Vergütungsausschusses: Bei ${Math.round(state.ceo.boardTrust)}/100 Vertrauen und aktueller Lage ist ein Sprung von +${(raisePct * 100).toFixed(0)} % nicht vermittelbar. Der Antrag selbst kostet Kapital (−2 Vertrauen) — Timing ist auch hier ein Hebel.`);
+        }
+      }
+      break;
+    }
+    case 'CREATE_APPOINTMENT': {
+      const execNames = state.people.executives.map((ex) => {
+        const emp = state.people.employees.find((e) => e.id === ex.employeeId);
+        return emp ? `${emp.firstName} ${emp.lastName}` : ex.role;
+      });
+      state.calendar.appointments.push({
+        id: nextId(state, 'apt'),
+        week: action.week,
+        weekday: action.weekday,
+        titleDe: action.titleDe.trim(),
+        kind: 'custom',
+        agendaDe: action.agendaDe.map((a) => a.trim()).filter(Boolean),
+        participants: [...execNames, state.people.assistant.name],
+        linkedEntityId: null,
+      });
+      summary = `Termin angesetzt: „${action.titleDe.trim()}“ (Woche ${action.week})`;
+      analysis.push('Der Termin steht im Kalender und ist dort als Meeting-Szene spielbar — das Führungsteam nimmt teil.');
+      break;
+    }
     case 'IPO_SELECT_BANK': {
       const bank = ipoBank(action.bankId);
       state.ipo.status = 'preparing';
@@ -441,7 +541,9 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     summaryDe: summary,
     hypothesis,
     immediateAnalysisDe: analysis,
-    evaluateAtWeek: week + 4,
+    // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
+    // Bewertungs-Pipeline — der Sentinel wird nie fällig.
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

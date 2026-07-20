@@ -54,6 +54,9 @@ interface BoardroomStore {
   /** Hochgeladenes Logo (Data-URL) des offenen Spielstands. */
   logoDataUrl: string | null;
 
+  /** Ziel-Thread für den Chat (z. B. aus dem Mitarbeiter-Steckbrief). */
+  chatThread: string | null;
+  openChatWith: (threadKey: string) => void;
   setLang: (l: Locale) => void;
   setLogoDataUrl: (d: string | null) => void;
   setView: (v: View) => void;
@@ -86,7 +89,9 @@ export const useStore = create<BoardroomStore>((set, get) => ({
   showBriefing: false,
   lang: getLocale(),
   logoDataUrl: null,
+  chatThread: null,
 
+  openChatWith: (chatThread) => set({ chatThread, view: 'chat' }),
   setLang: (lang) => {
     setLocale(lang);
     set({ lang });

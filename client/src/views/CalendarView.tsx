@@ -9,8 +9,13 @@ import { ThreadPane } from './ChatView.js';
  * mehreren Personas. Agenda-Vorschläge kommen von der Sekretärin (Engine).
  */
 export function CalendarView() {
-  const { state } = useStore();
+  const { state, act, busy } = useStore();
   const [openApt, setOpenApt] = useState<Appointment | null>(null);
+  const [creating, setCreating] = useState(false);
+  const [title, setTitle] = useState('');
+  const [inWeeks, setInWeeks] = useState(0);
+  const [weekday, setWeekday] = useState(2);
+  const [agenda, setAgenda] = useState('');
   if (!state) return null;
 
   const week = state.meta.week;
@@ -20,6 +25,12 @@ export function CalendarView() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-baseline justify-between">
+        <span className="kicker">Dein Kalender · Termine sind als Meeting-Szene spielbar</span>
+        <button className="btn-primary" onClick={() => setCreating(true)} disabled={state.meta.status !== 'active'}>
+          + Eigenen Termin ansetzen
+        </button>
+      </div>
       {weeks.map((w) => {
         const appts = state.calendar.appointments.filter((a) => a.week === w);
         return (
@@ -51,9 +62,64 @@ export function CalendarView() {
         );
       })}
       <p className="text-[10px] text-dim">
-        Termine entstehen automatisch: Leadership-Sync (wöchentlich), Board-Call (quartalsweise), Renewal-Gespräche (vor
-        Key-Account-Verlängerungen). Verschieben/Absagen über {state.people.assistant.name} (Chat) — Phase 2.1.
+        Termine entstehen automatisch (Leadership-Sync, Board-Call, Renewals, Earnings-Calls) — oder du setzt eigene an:
+        „+ Eigenen Termin" oben rechts. Das Führungsteam nimmt teil.
       </p>
+
+      {creating && (
+        <Modal title="Eigenen Termin ansetzen" onClose={() => setCreating(false)}>
+          <div className="space-y-3">
+            <div>
+              <label className="kicker mb-1 block text-[9.5px]">Titel *</label>
+              <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} maxLength={80} placeholder="z. B. „Strategie-Offsite: Pricing 2027“" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="kicker mb-1 block text-[9.5px]">Woche</label>
+                <select className="input" value={inWeeks} onChange={(e) => setInWeeks(Number(e.target.value))}>
+                  {[0, 1, 2, 3, 4, 5, 6, 7, 8].map((w) => (
+                    <option key={w} value={w}>{w === 0 ? `Diese Woche (W${week})` : `In ${w} Woche(n) (W${week + w})`}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="kicker mb-1 block text-[9.5px]">Wochentag</label>
+                <select className="input" value={weekday} onChange={(e) => setWeekday(Number(e.target.value))}>
+                  {days.map((d, i) => <option key={d} value={i}>{d}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="kicker mb-1 block text-[9.5px]">Agenda (eine Zeile pro Punkt, max. 5)</label>
+              <textarea className="input h-20 resize-none" value={agenda} onChange={(e) => setAgenda(e.target.value)} placeholder={'Pricing-Optionen durchgehen\nEntscheidungsvorlage fürs Board'} />
+            </div>
+            <div className="flex justify-end gap-2">
+              <button className="btn" onClick={() => setCreating(false)}>Abbrechen</button>
+              <button
+                className="btn-primary"
+                disabled={busy || title.trim().length < 3}
+                onClick={() => {
+                  setCreating(false);
+                  void act(
+                    {
+                      type: 'CREATE_APPOINTMENT',
+                      titleDe: title.trim(),
+                      week: week + inWeeks,
+                      weekday,
+                      agendaDe: agenda.split('\n').map((a) => a.trim()).filter(Boolean).slice(0, 5),
+                    },
+                    null,
+                  );
+                  setTitle('');
+                  setAgenda('');
+                }}
+              >
+                Termin ansetzen
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {openApt && (
         <Modal title={`${openApt.titleDe} · Woche ${openApt.week}`} onClose={() => setOpenApt(null)} wide>

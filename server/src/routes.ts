@@ -33,11 +33,11 @@ import { getLogo, quarterlyReportPdf, saveLogo } from './pdf.js';
 
 const zMoney = z.number().finite();
 const zDept = z.enum(['engineering', 'sales', 'marketing', 'cs', 'ga']);
-const zSeniority = z.enum(['junior', 'mid', 'senior', 'lead']);
+const zSeniority = z.enum(['werkstudent', 'junior', 'mid', 'senior', 'lead']);
 
 const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('PRICE_CHANGE'), pct: z.number().min(-0.5).max(0.5), applyToExisting: z.boolean() }),
-  z.object({ type: z.literal('START_HIRING'), dept: zDept, seniority: zSeniority, count: z.number().int().min(1).max(20) }),
+  z.object({ type: z.literal('START_HIRING'), dept: zDept, seniority: zSeniority, count: z.number().int().min(1).max(20), specialistRoleDe: z.string().min(3).max(40).optional() }),
   z.object({ type: z.literal('LAYOFF'), dept: zDept, count: z.number().int().min(1).max(50), generousSeverance: z.boolean() }),
   z.object({ type: z.literal('SET_MARKETING_BUDGET'), monthlyAmount: zMoney.min(0) }),
   z.object({ type: z.literal('SET_RND_ALLOCATION'), features: z.number().min(0).max(1), techDebt: z.number().min(0).max(1), bugfixes: z.number().min(0).max(1) }),
@@ -92,6 +92,16 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   // Phase 6: IPO
   z.object({ type: z.literal('IPO_SELECT_BANK'), bankId: z.string() }),
   z.object({ type: z.literal('IPO_PRICE'), pricePerShare: z.number().positive().max(10_000) }),
+  // Phase 7: Menschen & Termine
+  z.object({ type: z.literal('ADJUST_EMPLOYEE_SALARY'), employeeId: z.string(), pct: z.number().min(0.01).max(0.25) }),
+  z.object({ type: z.literal('SET_CEO_SALARY'), monthlyAmount: z.number().min(8_000).max(45_000) }),
+  z.object({
+    type: z.literal('CREATE_APPOINTMENT'),
+    titleDe: z.string().min(3).max(80),
+    week: z.number().int().min(0),
+    weekday: z.number().int().min(0).max(4),
+    agendaDe: z.array(z.string().max(120)).max(5),
+  }),
 ]);
 
 const zHypothesis = z
@@ -114,7 +124,19 @@ const zSetup: z.ZodType<GameSetup> = z.object({
     vision: z.string().max(300),
     values: z.array(z.string().min(2).max(40)).min(1).max(4),
     motto: z.string().min(2).max(120),
-    locationId: z.enum(['muenchen', 'berlin', 'zuerich', 'austin']),
+    locationId: z.string().min(2).max(40),
+    location: z
+      .object({
+        id: z.string().max(60),
+        nameDe: z.string().min(2).max(40),
+        country: z.string().max(40),
+        payrollIndex: z.number().min(0.3).max(1.6),
+        talentPool: z.number().min(0.4).max(1),
+        taxRate: z.number().min(0.1).max(0.4),
+        regulationDensity: z.enum(['low', 'medium', 'high']),
+        officeCostPerEmployeeMonthly: z.number().min(150).max(2000),
+      })
+      .optional(),
   }),
   playerProfile: z.object({
     ceoName: z.string().min(2).max(60),

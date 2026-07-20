@@ -27,7 +27,7 @@ export interface ScheduledEffect {
  * Cash fließt, und die Kapitalflussrechnung stimmt konstruktionsbedingt.
  */
 export type EffectPayload =
-  | { kind: 'HIRES_ARRIVE'; dept: Department; seniority: Seniority; count: number; costPerHire: Money }
+  | { kind: 'HIRES_ARRIVE'; dept: Department; seniority: Seniority; count: number; costPerHire: Money; specialistRoleDe?: string }
   | { kind: 'EXECUTE_LAYOFF'; dept: Department; count: number; generousSeverance: boolean }
   | { kind: 'DEBT_DRAW'; amount: Money }
   | { kind: 'DEBT_REPAY'; amount: Money }
@@ -50,7 +50,11 @@ export type EffectPayload =
   /** Integration eines gekauften Unternehmens (Phase 5). */
   | { kind: 'MA_INTEGRATION'; targetId: Id }
   /** Börsengang vollziehen: Zuteilung, Bruttoerlös, Fees, Erstnotiz (Phase 6). */
-  | { kind: 'IPO_LISTING'; pricePerShare: Money; subscriptionRatio: number };
+  | { kind: 'IPO_LISTING'; pricePerShare: Money; subscriptionRatio: number }
+  /** Individuelle Gehaltserhöhung (Phase 7): wirkt auf genau eine Person. */
+  | { kind: 'EMPLOYEE_RAISE'; employeeId: Id; pct: number }
+  /** Vom Aufsichtsrat genehmigtes CEO-Gehalt (Phase 7). */
+  | { kind: 'CEO_SALARY_SET'; monthlyAmount: Money };
 
 /** Zeitlich begrenzter Modifikator auf eine Systemgröße. */
 export interface ActiveModifier {

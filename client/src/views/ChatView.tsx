@@ -8,8 +8,13 @@ import { api, type ThreadTurn } from '../api.js';
  * (als protokollierter Intent, nie direkt durchs LLM).
  */
 export function ChatView() {
-  const { state } = useStore();
-  const [activeKey, setActiveKey] = useState<string>('dm:assistant');
+  const { state, chatThread } = useStore();
+  const [activeKey, setActiveKey] = useState<string>(chatThread ?? 'dm:assistant');
+  const [empSearch, setEmpSearch] = useState('');
+  // Sprungmarke aus Steckbrief/TeamView übernehmen
+  useEffect(() => {
+    if (chatThread) setActiveKey(chatThread);
+  }, [chatThread]);
   if (!state) return null;
 
   const roleDe: Record<string, string> = { cto: 'CTO', headOfSales: 'Head of Sales', headOfCs: 'Head of CS', cfo: 'CFO' };
@@ -43,8 +48,29 @@ export function ChatView() {
             </div>
           </button>
         ))}
+        <div className="panel-title">Alle Mitarbeitenden</div>
+        <input
+          className="w-full border-b border-line bg-transparent px-3 py-1.5 text-[11px] outline-none focus:border-accent"
+          placeholder="Suchen …"
+          value={empSearch}
+          onChange={(e) => setEmpSearch(e.target.value)}
+        />
+        {state.people.employees
+          .filter((e) => !state.people.executives.some((x) => x.employeeId === e.id))
+          .filter((e) => (`${e.firstName} ${e.lastName} ${e.roleTitleDe}`).toLowerCase().includes(empSearch.toLowerCase()))
+          .slice(0, 40)
+          .map((e) => (
+            <button
+              key={e.id}
+              onClick={() => setActiveKey('dm:' + e.id)}
+              className={`block w-full border-b border-line/40 px-3 py-1.5 text-left last:border-0 ${activeKey === 'dm:' + e.id ? 'bg-accent/10' : 'hover:bg-panel2'}`}
+            >
+              <div className="text-[11px] font-bold">{e.firstName} {e.lastName}</div>
+              <div className="text-[9.5px] text-dim">{e.roleTitleDe}</div>
+            </button>
+          ))}
         <p className="p-3 text-[9px] leading-relaxed text-dim/70">
-          Kanäle #leadership & #all-hands sowie DMs mit allen Mitarbeitenden folgen; Meetings laufen über den Kalender.
+          Jede Person antwortet in ihrem eigenen Charakter (Steckbrief im Team-Tab). Meetings laufen über den Kalender.
         </p>
       </div>
       <ThreadPane key={activeKey} threadKey={activeKey} />

@@ -29,7 +29,10 @@ export type PlayerAction =
   | MaDueDiligenceAction
   | MaAcquireAction
   | IpoSelectBankAction
-  | IpoPriceAction;
+  | IpoPriceAction
+  | AdjustEmployeeSalaryAction
+  | SetCeoSalaryAction
+  | CreateAppointmentAction;
 
 /**
  * Listenpreis ändern (± %). Sofort: Neugeschäfts-ARPA. Verzögert: Bestand wird
@@ -44,12 +47,17 @@ export interface PriceChangeAction {
   applyToExisting: boolean;
 }
 
-/** Stellen ausschreiben. Time-to-Fill hängt an Arbeitsmarkt-Reputation & Talentpool. */
+/**
+ * Stellen ausschreiben. Time-to-Fill hängt an Arbeitsmarkt-Reputation &
+ * Talentpool. Phase 7: `specialistRoleDe` erlaubt freie Spezialrollen
+ * („Quant", „Kryptographin" …) — Titel + Gehaltsaufschlag, Rest wie Abteilung.
+ */
 export interface StartHiringAction {
   type: 'START_HIRING';
   dept: Department;
   seniority: Seniority;
   count: number;
+  specialistRoleDe?: string;
 }
 
 /**
@@ -191,6 +199,37 @@ export interface IpoPriceAction {
 export const IPO_PREP_COST = 120_000;
 export const IPO_PREP_WEEKS = 8;
 export const IPO_ROADSHOW_WEEKS = 3;
+
+/**
+ * Individuelle Gehaltserhöhung (Phase 7): eine konkrete Person, aus dem
+ * Steckbrief heraus. Große Sprünge sprechen sich herum (Neid-Effekt).
+ */
+export interface AdjustEmployeeSalaryAction {
+  type: 'ADJUST_EMPLOYEE_SALARY';
+  employeeId: Id;
+  /** 0.01 .. 0.25 */
+  pct: Fraction;
+}
+
+/**
+ * Eigenes CEO-Gehalt (Phase 7) — geht als Antrag an den AUFSICHTSRAT.
+ * Genehmigung hängt deterministisch an Board-Vertrauen, Lage und Höhe des
+ * Sprungs; Ablehnung kostet Vertrauen („der denkt an sich statt an die Firma").
+ */
+export interface SetCeoSalaryAction {
+  type: 'SET_CEO_SALARY';
+  monthlyAmount: Money;
+}
+
+/** Eigenen Termin ansetzen (Phase 7) — erscheint im Kalender, spielbar als Meeting-Szene. */
+export interface CreateAppointmentAction {
+  type: 'CREATE_APPOINTMENT';
+  titleDe: string;
+  week: number;
+  /** 0 = Montag … 4 = Freitag */
+  weekday: number;
+  agendaDe: string[];
+}
 
 /** Ergebnis der Aktions-Validierung durch die Engine. */
 export interface ActionValidation {
