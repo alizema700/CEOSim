@@ -6,8 +6,11 @@ dist/
 build/
 *.tsbuildinfo
 
-# Lokale Daten (Spielstände, SQLite, LLM-Cache)
-data/
+# Lokale Laufzeit-Daten (Spielstände, SQLite, LLM-Cache).
+# WICHTIG: nur den Runtime-Ordner des Servers ignorieren — NICHT den
+# Quellcode-Ordner shared/src/data/ (Präzedenzfälle & Glossar). Ein
+# unverankertes `data/` würde jeden gleichnamigen Ordner erfassen.
+/server/data/
 *.sqlite
 *.sqlite-journal
 *.sqlite-wal
