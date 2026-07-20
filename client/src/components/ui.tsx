@@ -40,9 +40,12 @@ export function Panel({ title, children, right }: { title: string; children: Rea
 /**
  * KPI-Karte mit Formel-Tooltip (Didaktik-Kernstück): Klick ⇒ Popover mit
  * Definition, Formel und Einordnung — jeder Fachbegriff ist erklärbar.
+ * Mit `history` (Phase 8) zusätzlich ein „Verlauf →"-Link, der den
+ * Wochenverlauf dieser EINEN Kennzahl als Chart öffnet (KpiHistoryModal).
  */
-export function KpiCard({ id, value, contextDe }: { id: KpiId; value: number; contextDe?: string }) {
+export function KpiCard({ id, value, contextDe, history }: { id: KpiId; value: number; contextDe?: string; history?: KpiSnapshot[] }) {
   const [open, setOpen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
   const def = KPI_DEFINITIONS[id];
   return (
     <div className="relative">
@@ -59,9 +62,15 @@ export function KpiCard({ id, value, contextDe }: { id: KpiId; value: number; co
           <div className="serif mb-1 text-[17px] text-ink">{def.labelDe}</div>
           <p className="mb-2 text-xs leading-relaxed text-ink2">{def.definitionDe}</p>
           <div className="num mb-2 border border-line bg-panel2 p-2 text-[11px] text-accent">{def.formulaDe}</div>
-          {contextDe && <p className="text-[11px] leading-relaxed text-dim">→ {contextDe}</p>}
+          {contextDe && <p className="mb-2 text-[11px] leading-relaxed text-dim">→ {contextDe}</p>}
+          {history && history.length >= 2 && (
+            <button className="edlink text-[11px]" onClick={() => setShowHistory(true)}>
+              📈 Verlauf über {history.length} Wochen
+            </button>
+          )}
         </div>
       )}
+      {showHistory && history && <KpiHistoryModal id={id} history={history} onClose={() => setShowHistory(false)} />}
     </div>
   );
 }

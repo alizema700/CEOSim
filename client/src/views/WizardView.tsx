@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import type { DifficultyId, GameSetup, LocationId, PlayerSkillArea, ScenarioId } from '@boardroom/shared';
+import type { DifficultyId, GameSetup, PlayerSkillArea, ScenarioId } from '@boardroom/shared';
 import { CITY_PRESETS, DIFFICULTIES, LOCATIONS, profileForCity, type LocationProfile } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { eur, pct } from '../format.js';
+import { LocationMap } from '../components/LocationMap.js';
 
 /**
  * „Neues Unternehmen"-Wizard — individualisiert das Spiel auf den Spieler:
@@ -225,7 +226,7 @@ export function WizardView() {
             deterministisch ein Profil (gleiche Stadt ⇒ immer gleiche Bedingungen). Der Standort prägt Gehälter, Talentpool,
             Steuern, Regulierung und Bürokosten — für das ganze Spiel.
           </p>
-          <CityMap selected={locProfile} onSelect={setLocProfile} />
+          <LocationMap cities={CITY_PRESETS} selected={locProfile} onSelect={setLocProfile} />
           <FreeCityInput onSelect={setLocProfile} />
           <div className="panel p-3">
             <div className="kicker text-[9.5px]">Gewählt: {locProfile.nameDe} · {locProfile.country}</div>
@@ -310,77 +311,6 @@ export function WizardView() {
           </button>
         )}
       </div>
-    </div>
-  );
-}
-
-// ── Standort-Karte (Phase 7) ──────────────────────────────────────────
-// Redaktioneller Karten-Look: Punktraster-Gitter statt Fake-Küstenlinien,
-// Europa als Zoom (dichteste Städteliste) + Welt daneben.
-const CITY_COORDS: Record<string, { x: number; y: number; eu?: boolean }> = {
-  // Europa-Zoom: viewBox 0 0 400 300 (ca. 10°W–25°O / 62°N–36°N)
-  london: { x: 105, y: 92, eu: true },
-  amsterdam: { x: 162, y: 78, eu: true },
-  hamburg: { x: 196, y: 62, eu: true },
-  berlin: { x: 232, y: 76, eu: true },
-  warschau: { x: 300, y: 84, eu: true },
-  koeln: { x: 172, y: 96, eu: true },
-  frankfurt: { x: 188, y: 110, eu: true },
-  paris: { x: 132, y: 118, eu: true },
-  muenchen: { x: 214, y: 128, eu: true },
-  wien: { x: 262, y: 122, eu: true },
-  zuerich: { x: 190, y: 134, eu: true },
-  stockholm: { x: 262, y: 30, eu: true },
-  lissabon: { x: 42, y: 208, eu: true },
-  // Welt: viewBox 0 0 500 260 (equirektangular grob)
-  newyork: { x: 147, y: 92 },
-  austin: { x: 114, y: 112 },
-  telaviv: { x: 298, y: 105 },
-  bangalore: { x: 358, y: 138 },
-  singapur: { x: 394, y: 160 },
-};
-
-function CityMap({ selected, onSelect }: { selected: LocationProfile; onSelect: (p: LocationProfile) => void }) {
-  const euCities = CITY_PRESETS.filter((c) => CITY_COORDS[c.id]?.eu);
-  const worldCities = CITY_PRESETS.filter((c) => CITY_COORDS[c.id] && !CITY_COORDS[c.id]!.eu);
-  return (
-    <div className="grid gap-3 md:grid-cols-[3fr_2fr]">
-      <MapPanel titleDe="Europa" viewW={400} viewH={300} cities={euCities} selected={selected} onSelect={onSelect} labelAll />
-      <MapPanel titleDe="Welt" viewW={500} viewH={260} cities={worldCities} selected={selected} onSelect={onSelect} labelAll />
-    </div>
-  );
-}
-
-function MapPanel({ titleDe, viewW, viewH, cities, selected, onSelect, labelAll }: {
-  titleDe: string; viewW: number; viewH: number; cities: LocationProfile[];
-  selected: LocationProfile; onSelect: (p: LocationProfile) => void; labelAll?: boolean;
-}) {
-  const grid: React.ReactNode[] = [];
-  for (let gx = 20; gx < viewW; gx += 40) grid.push(<line key={'v' + gx} x1={gx} y1={0} x2={gx} y2={viewH} stroke="#e7e3da" strokeWidth="0.7" strokeDasharray="1 5" />);
-  for (let gy = 20; gy < viewH; gy += 40) grid.push(<line key={'h' + gy} x1={0} y1={gy} x2={viewW} y2={gy} stroke="#e7e3da" strokeWidth="0.7" strokeDasharray="1 5" />);
-  return (
-    <div className="panel p-2">
-      <div className="kicker px-1 pb-1 text-[9px]">{titleDe}</div>
-      <svg viewBox={`0 0 ${viewW} ${viewH}`} className="block w-full" style={{ background: '#fffdf8' }}>
-        {grid}
-        {cities.map((c) => {
-          const pos = CITY_COORDS[c.id]!;
-          const active = selected.id === c.id;
-          return (
-            <g key={c.id} className="cursor-pointer" onClick={() => onSelect(c)}>
-              {/* großzügige unsichtbare Klickfläche */}
-              <circle cx={pos.x} cy={pos.y} r={14} fill="transparent" />
-              {active && <circle cx={pos.x} cy={pos.y} r={9} fill="none" stroke="#2f7f79" strokeWidth="1.5" />}
-              <circle cx={pos.x} cy={pos.y} r={active ? 5 : 3.5} fill={active ? '#2f7f79' : '#171a1c'} />
-              {(labelAll || active) && (
-                <text x={pos.x + 9} y={pos.y + 3.5} fontSize={11} fontFamily="Spline Sans Mono" fill={active ? '#2f7f79' : '#6b7178'}>
-                  {c.nameDe}
-                </text>
-              )}
-            </g>
-          );
-        })}
-      </svg>
     </div>
   );
 }

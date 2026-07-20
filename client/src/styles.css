@@ -235,3 +235,31 @@ body {
 ::-webkit-scrollbar-track {
   background: transparent;
 }
+
+/* ── Leaflet-Karte im Zeitungsstil (Standort-Wahl, Phase 8) ──────────── */
+.leaflet-container {
+  font-family: var(--font-sans);
+  background: #eef0ea;
+}
+.leaflet-tooltip.br-map-tip {
+  background: var(--color-ink);
+  color: var(--color-bg);
+  border: none;
+  border-radius: 2px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 3px 8px;
+  box-shadow: none;
+}
+.leaflet-tooltip.br-map-tip::before {
+  border-top-color: var(--color-ink);
+}
+.leaflet-control-attribution {
+  font-size: 9px;
+  background: rgba(250, 249, 246, 0.75) !important;
+  color: var(--color-faint);
+}
+.leaflet-control-zoom a {
+  color: var(--color-ink) !important;
+  border-radius: 0 !important;
+}
