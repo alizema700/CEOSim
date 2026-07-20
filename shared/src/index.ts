@@ -54,5 +54,12 @@ export * from './engine/competitors.js';
 export * from './engine/ipo.js';
 
 // ── Kuratierte Daten (Phase 4) ───────────────────────────────────────
-export * from './data/precedents.js';
-export * from './data/glossary.js';
+// BEWUSST explizite Re-Exporte statt `export *`: Diese Module sind Blätter,
+// die sonst niemand direkt importiert (nur die Views). Bei `export *` kann
+// Vites Dep-Optimizer die Re-Exporte je nach Plattform/Timing verschlucken —
+// Symptom im Browser: „does not provide an export named 'GLOSSARY'". Benannte
+// Re-Exporte sind für esbuild/Vite immer statisch auflösbar.
+export { PRECEDENT_CASES } from './data/precedents.js';
+export type { PrecedentTag, PrecedentCase } from './data/precedents.js';
+export { GLOSSARY } from './data/glossary.js';
+export type { GlossaryEntry } from './data/glossary.js';
