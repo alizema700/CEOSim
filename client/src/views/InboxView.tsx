@@ -5,9 +5,11 @@ import { useStore } from '../store.js';
 import { api, type ThreadTurn } from '../api.js';
 
 /**
- * E-Mail-Postfach: Inbox / Erledigt / Archiv, Suche, Prioritäts-Flags der
- * Sekretärin. Mails frei beantworten (LLM spielt die Gegenseite), ans Team
- * delegieren oder ignorieren — Ereignis-Mails tragen ihre Antwort-Optionen.
+ * Postfach im Redaktions-Stil (2-Spalten-Mailclient): links die 400-px-Liste
+ * mit Rubriken (Eingang/Erledigt/Archiv) & Suche, rechts der Lesesaal mit
+ * Serifen-Schlagzeile, Fließtext und angehefteter Antwort-Leiste. Mails frei
+ * beantworten (LLM spielt die Gegenseite), delegieren oder ignorieren —
+ * Ereignis-Mails tragen ihre Antwort-Optionen mit.
  */
 export function InboxView() {
   const { state, messageStatus, markMessage, act, busy } = useStore();
@@ -15,21 +17,28 @@ export function InboxView() {
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
+  const folderOf = (m: InboxMessage): 'inbox' | 'done' | 'archiv' => {
+    if (messageStatus[m.id] === 'archived') return 'archiv';
+    return m.handledWeek !== null ? 'done' : 'inbox';
+  };
+
+  const all = useMemo(() => (state ? [...state.comms.messages].reverse() : []), [state]);
+  const counts = useMemo(() => {
+    const c = { inbox: 0, done: 0, archiv: 0 };
+    for (const m of all) c[folderOf(m)]++;
+    return c;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [all, messageStatus]);
+
   const messages = useMemo(() => {
-    if (!state) return [];
-    const all = [...state.comms.messages].reverse();
     const q = search.trim().toLowerCase();
     return all.filter((m) => {
-      const st = messageStatus[m.id];
-      const inFolder =
-        folder === 'archiv' ? st === 'archived'
-        : folder === 'done' ? st !== 'archived' && m.handledWeek !== null
-        : st !== 'archived' && m.handledWeek === null;
-      if (!inFolder) return false;
+      if (folderOf(m) !== folder) return false;
       if (!q) return true;
       return (m.subjectDe + m.bodyDe + m.from.name + (m.from.company ?? '')).toLowerCase().includes(q);
     });
-  }, [state, folder, search, messageStatus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [all, folder, search, messageStatus]);
 
   const selected = messages.find((m) => m.id === selectedId) ?? messages[0] ?? null;
 
@@ -40,65 +49,80 @@ export function InboxView() {
 
   if (!state) return null;
   const unreadCount = state.comms.messages.filter((m) => messageStatus[m.id] === undefined).length;
+  const openEventIds = new Set(state.openEvents.filter((e) => e.status === 'open').map((e) => e.instanceId));
 
   return (
-    <div className="flex h-full min-h-0 gap-3">
-      {/* Liste */}
-      <div className="flex w-96 shrink-0 flex-col">
-        <div className="mb-2 flex gap-1">
+    <div className="grid h-[calc(100vh-215px)] min-h-[520px] grid-cols-[380px_1px_1fr] gap-x-8">
+      {/* ── Liste ─────────────────────────────────────────────────────── */}
+      <div className="flex min-h-0 flex-col">
+        <div className="flex items-baseline gap-1.5 pb-2">
           {(
             [
-              ['inbox', `Inbox`],
+              ['inbox', 'Eingang'],
               ['done', 'Erledigt'],
               ['archiv', 'Archiv'],
             ] as const
           ).map(([f, label]) => (
-            <button key={f} className={`chip ${folder === f ? 'chip-on' : ''}`} onClick={() => setFolder(f)}>
-              {label}
+            <button key={f} className={`chip ${folder === f ? 'chip-on' : ''}`} onClick={() => { setFolder(f); setSelectedId(null); }}>
+              {label} {counts[f]}
             </button>
           ))}
-          <span className="ml-auto self-center text-[10px] text-dim">{unreadCount} ungelesen</span>
+          <span className="ml-auto self-center kicker text-[10px] text-bad">{unreadCount} ungelesen</span>
         </div>
-        <input className="input mb-2" placeholder="Suchen …" value={search} onChange={(e) => setSearch(e.target.value)} />
-        <div className="panel min-h-0 flex-1 overflow-y-auto">
-          {messages.length === 0 && <p className="p-4 text-xs text-dim">Keine Nachrichten hier.</p>}
+
+        <input
+          className="mb-1 w-full border-0 border-b border-line bg-transparent px-1 py-2 text-[13px] text-ink outline-none focus:border-accent"
+          placeholder="Suchen …"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {messages.length === 0 && <p className="serif px-1 py-6 text-[17px] italic text-dim">Keine Nachrichten in dieser Rubrik.</p>}
           {messages.map((m) => {
             const unread = messageStatus[m.id] === undefined;
+            const urgent = !!(m.eventInstanceId && openEventIds.has(m.eventInstanceId));
+            const active = selected?.id === m.id;
             return (
               <button
                 key={m.id}
                 onClick={() => setSelectedId(m.id)}
-                className={`block w-full border-b border-line/40 px-3 py-2 text-left transition-colors last:border-0 ${
-                  selected?.id === m.id ? 'bg-accent/10' : 'hover:bg-panel2'
-                }`}
+                className="block w-full border-b border-line py-3 pl-3 pr-3.5 text-left transition-colors hover:bg-panel2"
+                style={{ borderLeft: `3px solid ${active ? '#171a1c' : 'transparent'}` }}
               >
-                <div className="flex items-baseline gap-1.5">
-                  {m.priority === 'hoch' && <span className="text-bad">●</span>}
-                  <span className={`truncate text-xs ${unread ? 'font-bold text-ink' : 'text-dim'}`}>{m.from.name}</span>
-                  <span className="ml-auto shrink-0 text-[9px] text-dim">W{m.week}</span>
+                <div className="flex items-baseline gap-2">
+                  <span className="h-[7px] w-[7px] shrink-0 rounded-full" style={{ background: unread ? '#c2453d' : 'transparent' }} />
+                  <span className={`truncate text-[13px] ${unread ? 'font-semibold text-ink' : 'text-dim'}`}>{m.from.name}</span>
+                  {urgent && <span className="kicker shrink-0 text-[9.5px] text-bad">DRINGEND</span>}
+                  {!urgent && m.priority === 'hoch' && <span className="kicker shrink-0 text-[9.5px] text-warn">PRIO</span>}
+                  <span className="num ml-auto shrink-0 text-[10px] text-faint">W{m.week}</span>
                 </div>
-                <div className={`truncate text-xs ${unread ? 'text-ink' : 'text-dim'}`}>{icon(m)} {m.subjectDe}</div>
+                <div className={`serif mt-0.5 truncate pl-[15px] text-[15.5px] ${unread ? 'text-ink' : 'text-dim'}`}>{m.subjectDe}</div>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Detail */}
-      <div className="panel min-h-0 flex-1 overflow-y-auto">
-        {selected ? <MessageDetail key={selected.id} msg={selected} onAct={act} busy={busy} onArchive={() => void markMessage(selected.id, 'archived')} /> : (
-          <p className="p-6 text-xs text-dim">Wähle eine Nachricht.</p>
+      {/* ── Trennlinie ────────────────────────────────────────────────── */}
+      <div className="hair h-full w-px" />
+
+      {/* ── Lesesaal ──────────────────────────────────────────────────── */}
+      <div className="flex min-h-0 flex-col">
+        {selected ? (
+          <MessageDetail key={selected.id} msg={selected} onAct={act} busy={busy} urgent={!!(selected.eventInstanceId && openEventIds.has(selected.eventInstanceId))} onArchive={() => void markMessage(selected.id, 'archived')} />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center">
+            <div className="kicker">Lesesaal</div>
+            <p className="serif mt-2 text-[22px] italic text-dim">Wähle links eine Nachricht.</p>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-function icon(m: InboxMessage): string {
-  return { briefing: '📋', exec: '👔', employee: '👤', event: '🚨', external: '🌐', delegation: '↩️', system: '⚙' }[m.kind] ?? '✉';
-}
-
-function MessageDetail({ msg, onAct, busy, onArchive }: { msg: InboxMessage; onAct: ReturnType<typeof useStore.getState>['act']; busy: boolean; onArchive: () => void }) {
+function MessageDetail({ msg, onAct, busy, urgent, onArchive }: { msg: InboxMessage; onAct: ReturnType<typeof useStore.getState>['act']; busy: boolean; urgent: boolean; onArchive: () => void }) {
   const { state, setView } = useStore();
   const [turns, setTurns] = useState<ThreadTurn[]>([]);
   const [reply, setReply] = useState('');
@@ -122,6 +146,12 @@ function MessageDetail({ msg, onAct, busy, onArchive }: { msg: InboxMessage; onA
     { role: 'cfo', label: 'CFO' },
   ];
 
+  const kicker = urgent
+    ? { txt: 'Dringend · Frist läuft', cls: 'text-bad' }
+    : msg.priority === 'hoch'
+      ? { txt: 'Prio · vorsortiert von der Assistenz', cls: 'text-warn' }
+      : { txt: 'Korrespondenz', cls: 'text-dim' };
+
   async function send() {
     if (!state || reply.trim().length === 0) return;
     setSending(true);
@@ -129,37 +159,35 @@ function MessageDetail({ msg, onAct, busy, onArchive }: { msg: InboxMessage; onA
       const r = await api.sendThread(state.meta.gameId, threadKey, reply.trim());
       setTurns((t) => [...t, ...r.turns]);
       setReply('');
-      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
+      setTimeout(() => bottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 60);
     } finally {
       setSending(false);
     }
   }
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b border-line px-4 py-3">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <div className="text-sm font-bold">{msg.subjectDe}</div>
-            <div className="mt-0.5 text-[11px] text-dim">
-              {msg.from.name} · {msg.from.roleDe}
-              {msg.from.company ? ` · ${msg.from.company}` : ''} · Woche {msg.week}
-              {msg.priority === 'hoch' && <span className="ml-2 rounded border border-bad/50 px-1 text-[9px] text-bad">PRIO ⚑ Sekretärin</span>}
-            </div>
-          </div>
-          <div className="flex shrink-0 gap-1.5">
+    <div className="flex h-full min-h-0 flex-col">
+      {/* Kopf */}
+      <div className="pb-3">
+        <div className="flex items-start justify-between gap-4">
+          <div className={`kicker ${kicker.cls}`}>{kicker.txt}</div>
+          <div className="flex shrink-0 gap-4">
             {msg.delegable && msg.handledWeek === null && (
-              <button className="btn" onClick={() => setDelegateOpen((o) => !o)}>↪ Delegieren</button>
+              <button className="edlink text-[12.5px] text-dim" style={{ borderColor: '#ddd9d0' }} onClick={() => setDelegateOpen((o) => !o)}>Delegieren</button>
             )}
             {msg.suggestedActionType && (
-              <button className="btn" onClick={() => setView('decisions')}>⌘ Passende Aktion</button>
+              <button className="edlink text-[12.5px] text-dim" style={{ borderColor: '#ddd9d0' }} onClick={() => setView('decisions')}>Passende Aktion</button>
             )}
-            <button className="btn" onClick={onArchive}>🗄 Archiv</button>
+            <button className="edlink text-[12.5px] text-dim" style={{ borderColor: '#ddd9d0' }} onClick={onArchive}>Archivieren</button>
           </div>
         </div>
+        <h2 className="serif mt-2 text-[32px] leading-[1.12] text-ink" style={{ maxWidth: '30ch', textWrap: 'balance' }}>{msg.subjectDe}</h2>
+        <div className="kicker mt-2">
+          Von {msg.from.name} · {msg.from.roleDe}{msg.from.company ? ` · ${msg.from.company}` : ''} · Eingegangen W{msg.week}
+        </div>
         {delegateOpen && msg.handledWeek === null && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5 rounded border border-line bg-panel2 p-2">
-            <span className="text-[10px] uppercase text-dim">„Kümmer dich drum" an:</span>
+          <div className="mt-3 flex flex-wrap items-center gap-1.5 border border-line bg-panel2 p-2.5" style={{ borderRadius: 2 }}>
+            <span className="kicker text-[10px]">„Kümmer dich drum" an:</span>
             {execRoles.map((e) => (
               <button
                 key={e.role}
@@ -173,25 +201,26 @@ function MessageDetail({ msg, onAct, busy, onArchive }: { msg: InboxMessage; onA
                 {e.label}
               </button>
             ))}
-            <span className="w-full text-[9px] text-dim">Ergebnis hängt an Kompetenz & Beziehung — und kommt in 1–2 Wochen als Mail zurück.</span>
+            <span className="w-full kicker mt-1 text-[9px]">Ergebnis hängt an Kompetenz &amp; Beziehung — und kommt in 1–2 Wochen als Mail zurück.</span>
           </div>
         )}
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
-        <p className="whitespace-pre-wrap text-xs leading-relaxed">{msg.bodyDe}</p>
+      {/* Körper */}
+      <div className="min-h-0 flex-1 overflow-y-auto border-t border-line pt-4">
+        <p className="whitespace-pre-wrap text-[15px] leading-[1.7] text-ink2" style={{ maxWidth: '62ch' }}>{msg.bodyDe}</p>
 
         {msg.handledWeek !== null && (
-          <div className="mt-3 rounded border border-good/40 bg-good/5 px-2 py-1 text-[11px] text-good">✓ Mechanisch erledigt in Woche {msg.handledWeek}.</div>
+          <div className="mt-4 border-l-2 border-good bg-good/5 px-2.5 py-1.5 text-[12px] text-good">✓ Mechanisch erledigt in Woche {msg.handledWeek}.</div>
         )}
 
         {/* Ereignis-Optionen direkt in der Mail */}
         {event && card && event.status === 'open' && (
-          <div className="mt-4 rounded border border-warn/50 bg-warn/5 p-3">
-            <div className="mb-2 text-[10px] uppercase tracking-wider text-warn">Reaktion erforderlich (sonst greift nach {card.autoResolveAfterWeeks} W die Default-Folge)</div>
-            <div className="flex flex-col gap-1.5">
+          <div className="mt-5 border border-warn/50 bg-warn/5 p-3.5" style={{ borderRadius: 2 }}>
+            <div className="kicker text-warn">Reaktion erforderlich · sonst greift nach {card.autoResolveAfterWeeks} W die Default-Folge</div>
+            <div className="mt-2.5 flex flex-col gap-1.5">
               {card.options.map((opt) => (
-                <button key={opt.id} className="btn text-left" disabled={busy} onClick={() => void onAct({ type: 'RESPOND_EVENT', eventInstanceId: event.instanceId, optionId: opt.id }, null)}>
+                <button key={opt.id} className="btn justify-start text-left" disabled={busy} onClick={() => void onAct({ type: 'RESPOND_EVENT', eventInstanceId: event.instanceId, optionId: opt.id }, null)}>
                   {opt.labelDe}
                 </button>
               ))}
@@ -199,13 +228,15 @@ function MessageDetail({ msg, onAct, busy, onArchive }: { msg: InboxMessage; onA
           </div>
         )}
 
-        {/* Freier Antwort-Thread */}
+        {/* Antwort-Thread */}
         {turns.length > 0 && (
-          <div className="mt-4 space-y-2 border-t border-line pt-3">
+          <div className="mt-5 flex flex-col gap-4">
             {turns.map((t, i) => (
-              <div key={i} className={`max-w-[85%] rounded border p-2 text-xs leading-relaxed ${t.isPlayer ? 'ml-auto border-accent/40 bg-accent/5' : 'border-line bg-panel2'}`}>
-                <div className="mb-0.5 text-[9px] uppercase tracking-wider text-dim">{t.author} · {t.authorRole}</div>
-                <p className="whitespace-pre-wrap">{t.text}</p>
+              <div key={i} className="border-t border-line pt-3" style={{ maxWidth: '62ch' }}>
+                <div className={`kicker text-[10px] ${t.isPlayer ? 'text-accent' : 'text-dim'}`}>
+                  {t.isPlayer ? `Du · ${t.author}, CEO · gerade eben` : `${t.author} · antwortet in Rolle`}
+                </div>
+                <p className="mt-1.5 whitespace-pre-wrap text-[14.5px] leading-[1.6] text-ink2">{t.text}</p>
               </div>
             ))}
             <div ref={bottomRef} />
@@ -213,19 +244,23 @@ function MessageDetail({ msg, onAct, busy, onArchive }: { msg: InboxMessage; onA
         )}
       </div>
 
-      <div className="flex gap-2 border-t border-line p-3">
-        <textarea
-          className="input h-16 flex-1 resize-none"
-          placeholder="Antwort schreiben … (die Gegenseite antwortet in Rolle)"
-          value={reply}
-          onChange={(e) => setReply(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void send();
-          }}
-        />
-        <button className="btn-primary self-end" disabled={sending || reply.trim().length === 0} onClick={() => void send()}>
-          {sending ? '…' : 'Senden'}
-        </button>
+      {/* Antwort-Leiste */}
+      <div className="border-t-2 border-ink pt-3">
+        <div className="kicker mb-1.5 text-[10px]">Antwort · die Gegenseite antwortet in Rolle</div>
+        <div className="flex items-end gap-3">
+          <textarea
+            className="h-14 flex-1 resize-none border-0 border-b border-line bg-transparent px-1 py-1.5 text-[14.5px] text-ink outline-none focus:border-accent"
+            placeholder="Antwort schreiben … (Strg/⌘+Enter sendet)"
+            value={reply}
+            onChange={(e) => setReply(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void send();
+            }}
+          />
+          <button className="btn-primary shrink-0" disabled={sending || reply.trim().length === 0} onClick={() => void send()}>
+            {sending ? '…' : 'Senden →'}
+          </button>
+        </div>
       </div>
     </div>
   );
