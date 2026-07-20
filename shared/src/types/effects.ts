@@ -54,7 +54,11 @@ export type EffectPayload =
   /** Individuelle Gehaltserhöhung (Phase 7): wirkt auf genau eine Person. */
   | { kind: 'EMPLOYEE_RAISE'; employeeId: Id; pct: number }
   /** Vom Aufsichtsrat genehmigtes CEO-Gehalt (Phase 7). */
-  | { kind: 'CEO_SALARY_SET'; monthlyAmount: Money };
+  | { kind: 'CEO_SALARY_SET'; monthlyAmount: Money }
+  /** Tariflich vereinbarte Lohnerhöhung (Phase 8): trifft die Tarif-Belegschaft (ohne AT/Execs). */
+  | { kind: 'TARIF_RAISE'; pct: number; viaStrike: boolean }
+  /** (Warn-)Streik (Phase 8): Produktivitäts- & Vertriebseinbruch, Presse. */
+  | { kind: 'WARNING_STRIKE'; full: boolean };
 
 /** Zeitlich begrenzter Modifikator auf eine Systemgröße. */
 export interface ActiveModifier {

@@ -64,6 +64,8 @@ export interface CompanyState {
   funding: import('./funding.js').FundingState;
   /** IPO-Prozess & Börsennotierung (Phase 6). */
   ipo: import('./ipo.js').IpoState;
+  /** Arbeitsbeziehungen: Tarif, Gewerkschaft, Betriebsrat, Streik (Phase 8). */
+  labor: import('./labor.js').LaborState;
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];

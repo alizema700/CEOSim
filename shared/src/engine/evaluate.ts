@@ -106,6 +106,16 @@ function buildCausalChain(state: CompanyState, d: DecisionRecord, now: Record<Kp
     case 'IPO_PRICE':
       chain.push('Mechanik: Zeichnungsquote = f(Preis vs. Spanne, Bank-Platzierungskraft, Investoren-Reputation, Marktnachfrage). Unter 0,9× platzt der IPO; Überzeichnung erzeugt einen Erstnotiz-Pop — schön für Zeichner, entgangener Erlös für dich.');
       break;
+    case 'SET_TARIF_BINDING':
+      if (d.action.type === 'SET_TARIF_BINDING' && d.action.status === 'none') {
+        chain.push('Mechanik: Tarifflucht spart die nächste Tariferhöhung, kostet aber sofort Arbeitgebermarke, Presse-Reputation und ~10 Zufriedenheitspunkte pro tariflich Beschäftigtem; bei Betriebsrat/hohem Organisationsgrad wurde zusätzlich ein Warnstreik geplant.');
+      } else {
+        chain.push('Mechanik: Tarifbindung hebt die Löhne einmalig aufs Tarifniveau (Verband +5 %, Haustarif +3 %), senkt das Konfliktniveau und stärkt die Arbeitgebermarke — dafür läuft ab jetzt jährlich eine Tarifrunde, die verhandelt werden muss.');
+      }
+      break;
+    case 'NEGOTIATE_TARIF':
+      chain.push('Mechanik: Liegt das Angebot ≥ Forderung, nimmt die Gewerkschaft sofort an; im Korridor bis zur Schmerzgrenze gibt es einen Kompromiss knapp darüber; darunter Ablehnung + Warnstreik, und nach der dritten Runde setzt die Gewerkschaft die volle Forderung per Streik durch (der teuerste Pfad).');
+      break;
     default:
       break;
   }
@@ -299,6 +309,41 @@ function gradeProcess(state: CompanyState, d: DecisionRecord): Grade {
       }
       break;
     }
+    case 'SET_TARIF_BINDING': {
+      if (d.action.status === 'none') {
+        values -= 25; comms -= 15; risk -= 15;
+        reasons.push('Tarifflucht: Der kurzfristige Spareffekt wird mit Arbeitgebermarke, Betriebsfrieden und Presse bezahlt — reale Fälle (z. B. Einzelhandel) zeigen jahrelange Konflikte als Folge.');
+        const humane = state.identity.values.some((v) => /mensch|team|respekt|fair|sozial/i.test(v));
+        if (humane) {
+          values -= 10;
+          reasons.push(`Der Ausstieg widerspricht den selbst gewählten Werten („${state.identity.values.join('", „')}") — teuer in Kultur und Reputation.`);
+        }
+      } else {
+        values += 15; comms += 10; risk += 10;
+        reasons.push('Tarifbindung schafft planbare, faire Löhne und eine glaubwürdige Arbeitgebermarke — ein Signal an Belegschaft und Arbeitsmarkt zugleich.');
+        if (state.labor.tension > 55 || state.labor.unionizationRate > 0.45) {
+          timing += 15;
+          reasons.push('Zum Zeitpunkt hoher Anspannung/Organisierung eingegangen: proaktiv den Betriebsfrieden gesichert, bevor es eskaliert.');
+        }
+      }
+      break;
+    }
+    case 'NEGOTIATE_TARIF': {
+      const n = state.labor.negotiation;
+      const floor = n?.floorPct ?? 0.03;
+      const demand = n?.demandPct ?? 0.06;
+      if (d.action.offerPct < floor) {
+        risk -= 20; timing -= 10;
+        reasons.push(`Angebot unter der Schmerzgrenze (~${(floor * 100).toFixed(1)} %): provoziert einen Warnstreik statt eines Abschlusses — Produktionsausfall und Presse inklusive.`);
+      } else if (d.action.offerPct >= demand) {
+        risk -= 5; comms += 5;
+        reasons.push('Sofort die volle Forderung geboten: schnelle Ruhe, aber wenig Verhandlungsgeschick — der Korridor bis zur Schmerzgrenze blieb ungenutzt.');
+      } else {
+        risk += 15; comms += 10; info += 5;
+        reasons.push('Angebot im vertretbaren Korridor: fair genug für einen Abschluss, ohne die Kostenobergrenze auszureizen — solides Tarifhandwerk.');
+      }
+      break;
+    }
     default:
       break;
   }
@@ -376,6 +421,9 @@ function applySkillGains(state: CompanyState, d: DecisionRecord, grade: Grade): 
       s.leadership = clamp(s.leadership + gain, 0, 100); break;
     case 'SET_CEO_SALARY':
       s.governance = clamp(s.governance + gain, 0, 100); break;
+    case 'SET_TARIF_BINDING': case 'NEGOTIATE_TARIF':
+      s.leadership = clamp(s.leadership + gain, 0, 100);
+      s.governance = clamp(s.governance + gain * 0.6, 0, 100); break;
     default: break;
   }
   // Werte-Konsistenz zahlt auf Governance ein.

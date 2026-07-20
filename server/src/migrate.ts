@@ -1,4 +1,4 @@
-import { fnv1a, generateMaTargets, initialIpoState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
+import { fnv1a, generateMaTargets, initialIpoState, initialLaborState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
 
 /**
  * Sanfte Snapshot-Migration: füllt Felder auf, die neuere Engine-Versionen
@@ -39,6 +39,11 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   }
   if (!s.identity.location) {
     s.identity.location = resolveLocationProfile(s.identity.locationId);
+  }
+  // Phase 8: Arbeitsbeziehungen (Tarif, Gewerkschaft, Betriebsrat, Konfliktniveau).
+  if (!s.labor) {
+    const loc = s.identity.location ?? resolveLocationProfile(s.identity.locationId);
+    s.labor = initialLaborState(loc.regulationDensity, false);
   }
   return state;
 }

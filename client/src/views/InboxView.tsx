@@ -178,6 +178,9 @@ function MessageDetail({ msg, onAct, busy, urgent, onArchive }: { msg: InboxMess
             {msg.suggestedActionType && (
               <button className="edlink text-[12.5px] text-dim" style={{ borderColor: '#ddd9d0' }} onClick={() => setView('decisions')}>Passende Aktion</button>
             )}
+            {(msg.templateId === 'tarif-demand' || msg.templateId === 'works-council') && (
+              <button className="edlink text-[12.5px] text-accent" style={{ borderColor: '#ddd9d0' }} onClick={() => setView('team')}>Zu den Arbeitsbeziehungen</button>
+            )}
             <button className="edlink text-[12.5px] text-dim" style={{ borderColor: '#ddd9d0' }} onClick={onArchive}>Archivieren</button>
           </div>
         </div>

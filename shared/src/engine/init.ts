@@ -17,6 +17,7 @@ import { computeKpis } from './kpis.js';
 import { addMessage, execSender, upkeepCalendar } from './comms.js';
 import { generateMaTargets } from './ma.js';
 import { initialIpoState } from '../types/ipo.js';
+import { initialLaborState } from '../types/labor.js';
 
 /**
  * Spielinitialisierung: baut aus GameSetup + Seed den Start-CompanyState.
@@ -367,6 +368,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
     pressLog: [],
     funding: { rounds: [], investorBoardSeat: false, ventureDebtTaken: false },
     ipo: initialIpoState(),
+    labor: initialLaborState(loc.regulationDensity, dz),
     history: [],
     decisionLog: [],
     evaluations: [],

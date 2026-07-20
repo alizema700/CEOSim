@@ -26,6 +26,7 @@ export * from './types/comms.js';
 export * from './types/strategy.js';
 export * from './types/funding.js';
 export * from './types/ipo.js';
+export * from './types/labor.js';
 export * from './types/company.js';
 export * from './types/game.js';
 
@@ -52,6 +53,7 @@ export * from './engine/funding.js';
 export * from './engine/ma.js';
 export * from './engine/competitors.js';
 export * from './engine/ipo.js';
+export * from './engine/labor.js';
 
 // ── Kuratierte Daten (Phase 4) ───────────────────────────────────────
 // BEWUSST explizite Re-Exporte statt `export *`: Diese Module sind Blätter,

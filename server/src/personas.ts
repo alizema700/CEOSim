@@ -2,6 +2,7 @@ import { z } from 'zod';
 import {
   computeKpis,
   effectiveMonthlyChurn,
+  laborSummaryDe,
   runwayWeeks,
   totalMrr,
   type CompanyState,
@@ -47,6 +48,7 @@ export function stateBriefDe(state: CompanyState): string {
     `Werte: ${state.identity.values.join(', ')} · Motto: „${state.identity.motto}“.`,
     `MRR ${Math.round(totalMrr(state) / 1000)} k€/M · Cash ${Math.round(state.finance.cash / 1000)} k€ · Runway ${Math.round(runwayWeeks(state))} W · Logo-Churn ${(effectiveMonthlyChurn(state) * 100).toFixed(1)} %/M.`,
     `Team ${state.people.employees.length} Köpfe · Ø-Zufriedenheit ${Math.round(k.avgSatisfaction)} · Tech-Debt ${Math.round(state.product.techDebt)}/100 · NPS ${Math.round(state.product.nps)}.`,
+    `Arbeitsbeziehungen: ${laborSummaryDe(state.labor)}${state.labor.negotiation ? ` · laufende Tarifrunde: Forderung +${(state.labor.negotiation.demandPct * 100).toFixed(1)} %` : ''}.`,
     `Board-Vertrauen ${state.ceo.boardTrust}/100. Offene Ereignisse: ${state.openEvents.filter((e) => e.status === 'open').map((e) => e.cardId).join(', ') || 'keine'}.`,
   ].join('\n');
 }

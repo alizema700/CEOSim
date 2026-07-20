@@ -38,6 +38,7 @@ import { tickCompetitorAgents } from './competitors.js';
 import { applyEquityInjection } from './funding.js';
 import { applyMaIntegration } from './ma.js';
 import { applyIpoListing, tickIpo } from './ipo.js';
+import { coveredEmployees, tickLabor } from './labor.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -108,6 +109,7 @@ export function closeWeek(state: CompanyState): WeekReport {
   tickMarketAndReputation(state, occurrences);
   tickCompetitorAgents(state, occurrences);
   tickIpo(state, occurrences);
+  tickLabor(state, occurrences);
 
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);
@@ -201,22 +203,33 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
         .filter((e) => e.dept === fx.dept)
         .sort((a, b) => a.performance - b.performance || b.salaryMonthly - a.salaryMonthly)
         .slice(0, fx.count);
+      // Mitbestimmung (Phase 8): Mit Betriebsrat gilt ein Sozialplan —
+      // höhere Mindestabfindung, dafür etwas gedämpfte Moral-Folgen bei
+      // fairem Vorgehen; ein harter Abbau OHNE faires Paket eskaliert.
+      const council = state.labor.worksCouncil;
+      const socialPlan = council ? 1 : 0; // +1 Monat Abfindung als Sozialplan-Floor
       let severance = 0;
       for (const v of victims) {
         const tenureYears = Math.max(0.5, (week - v.hiredWeek) / 52);
-        const months = Math.min(6, 0.5 * tenureYears) * (fx.generousSeverance ? 1.6 : 1);
+        const months = (Math.min(6, 0.5 * tenureYears) + socialPlan) * (fx.generousSeverance ? 1.6 : 1);
         severance += v.salaryMonthly * months;
         removeEmployee(state, v.id);
         occ.push({ icon: '📦', textDe: `${v.firstName} ${v.lastName} (${v.roleTitleDe}) verlässt das Unternehmen.`, severity: 'bad' });
       }
       ledger.oneOffsPaid += Math.round(severance);
-      const moraleHit = fx.generousSeverance ? -6 : -12;
+      const moraleHit = (fx.generousSeverance ? -6 : -12) + (council && fx.generousSeverance ? 2 : 0);
       bumpSatisfaction(state, 'all', moraleHit);
       state.reputation.laborMarket = clamp(state.reputation.laborMarket + (fx.generousSeverance ? -3 : -7), 0, 100);
+      state.labor.tension = clamp(state.labor.tension + (fx.generousSeverance ? 6 : 16) + (council ? 6 : 0), 0, 100);
       const attritionDelay = 2 + (fx.count % 4);
       schedule(state, attritionDelay, sourceDe, null, {
         kind: 'ATTRITION_WAVE', dept: 'all', extraQuitProbability: fx.generousSeverance ? 0.01 : 0.025,
       }, 'system');
+      if (council && !fx.generousSeverance) {
+        // Harter Abbau ohne faires Paket trotz Betriebsrat ⇒ Arbeitskampf.
+        occ.push({ icon: '🪧', textDe: 'Der Betriebsrat widerspricht dem Stellenabbau und ruft zum Protest — ohne Sozialplan-Konsens droht Streik.', severity: 'bad' });
+        schedule(state, 1, sourceDe, null, { kind: 'WARNING_STRIKE', full: false }, 'system');
+      }
       const valueClash = state.identity.values.some((v) => /mensch|team|respekt|fair/i.test(v)) || /mensch/i.test(state.identity.motto);
       if (valueClash && !fx.generousSeverance) {
         bumpSatisfaction(state, 'all', -4);
@@ -382,6 +395,28 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
       state.ceo.salaryMonthly = fx.monthlyAmount;
       occ.push({ icon: '🏛️', textDe: `Aufsichtsrat wirksam: CEO-Vergütung jetzt ${k(fx.monthlyAmount)}/Monat.`, severity: 'info' });
       break;
+    case 'TARIF_RAISE': {
+      // Nur die Tarif-Belegschaft (AT/Execs bleiben außen vor).
+      let n = 0;
+      for (const e of coveredEmployees(state)) {
+        e.salaryMonthly = Math.round(e.salaryMonthly * (1 + fx.pct));
+        e.satisfaction = clamp(e.satisfaction + (fx.viaStrike ? 5 : 9), 0, 100);
+        e.attritionRiskWeekly = Math.max(0.0015, e.attritionRiskWeekly * 0.9);
+        n++;
+      }
+      occ.push({ icon: '💶', textDe: `Tariferhöhung +${(fx.pct * 100).toFixed(1)} % für ${n} Tarifbeschäftigte wirksam.`, severity: 'info' });
+      break;
+    }
+    case 'WARNING_STRIKE': {
+      const label = fx.full ? 'Streik' : 'Warnstreik';
+      // Produktivität bricht ein, Vertrieb/Neugeschäft stockt.
+      state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'velocity', factor: fx.full ? 0.45 : 0.7, startWeek: week, endWeek: week + (fx.full ? 2 : 1), sourceDe: `${label} (Tarifkonflikt)` });
+      state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'leadGen', factor: fx.full ? 0.8 : 0.9, startWeek: week, endWeek: week + 2, sourceDe: `${label}: Vertrieb gestört` });
+      state.reputation.press = clamp(state.reputation.press - (fx.full ? 6 : 3), 0, 100);
+      state.pressLog.push({ week, tone: 'negative', topicDe: `${label} bei ${state.identity.companyName} — Belegschaft legt die Arbeit nieder` });
+      occ.push({ icon: '✊', textDe: `${label}: Die Belegschaft legt die Arbeit nieder — Velocity und Neugeschäft leiden${fx.full ? ' deutlich' : ''}. Ein Abschluss wird dringend.`, severity: 'bad' });
+      break;
+    }
     case 'IPO_LISTING': {
       // Bruttoerlös über CFF (Ledger), Fees als Einmalaufwand durch die GuV,
       // Einlage ins Eigenkapital — Bilanz-Identität hält konstruktionsbedingt.

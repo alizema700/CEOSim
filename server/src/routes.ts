@@ -102,6 +102,8 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
     weekday: z.number().int().min(0).max(4),
     agendaDe: z.array(z.string().max(120)).max(5),
   }),
+  z.object({ type: z.literal('SET_TARIF_BINDING'), status: z.enum(['none', 'verband', 'haustarif']) }),
+  z.object({ type: z.literal('NEGOTIATE_TARIF'), offerPct: z.number().min(0).max(0.15) }),
 ]);
 
 const zHypothesis = z

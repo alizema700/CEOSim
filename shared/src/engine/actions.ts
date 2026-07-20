@@ -12,6 +12,8 @@ import { stream } from './rng.js';
 import { buildRound, generateTermSheets, validateTermSheet, validateVentureDebt, applyVentureDebtTerms } from './funding.js';
 import { maTarget } from './ma.js';
 import { IPO_BANKS, ipoBank, ipoEligibility, subscriptionRatioFor } from './ipo.js';
+import { applyTarifBinding, applyTarifOffer } from './labor.js';
+import type { Occurrence } from '../types/game.js';
 
 export { deptDe };
 
@@ -209,6 +211,24 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
         if (action.pricePerShare > hi * 1.08) errors.push(`Mehr als ~8 % über der Spanne (${hi.toFixed(2)} €) trägt das Buch nicht.`);
         if (action.pricePerShare > hi) warnings.push('Über der Spanne zu preisen ist eine Wette auf ein heißes Buch — wenn die Zeichnungsquote kippt, platzt der IPO öffentlich.');
         if (action.pricePerShare < lo) warnings.push('Unter der Spanne: sicheres Buch, aber du lässt bewusst Geld auf dem Tisch.');
+      }
+      break;
+    }
+    case 'SET_TARIF_BINDING': {
+      if (action.status === state.labor.tarifStatus) errors.push('Dieser Tarifstatus ist bereits aktiv.');
+      if (state.labor.negotiation !== null) errors.push('Während einer laufenden Tarifrunde lässt sich die Bindung nicht ändern — erst den Abschluss.');
+      if (action.status === 'none') {
+        warnings.push('Tarifflucht ist ein tiefer Einschnitt: Arbeitgebermarke, Betriebsfrieden und Vertrauen leiden dauerhaft — und bei Betriebsrat/hoher Organisation droht Streik.');
+      } else if (runwayWeeks(state) < 16) {
+        warnings.push('Tarifbeitritt hebt sofort die Löhne — bei knappem Runway will das gut überlegt sein.');
+      }
+      break;
+    }
+    case 'NEGOTIATE_TARIF': {
+      if (!state.labor.negotiation) errors.push('Es läuft gerade keine Tarifrunde.');
+      if (action.offerPct < 0 || action.offerPct > 0.15) errors.push('Angebot: 0–15 %.');
+      else if (state.labor.negotiation && action.offerPct < state.labor.negotiation.floorPct) {
+        warnings.push(`Dein Angebot liegt unter der erwarteten Schmerzgrenze (~${(state.labor.negotiation.floorPct * 100).toFixed(1)} %) — mit Ablehnung und Warnstreik ist zu rechnen.`);
       }
       break;
     }
@@ -490,6 +510,30 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       });
       summary = `Termin angesetzt: „${action.titleDe.trim()}“ (Woche ${action.week})`;
       analysis.push('Der Termin steht im Kalender und ist dort als Meeting-Szene spielbar — das Führungsteam nimmt teil.');
+      break;
+    }
+    case 'SET_TARIF_BINDING': {
+      // Betriebsrat kann die Tarifflucht nicht verhindern, aber sie ist ohne
+      // seine Anhörung ein schwerer Vertrauensbruch — die Warnung steht im UI.
+      const laborOcc: Occurrence[] = [];
+      analysis.push(...applyTarifBinding(state, action.status, laborOcc));
+      // Sofort-Occurrences (z. B. „Tarifausstieg beschlossen") in die Analyse
+      // spiegeln — der Entscheidungs-Record trägt keine Occurrence-Liste.
+      for (const o of laborOcc) analysis.push(`${o.icon} ${o.textDe}`);
+      summary =
+        action.status === 'none'
+          ? 'Tarifausstieg (Tarifflucht) beschlossen'
+          : action.status === 'verband'
+            ? 'Flächentarifvertrag (Arbeitgeberverband) beigetreten'
+            : 'Haustarifvertrag abgeschlossen';
+      break;
+    }
+    case 'NEGOTIATE_TARIF': {
+      const laborOcc: Occurrence[] = [];
+      const demand = state.labor.negotiation?.demandPct ?? 0;
+      analysis.push(...applyTarifOffer(state, action.offerPct, laborOcc));
+      for (const o of laborOcc) analysis.push(`${o.icon} ${o.textDe}`);
+      summary = `Tarifangebot: +${(action.offerPct * 100).toFixed(1)} % (Forderung war +${(demand * 100).toFixed(1)} %)`;
       break;
     }
     case 'IPO_SELECT_BANK': {

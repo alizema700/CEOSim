@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { DEPARTMENTS, deptDe, EMPLOYER_COST_FACTOR, type Employee } from '@boardroom/shared';
+import { DEPARTMENTS, deptDe, EMPLOYER_COST_FACTOR, laborSummaryDe, type Employee, type TarifStatus } from '@boardroom/shared';
 import { useStore } from '../store.js';
-import { Bar, GradeBadge, Modal, Panel, scoreColor } from '../components/ui.js';
+import { Bar, Drill, GradeBadge, Modal, Panel, scoreColor } from '../components/ui.js';
 import { eur, num, pct } from '../format.js';
 
 /**
@@ -51,6 +51,9 @@ export function TeamView() {
           })}
         </div>
       </section>
+
+      {/* ── Arbeitsbeziehungen (Phase 8) ───────────────────────────── */}
+      <LaborPanel />
 
       <section className="rule-top grid gap-6 pt-3.5 lg:grid-cols-3">
         <Panel title="Stimmung je Abteilung">
@@ -187,6 +190,153 @@ function CeoPanel() {
         </div>
       </div>
     </Panel>
+  );
+}
+
+/** Konflikt-Farbe: hohe Anspannung ist SCHLECHT (invertiert zu scoreColor). */
+function tensionColor(v: number): string {
+  return v >= 60 ? 'bg-bad' : v >= 35 ? 'bg-warn' : 'bg-good';
+}
+
+const TARIF_LABEL: Record<TarifStatus, string> = {
+  none: 'ohne Tarif',
+  verband: 'Flächentarif (Verband)',
+  haustarif: 'Haustarifvertrag',
+};
+
+/**
+ * Arbeitsbeziehungen (Phase 8): Tarifbindung, Organisationsgrad, Betriebsrat,
+ * Konfliktniveau — plus die aktive Tarifrunde (Forderung vs. dein Angebot).
+ * „Tiefe auf Klick": Kennzahlen sind sofort sichtbar, Bindung & Verlauf klappen
+ * auf; eine laufende Verhandlung wird prominent gezeigt, weil sie eine Frist hat.
+ */
+function LaborPanel() {
+  const { state, act, busy } = useStore();
+  const [tab, setTab] = useState<TarifStatus | null>(null);
+  if (!state) return null;
+  const l = state.labor;
+  const active = state.meta.status === 'active';
+  const orgPct = Math.round(l.unionizationRate * 100);
+  const neg = l.negotiation;
+
+  return (
+    <Panel
+      title="🤝 Arbeitsbeziehungen"
+      right={<span className="num text-[10.5px] text-dim">{laborSummaryDe(l)}</span>}
+    >
+      {/* Kennzahlen-Zeile — immer sichtbar */}
+      <div className="grid gap-4 sm:grid-cols-4">
+        <div>
+          <div className="kicker text-[9px]">Tarifbindung</div>
+          <div className="serif mt-0.5 text-[17px] leading-tight">{TARIF_LABEL[l.tarifStatus]}</div>
+          {l.lastRaisePct !== null && <div className="mt-0.5 text-[10px] text-dim">letzte Runde +{(l.lastRaisePct * 100).toFixed(1)} %{l.lastRaiseWeek !== null ? ` (W${l.lastRaiseWeek})` : ''}</div>}
+        </div>
+        <div>
+          <div className="kicker text-[9px]">Organisationsgrad</div>
+          <div className="num mt-0.5 text-[17px]">{orgPct} %</div>
+          <div className="mt-1"><Bar value={orgPct} color="bg-accent" /></div>
+        </div>
+        <div>
+          <div className="kicker text-[9px]">Betriebsrat</div>
+          <div className={`serif mt-0.5 text-[17px] leading-tight ${l.worksCouncil ? 'text-accent' : 'text-dim'}`}>{l.worksCouncil ? 'gewählt' : 'keiner'}</div>
+          {l.worksCouncil && l.worksCouncilSinceWeek !== null && <div className="mt-0.5 text-[10px] text-dim">seit Woche {l.worksCouncilSinceWeek} · Mitbestimmung</div>}
+        </div>
+        <div>
+          <div className="kicker text-[9px]">Konfliktniveau</div>
+          <div className={`num mt-0.5 text-[17px] ${l.tension >= 60 ? 'text-bad' : l.tension >= 35 ? 'text-warn' : 'text-good'}`}>{Math.round(l.tension)}/100</div>
+          <div className="mt-1"><Bar value={l.tension} color={tensionColor(l.tension)} /></div>
+        </div>
+      </div>
+
+      {/* Aktive Tarifrunde — prominent, weil fristgebunden */}
+      {neg && (
+        <NegotiationBox demandPct={neg.demandPct} floorPct={neg.floorPct} deadlineWeek={neg.deadlineWeek} round={neg.round} lastOfferPct={neg.lastOfferPct} week={state.meta.week} disabled={busy || !active} onOffer={(p) => void act({ type: 'NEGOTIATE_TARIF', offerPct: p }, null)} />
+      )}
+
+      {/* Tarifbindung ändern — hinter Klick (Tarifflucht ist ein harter Schritt) */}
+      <Drill id="tarif-binding" title="Tarifbindung ändern" summary={l.tarifStatus === 'none' ? 'derzeit ohne Tarif' : TARIF_LABEL[l.tarifStatus]}>
+        <p className="mb-3 text-[11px] leading-relaxed text-dim">
+          Tarifbindung hebt die Löhne einmalig aufs Tarifniveau (Verband +5 %, Haustarif +3 %), senkt die Anspannung und stärkt die Arbeitgebermarke — dafür läuft ab dann jährlich eine Tarifrunde. Ein <span className="text-bad">Tarifausstieg</span> spart kurzfristig, kostet aber Vertrauen, Presse und (bei Betriebsrat/hohem Organisationsgrad) provoziert Streik.
+        </p>
+        <div className="flex flex-wrap gap-2">
+          {(['verband', 'haustarif', 'none'] as TarifStatus[]).map((s) => {
+            const isCurrent = l.tarifStatus === s;
+            const danger = s === 'none';
+            const label = s === 'verband' ? 'Flächentarif beitreten' : s === 'haustarif' ? 'Haustarif abschließen' : 'Tarifausstieg (Tarifflucht)';
+            return (
+              <button
+                key={s}
+                className={danger ? 'btn border-bad text-bad' : 'btn'}
+                disabled={busy || !active || isCurrent}
+                onClick={() => { setTab(null); void act({ type: 'SET_TARIF_BINDING', status: s }, null); }}
+              >
+                {isCurrent ? `✓ ${TARIF_LABEL[s]} (aktuell)` : label}
+              </button>
+            );
+          })}
+        </div>
+        {tab !== null && <p className="mt-2 text-[10px] text-warn">Wird ausgeführt …</p>}
+      </Drill>
+
+      {/* Verlauf der Tarifabschlüsse — hinter Klick */}
+      {l.rounds.length > 0 && (
+        <Drill id="tarif-history" title="Verlauf der Tarifabschlüsse" summary={`${l.rounds.length} Abschluss/Abschlüsse`}>
+          <table className="w-full text-xs">
+            <thead className="text-left text-[10px] uppercase text-dim">
+              <tr><th className="py-1 pr-2">Woche</th><th className="py-1 pr-2">Abschluss</th><th className="py-1">Weg</th></tr>
+            </thead>
+            <tbody>
+              {[...l.rounds].reverse().map((r, i) => (
+                <tr key={i} className="border-b border-line/40 last:border-0">
+                  <td className="num py-1 pr-2">W{r.week}</td>
+                  <td className="num py-1 pr-2">+{(r.agreedPct * 100).toFixed(1)} %</td>
+                  <td className={`py-1 ${r.viaStrike ? 'text-bad' : 'text-good'}`}>{r.viaStrike ? '✊ nach Streik' : '🤝 verhandelt'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Drill>
+      )}
+    </Panel>
+  );
+}
+
+/** Aktive Tarifrunde: Forderung, Schmerzgrenze und dein Angebot. */
+function NegotiationBox({ demandPct, floorPct, deadlineWeek, round, lastOfferPct, week, disabled, onOffer }: {
+  demandPct: number; floorPct: number; deadlineWeek: number; round: number; lastOfferPct: number | null; week: number; disabled: boolean; onOffer: (p: number) => void;
+}) {
+  // Startangebot: knapp über der Schmerzgrenze (fairer Verhandlungsauftakt).
+  const [offer, setOffer] = useState(Math.round(floorPct * 1.1 * 1000) / 1000);
+  const weeksLeft = deadlineWeek - week;
+  const willAccept = offer >= demandPct * 0.97;
+  const willCompromise = !willAccept && offer >= floorPct;
+  return (
+    <div className="mt-4 border-2 border-warn bg-panel2 p-3.5" style={{ borderRadius: 3 }}>
+      <div className="flex items-baseline justify-between">
+        <span className="kicker text-warn">Laufende Tarifrunde · Runde {round + 1}</span>
+        <span className={`num text-[11px] ${weeksLeft <= 1 ? 'text-bad' : 'text-dim'}`}>Frist in {Math.max(0, weeksLeft)} Woche{weeksLeft === 1 ? '' : 'n'}</span>
+      </div>
+      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+        <div className="text-xs">
+          <div className="flex justify-between border-b border-line pb-1"><span className="text-dim">Forderung der Gewerkschaft</span><span className="num text-warn">+{(demandPct * 100).toFixed(1)} %</span></div>
+          <div className="flex justify-between pt-1"><span className="text-dim">Schmerzgrenze (geschätzt)</span><span className="num">~+{(floorPct * 100).toFixed(1)} %</span></div>
+          {lastOfferPct !== null && <div className="flex justify-between pt-1"><span className="text-dim">dein letztes Angebot</span><span className="num">+{(lastOfferPct * 100).toFixed(1)} %</span></div>}
+        </div>
+        <div>
+          <div className="kicker text-[9px]">Dein Angebot</div>
+          <div className="mt-1 flex items-center gap-2">
+            <input type="range" min={0} max={Math.round(demandPct * 100 * 10) / 10 + 1} step={0.1} value={offer * 100} onChange={(e) => setOffer(Number(e.target.value) / 100)} className="flex-1" disabled={disabled} />
+            <span className="num w-16 text-right text-sm">+{(offer * 100).toFixed(1)} %</span>
+          </div>
+          <p className="mt-1 text-[10px] text-dim">
+            {willAccept ? 'Trifft die Forderung — sofortige Annahme, teuer, aber Ruhe.' : willCompromise ? 'Im Korridor — Kompromiss knapp darüber ist wahrscheinlich.' : 'Unter der Schmerzgrenze — Ablehnung und Warnstreik drohen.'}
+          </p>
+          <button className="btn-primary mt-2 w-full" disabled={disabled} onClick={() => onOffer(offer)}>
+            Angebot vorlegen (+{(offer * 100).toFixed(1)} %)
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

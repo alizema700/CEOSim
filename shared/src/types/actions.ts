@@ -32,7 +32,9 @@ export type PlayerAction =
   | IpoPriceAction
   | AdjustEmployeeSalaryAction
   | SetCeoSalaryAction
-  | CreateAppointmentAction;
+  | CreateAppointmentAction
+  | SetTarifBindingAction
+  | NegotiateTarifAction;
 
 /**
  * Listenpreis ändern (± %). Sofort: Neugeschäfts-ARPA. Verzögert: Bestand wird
@@ -229,6 +231,25 @@ export interface CreateAppointmentAction {
   /** 0 = Montag … 4 = Freitag */
   weekday: number;
   agendaDe: string[];
+}
+
+/**
+ * Tarifbindung ändern (Phase 8): Flächentarif (Verband) beitreten, eigenen
+ * Haustarif abschließen — oder aussteigen (Tarifflucht, mit harten Folgen).
+ */
+export interface SetTarifBindingAction {
+  type: 'SET_TARIF_BINDING';
+  status: import('./labor.js').TarifStatus;
+}
+
+/**
+ * Tarifrunde: Lohnangebot an die Gewerkschaft (Phase 8). Nur möglich, wenn
+ * eine Verhandlung läuft. Zu niedrig ⇒ Ablehnung, Konflikt, Warnstreik.
+ */
+export interface NegotiateTarifAction {
+  type: 'NEGOTIATE_TARIF';
+  /** Angebotene Lohnerhöhung in Prozent (0 .. 0.15). */
+  offerPct: import('./common.js').Fraction;
 }
 
 /** Ergebnis der Aktions-Validierung durch die Engine. */
