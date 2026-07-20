@@ -400,7 +400,7 @@ function resolveMailPersona(state: import('@boardroom/shared').CompanyState, thr
     roleDe: msg.from.roleDe + (msg.from.company ? ` · ${msg.from.company}` : ''),
     execId: null,
     systemDe: `Du spielst „${msg.from.name}“ (${msg.from.roleDe}${msg.from.company ? ', ' + msg.from.company : ''}) in einem CEO-Trainings-Simulator. Kontext eurer Konversation ist diese Nachricht an den CEO: „${msg.subjectDe} — ${msg.bodyDe.slice(0, 500)}“. Bleib in der Rolle, antworte kurz und realistisch auf Deutsch. Erfinde keine Zahlen über die Firma des CEO. Du kannst Forderungen stellen, verhandeln oder dich beschweren — aber Vertragliches entscheidet die Simulation, nicht dieses Gespräch.`,
-    fallbackDe: 'Danke für die schnelle Rückmeldung. Wir melden uns kommende Woche mit Details. (Offline-Modus: Für lebendige Antworten ANTHROPIC_API_KEY hinterlegen.)',
+    fallbackDe: 'Danke für die schnelle Rückmeldung. Wir melden uns kommende Woche mit Details. (Offline-Modus: Für lebendige Antworten einen API-Key (OpenAI/Anthropic) in server/.env hinterlegen.)',
   };
 }
 

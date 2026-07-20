@@ -45,7 +45,7 @@ export async function classifyPress(state: CompanyState, titleDe: string, bodyDe
     leadFactor: sober ? 1.04 : 1.0,
     scandalProb: hype >= 2 ? 0.25 : 0,
     scandalTopicDe: hype >= 2 ? 'PR-Superlative halten der Nachprüfung nicht stand' : '',
-    articleDe: `(Regelbasiertes Medienecho) Die Mitteilung „${titleDe}“ wurde von der Fachpresse ${sober ? 'sachlich aufgegriffen' : hype >= 2 ? 'als Marketing-Getöse eingeordnet' : 'kurz vermeldet'}. Für lebendige Artikel einen ANTHROPIC_API_KEY hinterlegen.`,
+    articleDe: `(Regelbasiertes Medienecho) Die Mitteilung „${titleDe}“ wurde von der Fachpresse ${sober ? 'sachlich aufgegriffen' : hype >= 2 ? 'als Marketing-Getöse eingeordnet' : 'kurz vermeldet'}. Für lebendige Artikel einen API-Key (OpenAI/Anthropic) hinterlegen.`,
     verdictDe: sober ? 'Sachlich, konkret, glaubwürdig — solide Arbeit.' : hype >= 2 ? `${hype} Superlative ohne Belege — die Presse ist nicht euer Werbeblock.` : 'Okay, aber ohne echten Nachrichtenwert.',
   };
 }

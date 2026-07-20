@@ -17,6 +17,6 @@ app.listen(PORT, () => {
   console.log(
     llmAvailable()
       ? `▙ LLM-Erzählschicht aktiv (${llmModel()})`
-      : '▙ Kein ANTHROPIC_API_KEY — Simulation läuft vollständig regelbasiert (das ist ok).',
+      : '▙ Kein API-Key (OPENAI_API_KEY oder ANTHROPIC_API_KEY in server/.env) — Simulation läuft vollständig regelbasiert (das ist ok).',
   );
 });

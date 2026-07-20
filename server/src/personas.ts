@@ -71,7 +71,7 @@ export function resolvePersona(state: CompanyState, threadKey: string): PersonaR
       roleDe: 'Kanzlei Brandt & Kollegen',
       execId: null,
       systemDe: `Du bist Dr. Katharina Brandt, Partnerin der (fiktiven) Wirtschaftskanzlei Brandt & Kollegen, in einem CEO-TRAININGS-SIMULATOR. Du berätst den CEO simuliert zu Arbeitsrecht (Kündigungen, Abmahnungen), Vertragsrecht (AGB, SLAs), Gesellschaftsrecht (Beschlüsse, Satzung), DSGVO, M&A-Due-Diligence und Kapitalmarktthemen — als AUSBILDUNGSINHALT. Stil: präzise, strukturiert (kurze nummerierte Punkte), nennt typische Fristen/Risiken/Optionen und was die Gegenseite tun könnte; empfiehlt bei Detailfragen weitere Prüfung. Du erinnerst gelegentlich charmant daran, dass jede Antwort Honorar kostet („Die Uhr läuft, Herr/Frau CEO."). WICHTIG: Beginne JEDE Antwort mit dem Kürzel „[Simulierte Ausbildungs-Beratung — keine echte Rechtsberatung]“. Erfinde keine konkreten Paragraphen-Zitate mit Detailinhalt; bleib bei allgemein bekannten Konzepten (z. B. 72h-Meldefrist Art. 33 DSGVO, KSchG-Grundsätze).`,
-      fallbackDe: '[Simulierte Ausbildungs-Beratung — keine echte Rechtsberatung]\n\nDanke für Ihre Anfrage. Kurzeinordnung folgt schriftlich; für die Detailprüfung brauchen wir die Unterlagen. Drei Punkte vorab: (1) Fristen notieren und wahren, (2) nichts Schriftliches ohne Gegenlesen herausgeben, (3) Kommunikation intern bündeln. Wir melden uns. — Brandt (Offline-Modus: Für ausführliche simulierte Beratung ANTHROPIC_API_KEY hinterlegen; das Honorar wurde dennoch gebucht — Anwaltszeit kostet.)',
+      fallbackDe: '[Simulierte Ausbildungs-Beratung — keine echte Rechtsberatung]\n\nDanke für Ihre Anfrage. Kurzeinordnung folgt schriftlich; für die Detailprüfung brauchen wir die Unterlagen. Drei Punkte vorab: (1) Fristen notieren und wahren, (2) nichts Schriftliches ohne Gegenlesen herausgeben, (3) Kommunikation intern bündeln. Wir melden uns. — Brandt (Offline-Modus: Für ausführliche simulierte Beratung einen API-Key (OpenAI/Anthropic) hinterlegen; das Honorar wurde dennoch gebucht — Anwaltszeit kostet.)',
     };
   }
   if (threadKey === 'dm:assistant') {
@@ -93,7 +93,7 @@ export function resolvePersona(state: CompanyState, threadKey: string): PersonaR
       roleDe: ipo.status === 'roadshow' ? 'Roadshow (institutionelle Investoren)' : 'Investor Relations',
       execId: null,
       systemDe: `Du spielst wechselnde institutionelle Investoren (Fondsmanager, Analysten) in der ${ipo.status === 'roadshow' ? `IPO-Roadshow (${spanTxt})` : 'IR-Sprechstunde einer börsennotierten Firma'} eines CEO-Trainings-Simulators. Stil: höflich, aber unbequem — ihr bohrt bei Churn, Unit Economics, Wettbewerbsvorteil, Use of Proceeds und Management-Track-Record. Jede Antwort: 1–2 harte Fragen oder eine pointierte Einschätzung, max. 100 Wörter, auf Deutsch, Anrede „Sie". Keine erfundenen Zahlen über die Firma — nur das Lagebild. Kauf-/Zeichnungszusagen gibst du NIE; die Nachfrage entscheidet die Simulation.`,
-      fallbackDe: 'Interessant. Zwei Fragen für die nächste Runde: Wie entwickelt sich die Netto-Kundenbindung der letzten Kohorten — und wofür genau ist der Emissionserlös eingeplant? Wir melden uns über die Bank. (Offline-Modus: Für lebendige Q&A ANTHROPIC_API_KEY hinterlegen.)',
+      fallbackDe: 'Interessant. Zwei Fragen für die nächste Runde: Wie entwickelt sich die Netto-Kundenbindung der letzten Kohorten — und wofür genau ist der Emissionserlös eingeplant? Wir melden uns über die Bank. (Offline-Modus: Für lebendige Q&A einen API-Key (OpenAI/Anthropic) hinterlegen.)',
     };
   }
   const exec = state.people.executives.find((e) => 'dm:' + e.id === threadKey);
@@ -221,7 +221,7 @@ export async function meetingRound(
       {
         speaker: first.name,
         roleDe: first.roleDe,
-        textDe: 'Danke für den Punkt — lass uns das anhand der Agenda durchgehen. Aus meiner Sicht ist der wichtigste nächste Schritt, die offenen Themen aus dem Lagebild zu priorisieren. (Offline-Modus: Für lebendige Meetings einen ANTHROPIC_API_KEY hinterlegen.)',
+        textDe: 'Danke für den Punkt — lass uns das anhand der Agenda durchgehen. Aus meiner Sicht ist der wichtigste nächste Schritt, die offenen Themen aus dem Lagebild zu priorisieren. (Offline-Modus: Für lebendige Meetings einen API-Key (OpenAI/Anthropic) hinterlegen.)',
       },
     ],
     boardTrustDelta: 0,
