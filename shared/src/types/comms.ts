@@ -74,7 +74,7 @@ export interface Appointment {
   /** Wochentag 0 = Montag … 4 = Freitag. */
   weekday: number;
   titleDe: string;
-  kind: 'leadershipSync' | 'boardCall' | 'customerCall' | 'legal' | 'custom';
+  kind: 'leadershipSync' | 'boardCall' | 'customerCall' | 'legal' | 'earningsCall' | 'custom';
   /** Agenda-Vorschlag der Sekretärin (regelbasiert aus dem State). */
   agendaDe: string[];
   /** Teilnehmer-Namen (Snapshot zum Erstellzeitpunkt). */

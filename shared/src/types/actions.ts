@@ -27,7 +27,9 @@ export type PlayerAction =
   | AcceptTermSheetAction
   | RaiseVentureDebtAction
   | MaDueDiligenceAction
-  | MaAcquireAction;
+  | MaAcquireAction
+  | IpoSelectBankAction
+  | IpoPriceAction;
 
 /**
  * Listenpreis ändern (± %). Sofort: Neugeschäfts-ARPA. Verzögert: Bestand wird
@@ -170,6 +172,25 @@ export interface MaAcquireAction {
 }
 
 export const MA_DD_FEE = 15_000;
+
+/**
+ * IPO (Phase 6): Bank mandatieren — startet die Vorbereitung (Prospekt,
+ * Audit, ~120 k€) und nach 8 Wochen die Roadshow.
+ */
+export interface IpoSelectBankAction {
+  type: 'IPO_SELECT_BANK';
+  bankId: string;
+}
+
+/** IPO-Pricing innerhalb (oder unterhalb) der Bookbuilding-Spanne. */
+export interface IpoPriceAction {
+  type: 'IPO_PRICE';
+  pricePerShare: number;
+}
+
+export const IPO_PREP_COST = 120_000;
+export const IPO_PREP_WEEKS = 8;
+export const IPO_ROADSHOW_WEEKS = 3;
 
 /** Ergebnis der Aktions-Validierung durch die Engine. */
 export interface ActionValidation {

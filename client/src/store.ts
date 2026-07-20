@@ -10,6 +10,7 @@ import type {
   DecisionRecord,
 } from '@boardroom/shared';
 import { api } from './api.js';
+import { getLocale, setLocale, type Locale } from './i18n.js';
 
 export type View =
   | 'saves'
@@ -28,6 +29,7 @@ export type View =
   | 'legal'
   | 'press'
   | 'strategy'
+  | 'boerse'
   | 'learn'
   | 'settings';
 
@@ -47,7 +49,13 @@ interface BoardroomStore {
   /** Lese-/Archiv-Status je Nachricht (DB-Overlay, nicht Teil des Engine-States). */
   messageStatus: Record<string, string>;
   showBriefing: boolean;
+  /** UI-Sprache (Chrome-Labels; Spielinhalte bleiben Deutsch). */
+  lang: Locale;
+  /** Hochgeladenes Logo (Data-URL) des offenen Spielstands. */
+  logoDataUrl: string | null;
 
+  setLang: (l: Locale) => void;
+  setLogoDataUrl: (d: string | null) => void;
   setView: (v: View) => void;
   markMessage: (mid: string, status: 'read' | 'archived' | 'inbox') => Promise<void>;
   dismissBriefing: () => void;
@@ -76,7 +84,14 @@ export const useStore = create<BoardroomStore>((set, get) => ({
   hypothesisMode: true,
   messageStatus: {},
   showBriefing: false,
+  lang: getLocale(),
+  logoDataUrl: null,
 
+  setLang: (lang) => {
+    setLocale(lang);
+    set({ lang });
+  },
+  setLogoDataUrl: (logoDataUrl) => set({ logoDataUrl }),
   setView: (view) => set({ view }),
   dismissBriefing: () => set({ showBriefing: false }),
   markMessage: async (mid, status) => {
@@ -100,6 +115,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
 
   openGame: async (id) => {
     set({ busy: true, error: null });
+    void api.getLogo(id).then((r) => set({ logoDataUrl: r.dataUrl })).catch(() => set({ logoDataUrl: null }));
     try {
       const [{ state, evaluations }, { reports }, { status }] = await Promise.all([
         api.getGame(id),

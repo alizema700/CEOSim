@@ -16,6 +16,7 @@ import { gaussian, intBetween, stream } from './rng.js';
 import { computeKpis } from './kpis.js';
 import { addMessage, execSender, upkeepCalendar } from './comms.js';
 import { generateMaTargets } from './ma.js';
+import { initialIpoState } from '../types/ipo.js';
 
 /**
  * Spielinitialisierung: baut aus GameSetup + Seed den Start-CompanyState.
@@ -94,9 +95,16 @@ function nextId(state: { idCounter: number }, prefix: string): string {
 }
 
 export function createCompany(setup: GameSetup, seed: number, gameId: string, createdAtISO: string): CompanyState {
-  if (setup.scenarioId !== 'saas-turnaround') {
-    throw new Error(`Szenario ${setup.scenarioId} ist noch nicht implementiert (Phase 6).`);
+  if (setup.scenarioId !== 'saas-turnaround' && setup.scenarioId !== 'distressed') {
+    throw new Error(`Szenario ${setup.scenarioId} ist noch nicht implementiert.`);
   }
+  /**
+   * Szenario 2 (Phase 6): „Sanierungsfall" — dieselbe Firma, aber zwei Jahre
+   * schlechter geführt: fast leere Kasse, Lieferanten auf der Bremse, Bank
+   * nervös, Produkt verwahrlost, Team zermürbt. Runway ist hier von Tag 1
+   * die einzige Uhr, die zählt.
+   */
+  const dz = setup.scenarioId === 'distressed';
   const loc = LOCATIONS[setup.identity.locationId];
   const diff = DIFFICULTIES[setup.difficulty];
   const counter = { idCounter: 0 };
@@ -119,7 +127,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
         seniority,
         salaryMonthly: Math.round(baseSalary * loc.payrollIndex * gaussian(rngPeople, 1, 0.05)),
         performance: Math.round(gaussian(rngPeople, 68, 12)),
-        satisfaction: Math.round(gaussian(rngPeople, 58, 10)), // gedrückt: Übernahme-Unsicherheit
+        satisfaction: Math.round(gaussian(rngPeople, dz ? 49 : 58, 10)), // gedrückt: Übernahme-Unsicherheit (Sanierungsfall: zermürbt)
         attritionRiskWeekly: 0.0035,
         keyPerson: seniority === 'lead' || (seniority === 'senior' && rngPeople() < 0.4),
         hiredWeek: -intBetween(rngPeople, 20, 200),
@@ -155,12 +163,12 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
 
   // Bestand in 4 Alters-Kohorten je Segment aufteilen (ältere churnen weniger).
   const cohorts: CustomerCohort[] = [];
-  const smbTotal = 262;
-  const mmTotal = 18;
+  const smbTotal = dz ? 232 : 262;
+  const mmTotal = dz ? 15 : 18;
   const split = [0.18, 0.24, 0.27, 0.31]; // jüngste → älteste
   const ageWeeks = [7, 33, 59, 111];
   split.forEach((share, i) => {
-    const churnByAge = [0.058, 0.045, 0.034, 0.026][i] ?? 0.03; // DAS Problem: junge Kohorten churnen massiv
+    const churnByAge = (dz ? [0.072, 0.056, 0.041, 0.03] : [0.058, 0.045, 0.034, 0.026])[i] ?? 0.03; // DAS Problem: junge Kohorten churnen massiv
     cohorts.push({
       id: nextId(counter, 'coh'),
       segmentId: segSmb.id,
@@ -178,7 +186,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
       logosMonthly: mmTotal * share * 0.4,
       logosAnnual: mmTotal * share * 0.6,
       arpaMonthly: segMm.baseArpaMonthly * gaussian(rngCust, 1, 0.03),
-      baseMonthlyChurn: [0.028, 0.022, 0.017, 0.013][i] ?? 0.018,
+      baseMonthlyChurn: (dz ? [0.034, 0.026, 0.02, 0.015] : [0.028, 0.022, 0.017, 0.013])[i] ?? 0.018,
       monthlyExpansion: 0.009,
     });
   });
@@ -190,22 +198,23 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
     name: accountName(rngCust, takenNames),
     segmentId: segMm.id,
     mrr,
-    health: intBetween(rngCust, 55, 80) - (i === 0 ? 12 : 0), // größter Account ist angespannt
+    health: intBetween(rngCust, 55, 80) - (i === 0 ? (dz ? 22 : 12) : 0), // größter Account ist angespannt
     renewalWeek: intBetween(rngCust, 9, 48),
-    status: 'ok',
+    status: dz && i === 0 ? 'atRisk' : 'ok',
   }));
 
   // ── Finanzen ──────────────────────────────────────────────────────
-  const cash = Math.round(900_000 * diff.startingCashMult);
+  const cash = Math.round((dz ? 340_000 : 900_000) * diff.startingCashMult);
   const cohortMrr = cohorts.reduce((s, c) => s + (c.logosMonthly + c.logosAnnual) * c.arpaMonthly, 0);
   const totalMrr = cohortMrr + kaMrr.reduce((a, b) => a + b, 0);
-  const accountsReceivable = Math.round(totalMrr * (38 / 30.44)); // DSO 38 Tage
-  const accountsPayable = 96_000;
+  const dso = dz ? 44 : 38;
+  const accountsReceivable = Math.round(totalMrr * (dso / 30.44));
+  const accountsPayable = dz ? 148_000 : 96_000; // Sanierungsfall: Lieferanten warten bereits
   // Jahresvorauszahler: im Schnitt 6 Monate Leistung noch offen.
   const annualMrr =
     cohorts.reduce((s, c) => s + c.logosAnnual * c.arpaMonthly, 0) + kaMrr.reduce((a, b) => a + b, 0);
   const deferredRevenue = Math.round(annualMrr * 6);
-  const debtPrincipal = 300_000;
+  const debtPrincipal = dz ? 540_000 : 300_000;
   const contributedCapital = 2_500_000;
   const assets = cash + accountsReceivable;
   const liabilities = accountsPayable + deferredRevenue + debtPrincipal;
@@ -239,22 +248,22 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
       deferredRevenue,
       debt: {
         principal: debtPrincipal,
-        annualRate: 0.08,
-        creditLine: 600_000,
+        annualRate: dz ? 0.095 : 0.08,
+        creditLine: dz ? 700_000 : 600_000,
         covenants: [
-          { type: 'minCash', value: 150_000, labelDe: 'Mindestliquidität 150 k€' },
-          { type: 'maxDebtToArr', value: 0.5, labelDe: 'Verschuldung max. 50 % vom ARR' },
+          { type: 'minCash', value: dz ? 120_000 : 150_000, labelDe: dz ? 'Mindestliquidität 120 k€' : 'Mindestliquidität 150 k€' },
+          { type: 'maxDebtToArr', value: dz ? 0.6 : 0.5, labelDe: dz ? 'Verschuldung max. 60 % vom ARR' : 'Verschuldung max. 50 % vom ARR' },
         ],
       },
       contributedCapital,
       retainedEarnings,
-      dsoDays: 38,
-      dpoDays: 24,
+      dsoDays: dso,
+      dpoDays: dz ? 33 : 24,
       cogsRate: 0.22,
       consecutiveMinCashBreachWeeks: 0,
       budgetsMonthly: {
-        marketing: 25_000,
-        customerSuccess: 6_000,
+        marketing: dz ? 17_000 : 25_000,
+        customerSuccess: dz ? 4_000 : 6_000,
         rndTools: 8_000,
         gaOther: 12_000,
       },
@@ -271,7 +280,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
           { count: 18, weeksToDecision: 3 },
         ],
         leadToTrialRate: 0.28,
-        trialWinRate: 0.15,
+        trialWinRate: dz ? 0.13 : 0.15,
         recentNewLogos: [],
         recentSmSpend: [],
       },
@@ -283,14 +292,14 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
       executives,
       assistant,
       openRequisitions: [],
-      moraleByDept: Object.fromEntries(DEPARTMENTS.map((d) => [d, 58])) as Record<Department, number>,
+      moraleByDept: Object.fromEntries(DEPARTMENTS.map((d) => [d, dz ? 50 : 58])) as Record<Department, number>,
       attritionModifier: 1.0,
     },
     product: {
-      techDebt: 62,
+      techDebt: dz ? 79 : 62,
       velocityPointsPerWeek: 0, // wird im ersten Tick berechnet
-      bugBacklog: 34,
-      nps: 12,
+      bugBacklog: dz ? 58 : 34,
+      nps: dz ? 1 : 12,
       dauMauRatio: 0.42,
       featurePointsShipped: 0,
       rndAllocation: { features: 0.7, techDebt: 0.15, bugfixes: 0.15 },
@@ -334,10 +343,12 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
       agentCooldowns: {},
       maTargets: generateMaTargets(seed, counter),
     },
-    reputation: { customers: 55, press: 50, laborMarket: 52, investors: 54 },
+    reputation: dz
+      ? { customers: 46, press: 39, laborMarket: 45, investors: 41 }
+      : { customers: 55, press: 50, laborMarket: 52, investors: 54 },
     ceo: {
-      boardTrust: 58,
-      trustLog: [{ week: 0, delta: 0, reasonDe: 'Amtsantritt: Das Board gewährt einen Vertrauensvorschuss — und erwartet einen Plan.' }],
+      boardTrust: dz ? 47 : 58,
+      trustLog: [{ week: 0, delta: 0, reasonDe: dz ? 'Amtsantritt als Sanierer: Das Board hat wenig Geduld übrig — es zählt nur noch der Plan.' : 'Amtsantritt: Das Board gewährt einen Vertrauensvorschuss — und erwartet einen Plan.' }],
       reputation: 50,
       salaryMonthly: 12_000,
       equityShare: 0.05,
@@ -353,6 +364,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
     projects: [],
     pressLog: [],
     funding: { rounds: [], investorBoardSeat: false, ventureDebtTaken: false },
+    ipo: initialIpoState(),
     history: [],
     decisionLog: [],
     evaluations: [],
@@ -370,7 +382,9 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
   addMessage(state, {
     from: { name: assistant.name, roleDe: 'Chief of Staff', refId: assistant.id, company: null },
     subjectDe: `Willkommen bei ${setup.identity.companyName} — dein Antritts-Briefing`,
-    bodyDe: `herzlich willkommen an Bord! Ich bin ${assistant.name}, deine Chief of Staff — ich halte dir Kalender, Inbox und Flurfunk im Griff.\n\nDie Lage in einem Absatz: Das Produkt ist solide, der Umsatz auch (~${Math.round(totalMrrOf(state) / 1000)} k€ MRR) — aber die jungen Kunden-Kohorten kündigen zu schnell, das Engineering schiebt Altlasten vor sich her, und die Kasse reicht bei aktuellem Tempo nicht ewig. Das Board hat dich geholt, um genau das zu drehen.\n\nMein Rat für Woche 1: Sprich mit dem Führungsteam (Chat), sieh dir Kunden & Finanzen an, triff die ersten Entscheidungen — und schließe dann die Woche ab. Ich melde mich jeden Montag mit deinem Briefing.\n\n${assistant.name.split(' ')[0]}`,
+    bodyDe: dz
+      ? `willkommen — und ich sage das ohne Umschweife: Du übernimmst einen Sanierungsfall. Die Lage: ~${Math.round(totalMrrOf(state) / 1000)} k€ MRR, aber die Kasse ist fast leer, die Lieferanten sind bereits vertröstet, die Bank prüft die Covenants monatlich und das Team hat zwei Chef-Wechsel hinter sich. Jede Woche ohne Entscheidung ist eine Woche weniger Runway.\n\nMein Rat für Woche 1: Finanzen-Tab ZUERST (Runway, Covenants), dann die härteste Frage ehrlich beantworten: Was wird abgeschaltet, damit der Kern überlebt? Das Board erwartet keinen Visionsvortrag — es erwartet einen 13-Wochen-Liquiditätsplan.\n\nIch bin da. ${assistant.name.split(' ')[0]}`
+      : `herzlich willkommen an Bord! Ich bin ${assistant.name}, deine Chief of Staff — ich halte dir Kalender, Inbox und Flurfunk im Griff.\n\nDie Lage in einem Absatz: Das Produkt ist solide, der Umsatz auch (~${Math.round(totalMrrOf(state) / 1000)} k€ MRR) — aber die jungen Kunden-Kohorten kündigen zu schnell, das Engineering schiebt Altlasten vor sich her, und die Kasse reicht bei aktuellem Tempo nicht ewig. Das Board hat dich geholt, um genau das zu drehen.\n\nMein Rat für Woche 1: Sprich mit dem Führungsteam (Chat), sieh dir Kunden & Finanzen an, triff die ersten Entscheidungen — und schließe dann die Woche ab. Ich melde mich jeden Montag mit deinem Briefing.\n\n${assistant.name.split(' ')[0]}`,
     kind: 'briefing',
     eventInstanceId: null,
     delegable: false,

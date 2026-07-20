@@ -3,10 +3,11 @@ import { useStore } from '../store.js';
 import { api } from '../api.js';
 import { Panel, StatRow } from '../components/ui.js';
 import { num } from '../format.js';
+import { t } from '../i18n.js';
 
-/** Einstellungen: Token-Kosten-Dashboard, Didaktik-Schalter, Export, Danger Zone. */
+/** Einstellungen: Token-Kosten, Didaktik, Sprache, Logo, PDF, Export, Danger Zone. */
 export function SettingsView() {
-  const { state, hypothesisMode, setHypothesisMode, deleteGame, leaveGame } = useStore();
+  const { state, hypothesisMode, setHypothesisMode, deleteGame, leaveGame, lang, setLang, logoDataUrl, setLogoDataUrl, setError } = useStore();
   const [usage, setUsage] = useState<Awaited<ReturnType<typeof api.llmUsage>> | null>(null);
 
   useEffect(() => {
@@ -14,6 +15,23 @@ export function SettingsView() {
   }, []);
 
   if (!state) return null;
+
+  function onLogoFile(file: File | undefined) {
+    if (!file || !state) return;
+    if (file.size > 280_000) {
+      setError('Logo zu groß — bitte max. ~280 KB (PNG/JPG).');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      void api
+        .uploadLogo(state.meta.gameId, dataUrl)
+        .then(() => setLogoDataUrl(dataUrl))
+        .catch((e) => setError((e as Error).message));
+    };
+    reader.readAsDataURL(file);
+  }
 
   return (
     <div className="grid gap-4 lg:grid-cols-2">
@@ -52,15 +70,47 @@ export function SettingsView() {
           </label>
         </Panel>
 
-        <Panel title="Spielstand">
+        <Panel title={`🌐 ${t('language')} (Phase 6: Chrome-Labels)`}>
+          <div className="flex gap-1.5">
+            <button className={`chip ${lang === 'de' ? 'chip-on' : ''}`} onClick={() => setLang('de')}>Deutsch</button>
+            <button className={`chip ${lang === 'en' ? 'chip-on' : ''}`} onClick={() => setLang('en')}>English</button>
+          </div>
+          <p className="mt-2 text-[10px] text-dim">
+            Übersetzt Navigation & Top-Bar. Spielinhalte (Mails, Analysen, Events) kommen aus der Engine und bleiben vorerst Deutsch —
+            die volle EN-Lokalisierung ist im i18n-Gerüst vorbereitet.
+          </p>
+        </Panel>
+
+        <Panel title="🖼 Firmenlogo">
+          <div className="flex items-center gap-3">
+            {logoDataUrl ? (
+              <img src={logoDataUrl} alt="Logo" className="h-12 w-12 rounded border border-line object-cover" />
+            ) : (
+              <span className="flex h-12 w-12 items-center justify-center rounded border border-line text-xl" style={{ background: state.identity.logoColor + '33' }}>
+                {state.identity.logoEmoji}
+              </span>
+            )}
+            <label className="btn cursor-pointer">
+              {t('logo_upload')}
+              <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => onLogoFile(e.target.files?.[0])} />
+            </label>
+          </div>
+          <p className="mt-2 text-[10px] text-dim">Erscheint in der Seitenleiste und auf dem PDF-Quartalsbericht.</p>
+        </Panel>
+
+        <Panel title="Spielstand & Berichte">
           <div className="flex flex-wrap gap-2">
             <a className="btn" href={`/api/games/${state.meta.gameId}/export`} download>
               ⬇ Als JSON exportieren (Event-Log + Snapshot)
             </a>
+            <a className="btn" href={`/api/games/${state.meta.gameId}/report.pdf`} download>
+              📄 {t('quarterly_pdf')}
+            </a>
           </div>
           <p className="mt-2 text-[10px] text-dim">
             Der Export enthält das vollständige append-only Event-Log. Beim Import wird es deterministisch REPLAYT — gleicher
-            Seed + gleiche Entscheidungen ⇒ identischer Zustand. Grundlage für das Was-wäre-wenn-Labor (Phase 4).
+            Seed + gleiche Entscheidungen ⇒ identischer Zustand. Der PDF-Bericht fasst die letzten 13 Wochen zusammen
+            (Kennzahlen, GuV, Entscheidungen mit Noten, Lektionen).
           </p>
         </Panel>
 

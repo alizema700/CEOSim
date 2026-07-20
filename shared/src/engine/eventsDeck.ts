@@ -424,6 +424,22 @@ export const EVENT_CARDS: RandomEventCard[] = [
     defaultOptionId: 'decline',
     autoResolveAfterWeeks: 3,
   },
+  {
+    // Phase 6: nur börsennotiert relevant — weightFor gated auf pendingAdhocTopicDe.
+    id: 'ADHOC_DUTY',
+    titleDe: 'Ad-hoc-Pflicht: kursrelevante Insiderinformation',
+    bodyTemplateDe:
+      'Euer Kapitalmarktrechtler am Telefon, ungewohnt ernst: „${topic}" erfüllt alle Merkmale einer Insiderinformation nach Art. 17 MAR — euch unmittelbar betreffend, nicht öffentlich, kurserheblich. Grundsatz: UNVERZÜGLICHE Ad-hoc-Veröffentlichung. Ein Aufschub ist nur zulässig, wenn berechtigte Interessen ihn erfordern, keine Irreführung droht und Vertraulichkeit gewährleistet ist — und er fliegt euch um die Ohren, wenn es vorher leakt. Der Kurs wird so oder so leiden. Die Frage ist: kontrolliert jetzt oder unkontrolliert später.',
+    baseWeeklyWeight: 0,
+    cooldownWeeks: 0,
+    minWeek: 0,
+    options: [
+      { id: 'disclose', labelDe: 'Sofort Ad-hoc veröffentlichen — Kursdelle, aber sauber', immediateEffects: [], scheduledEffects: [], processQualityHint: 'good' },
+      { id: 'defer', labelDe: 'Formalen Aufschub beschließen und erst intern klären (Leak-Risiko, BaFin-Risiko)', immediateEffects: [], scheduledEffects: [], processQualityHint: 'risky' },
+    ],
+    defaultOptionId: 'disclose',
+    autoResolveAfterWeeks: 1,
+  },
 ];
 
 // ────────────────────────────────────────────────────────────────────
@@ -456,6 +472,9 @@ function weightFor(card: RandomEventCard, state: CompanyState): number {
       weight *= growth;
       break;
     }
+    case 'ADHOC_DUTY':
+      // Garantierter Trigger, sobald eine Ad-hoc-Pflicht ansteht (börsennotiert).
+      return state.ipo.pendingAdhocTopicDe !== null ? 9 : 0;
     default:
       break;
   }
@@ -542,6 +561,9 @@ function renderBody(card: RandomEventCard, state: CompanyState, instance: Pick<A
     case 'PARTNERSHIP_OFFER':
       fill('partner', PARTNER_POOL[(state.meta.week + state.idCounter) % PARTNER_POOL.length] ?? PARTNER_POOL[0]!);
       break;
+    case 'ADHOC_DUTY':
+      fill('topic', state.ipo.pendingAdhocTopicDe ?? 'Kursrelevantes Ereignis');
+      break;
     default:
       break;
   }
@@ -573,6 +595,8 @@ function mailSender(card: RandomEventCard, state: CompanyState, instance: Active
       return { name: 'Referat Digitalförderung', roleDe: 'Behörde', refId: null, company: 'Wirtschaftsministerium' };
     case 'ACCOUNTING_FRAUD':
       return { name: 'Controlling', roleDe: 'Vertraulich', refId: null, company: null };
+    case 'ADHOC_DUTY':
+      return { name: 'Dr. Katharina Brandt', roleDe: 'Kapitalmarktrecht', refId: null, company: 'Brandt & Kollegen' };
     default:
       return { name: 'Extern', roleDe: 'Eingang', refId: null, company: null };
   }
@@ -832,6 +856,32 @@ function applyOption(
           analysis.push('Die Bank war nicht überzeugt und hat das Board direkt informiert. Das kostet Vertrauen.');
         }
       }
+      break;
+    }
+    case 'ADHOC_DUTY': {
+      const ipo = state.ipo;
+      const topic = ipo.pendingAdhocTopicDe ?? 'Kursrelevantes Ereignis';
+      if (option.id === 'disclose') {
+        if (ipo.sharePrice !== null) ipo.sharePrice = Math.round(ipo.sharePrice * 0.92 * 100) / 100;
+        state.reputation.press = clamp(state.reputation.press + 2, 0, 100);
+        state.pressLog.push({ week, tone: 'neutral', topicDe: `Ad-hoc-Mitteilung von ${state.identity.companyName}: ${topic}` });
+        analysis.push('Der Kurs nimmt ~−8 % — aber kontrolliert, mit eurer Einordnung, ohne Rechtsrisiko. Kapitalmarkt-Vertrauen ist ein Marathon: Wer schlechte Nachrichten selbst meldet, dem glaubt man auch die guten.');
+      } else {
+        const rng = stream(state.meta.seed, 'adhoc-defer', week, state.idCounter);
+        if (rng() < 0.5) {
+          if (ipo.sharePrice !== null) ipo.sharePrice = Math.round(ipo.sharePrice * 0.8 * 100) / 100;
+          schedule(state, 0, src, decisionId, { kind: 'ONE_OFF_COST', amount: 50_000, labelDe: 'BaFin-Bußgeld: verspätete Ad-hoc-Mitteilung' }, 'event');
+          state.reputation.press = clamp(state.reputation.press - 7, 0, 100);
+          state.ceo.boardTrust = clamp(state.ceo.boardTrust - 6, 0, 100);
+          state.ceo.trustLog.push({ week, delta: -6, reasonDe: 'Ad-hoc-Aufschub geleakt — BaFin-Verfahren, Kurssturz, Vertrauensschaden.' });
+          state.pressLog.push({ week, tone: 'negative', topicDe: `${state.identity.companyName} verschwieg kursrelevante Information — BaFin prüft` });
+          analysis.push('Es ist geleakt: „Unternehmen verschwieg …" ist jetzt die Schlagzeile. Kurs −20 %, 50 k€ Bußgeld, und ab jetzt liest der Markt jede eurer Meldungen mit spitzen Fingern.');
+        } else {
+          if (ipo.sharePrice !== null) ipo.sharePrice = Math.round(ipo.sharePrice * 0.97 * 100) / 100;
+          analysis.push('Der Aufschub hat gehalten — diesmal. Merke trotzdem: Du hast Rechtsrisiko gegen ein paar Tage Ruhe getauscht. Beim nächsten Mal würfelst du wieder.');
+        }
+      }
+      ipo.pendingAdhocTopicDe = null;
       break;
     }
     default:

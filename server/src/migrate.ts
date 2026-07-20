@@ -1,4 +1,4 @@
-import { generateMaTargets, type CompanyState } from '@boardroom/shared';
+import { generateMaTargets, initialIpoState, type CompanyState } from '@boardroom/shared';
 
 /**
  * Sanfte Snapshot-Migration: füllt Felder auf, die neuere Engine-Versionen
@@ -29,5 +29,7 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   if (!s.funding) s.funding = { rounds: [], investorBoardSeat: false, ventureDebtTaken: false };
   if (!s.market.agentCooldowns) s.market.agentCooldowns = {};
   if (!s.market.maTargets) s.market.maTargets = generateMaTargets(s.meta.seed, s);
+  // Phase 6: IPO-Prozess
+  if (!s.ipo) s.ipo = initialIpoState();
   return state;
 }

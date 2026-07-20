@@ -6,6 +6,7 @@ import {
   totalMrr,
   type KpiId,
 } from '@boardroom/shared';
+import { useState } from 'react';
 import { useStore } from '../store.js';
 import { eur, num, pct } from '../format.js';
 import { KpiCard, Panel } from '../components/ui.js';
@@ -49,6 +50,7 @@ export function DashboardView() {
 
   return (
     <div className="space-y-4">
+      <TutorialPanel />
       {/* Alerts */}
       {lastReport && lastReport.alerts.length > 0 && (
         <div className="space-y-2">
@@ -173,6 +175,62 @@ function Chart({ title, data, dataKey, color }: { title: string; data: Record<st
             <Line type="monotone" dataKey={dataKey} stroke={color} strokeWidth={1.5} dot={false} />
           </LineChart>
         </ResponsiveContainer>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * Tutorial-Checkliste (Phase 6): führt neue CEOs durch die erste Spielstunde.
+ * Haken kommen aus dem echten Spielzustand — kein separater Tutorial-Modus.
+ */
+function TutorialPanel() {
+  const { state, evaluations, messageStatus, setView } = useStore();
+  const [, force] = useState(0);
+  if (!state) return null;
+  const gid = state.meta.gameId;
+  const dismissedKey = `br-tut-dismissed-${gid}`;
+  if (typeof localStorage !== 'undefined' && localStorage.getItem(dismissedKey)) return null;
+
+  const chatted = typeof localStorage !== 'undefined' && !!localStorage.getItem(`br-tut-chat-${gid}`);
+  const steps: { label: string; done: boolean; go?: () => void }[] = [
+    { label: 'Briefing der Chief of Staff lesen (Inbox)', done: Object.values(messageStatus).some((s) => s === 'read'), go: () => setView('inbox') },
+    { label: 'Mit dem Führungsteam sprechen (Chat)', done: chatted, go: () => setView('chat') },
+    { label: 'Erste Entscheidung treffen (Entscheidungen)', done: state.decisionLog.length > 0, go: () => setView('decisions') },
+    { label: 'Dabei eine Hypothese formulieren („Was erwarte ich?")', done: state.decisionLog.some((d) => d.hypothesis !== null), go: () => setView('decisions') },
+    { label: 'Die Woche abschließen (▶ oben rechts)', done: state.meta.week > 0 },
+    { label: 'Nach ~4 Wochen: erste Bewertung ansehen (Bewertungen)', done: evaluations.length > 0 || state.evaluations.length > 0, go: () => setView('evaluations') },
+  ];
+  const doneCount = steps.filter((s) => s.done).length;
+  if (doneCount === steps.length) return null;
+
+  return (
+    <Panel title={`🧭 Erste Schritte als CEO (${doneCount}/${steps.length})`}>
+      <div className="grid gap-1 md:grid-cols-2">
+        {steps.map((s, i) => (
+          <button
+            key={i}
+            className={`flex items-center gap-2 rounded px-1.5 py-1 text-left text-xs ${s.done ? 'text-good' : 'text-dim hover:text-ink'}`}
+            onClick={() => !s.done && s.go?.()}
+          >
+            <span>{s.done ? '☑' : '☐'}</span>
+            <span className={s.done ? 'line-through opacity-70' : ''}>{s.label}</span>
+          </button>
+        ))}
+      </div>
+      <div className="mt-2 flex items-center justify-between">
+        <p className="text-[10px] text-dim">
+          Prinzip des Simulators: Erst Erwartung, dann Entscheidung, dann Abgleich — bewertet wird dein PROZESS, nicht dein Glück.
+        </p>
+        <button
+          className="text-[10px] text-dim underline hover:text-ink"
+          onClick={() => {
+            localStorage.setItem(dismissedKey, '1');
+            force((x) => x + 1);
+          }}
+        >
+          Ausblenden
+        </button>
       </div>
     </Panel>
   );

@@ -36,6 +36,7 @@ import { projectsMonthlyCost, tickProjects } from './projects.js';
 import { tickCompetitorAgents } from './competitors.js';
 import { applyEquityInjection } from './funding.js';
 import { applyMaIntegration } from './ma.js';
+import { applyIpoListing, tickIpo } from './ipo.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -102,9 +103,10 @@ export function closeWeek(state: CompanyState): WeekReport {
   // ── 5. Finanz-Ledger → Statements ─────────────────────────────────
   const { income, cashflow, balance } = closeLedger(state, ledger, cashStart);
 
-  // ── 6. Markt, Reputation & Konkurrenz-Agenten (Phase 5) ───────────
+  // ── 6. Markt, Reputation, Konkurrenz-Agenten & Börse (Phase 5/6) ──
   tickMarketAndReputation(state, occurrences);
   tickCompetitorAgents(state, occurrences);
+  tickIpo(state, occurrences);
 
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);
@@ -331,6 +333,11 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
         state.ceo.boardTrust = clamp(state.ceo.boardTrust - 8, 0, 100);
         state.ceo.trustLog.push({ week, delta: -8, reasonDe: `Skandal aufgeflogen: ${fx.topicDe}` });
         occ.push({ icon: '🔥', textDe: `ES IST RAUSGEKOMMEN: ${fx.topicDe} — Bußgeld/Schaden ${k(fx.fine)}, Presse & Board toben.`, severity: 'bad' });
+        // Börsennotiert? Dann ist das eine Insiderinformation ⇒ Ad-hoc-Pflicht (Art. 17 MAR).
+        if (state.ipo.status === 'public') {
+          state.ipo.pendingAdhocTopicDe = fx.topicDe;
+          if (state.ipo.sharePrice !== null) state.ipo.sharePrice = Math.round(state.ipo.sharePrice * 0.95 * 100) / 100;
+        }
       }
       break;
     }
@@ -349,6 +356,15 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
     case 'MA_INTEGRATION':
       applyMaIntegration(state, fx.targetId, occ);
       break;
+    case 'IPO_LISTING': {
+      // Bruttoerlös über CFF (Ledger), Fees als Einmalaufwand durch die GuV,
+      // Einlage ins Eigenkapital — Bilanz-Identität hält konstruktionsbedingt.
+      const { grossProceeds, fees } = applyIpoListing(state, fx.pricePerShare, fx.subscriptionRatio, occ);
+      ledger.equityRaised += grossProceeds;
+      ledger.oneOffsPaid += fees;
+      state.finance.contributedCapital += grossProceeds;
+      break;
+    }
   }
 }
 

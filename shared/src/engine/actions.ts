@@ -1,4 +1,4 @@
-import { CONSULTANT_FEE, MA_DD_FEE, type ActionValidation, type PlayerAction } from '../types/actions.js';
+import { CONSULTANT_FEE, IPO_PREP_COST, IPO_PREP_WEEKS, MA_DD_FEE, type ActionValidation, type PlayerAction } from '../types/actions.js';
 import type { CompanyState } from '../types/company.js';
 import type { DecisionRecord, Hypothesis } from '../types/evaluation.js';
 import type { EffectPayload } from '../types/effects.js';
@@ -10,6 +10,7 @@ import { executeDelegation } from './comms.js';
 import { clampClassification, startProject } from './projects.js';
 import { buildRound, generateTermSheets, validateTermSheet, validateVentureDebt, applyVentureDebtTerms } from './funding.js';
 import { maTarget } from './ma.js';
+import { IPO_BANKS, ipoBank, ipoEligibility, subscriptionRatioFor } from './ipo.js';
 
 export { deptDe };
 
@@ -159,6 +160,29 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
         }
         if (!t.ddDone) warnings.push('Kauf OHNE Due Diligence: Du übernimmst alle versteckten Altlasten ungeprüft. Die DD ist fast immer gut investiertes Geld.');
         if (runwayWeeks(state) < 20) warnings.push('Akquisition bei unter 20 Wochen Runway: Integrationen kosten Cash UND Management-Aufmerksamkeit.');
+      }
+      break;
+    }
+    case 'IPO_SELECT_BANK': {
+      if (!IPO_BANKS.some((b) => b.id === action.bankId)) errors.push('Unbekannte Bank.');
+      if (state.ipo.status !== 'eligible' && state.ipo.status !== 'withdrawn') {
+        errors.push(state.ipo.status === 'public' ? 'Ihr seid bereits börsennotiert.' : state.ipo.status === 'locked' ? 'Die Firma erfüllt die IPO-Kriterien noch nicht (siehe Börse-Tab).' : 'Der IPO-Prozess läuft bereits.');
+      }
+      const elig = ipoEligibility(state);
+      if (!elig.ok) errors.push('IPO-Kriterien aktuell nicht erfüllt: ' + elig.criteria.filter((c) => !c.ok).map((c) => c.labelDe).join(' · '));
+      if (f.cash < IPO_PREP_COST * 2) errors.push(`Prospekt, Audit & Anwälte kosten ~${fmt(IPO_PREP_COST)} — dafür ist die Kasse zu knapp.`);
+      break;
+    }
+    case 'IPO_PRICE': {
+      const ipo = state.ipo;
+      if (ipo.status !== 'roadshow') errors.push('Pricing ist nur während der Roadshow möglich.');
+      else {
+        const lo = ipo.bookLow ?? 0;
+        const hi = ipo.bookHigh ?? 0;
+        if (action.pricePerShare < lo * 0.75) errors.push(`Unter ${(lo * 0.75).toFixed(2)} € macht die Bank nicht mit (Spanne ${lo.toFixed(2)}–${hi.toFixed(2)} €).`);
+        if (action.pricePerShare > hi * 1.08) errors.push(`Mehr als ~8 % über der Spanne (${hi.toFixed(2)} €) trägt das Buch nicht.`);
+        if (action.pricePerShare > hi) warnings.push('Über der Spanne zu preisen ist eine Wette auf ein heißes Buch — wenn die Zeichnungsquote kippt, platzt der IPO öffentlich.');
+        if (action.pricePerShare < lo) warnings.push('Unter der Spanne: sicheres Buch, aber du lässt bewusst Geld auf dem Tisch.');
       }
       break;
     }
@@ -366,6 +390,45 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push('Der Kaufpreis wird diese Woche zahlungswirksam (vereinfachte Buchung als Einmalaufwand durch die GuV — kein Goodwill-Ansatz in diesem Modell).');
       analysis.push(`Integration ab Woche ${week + 1}: ~${fmt(t.mrr)} MRR und ${t.employees} Mitarbeitende kommen an Bord — mit Kulturrisiko und ${t.ddDone ? 'den bekannten DD-Befunden' : 'allen UNGEPRÜFTEN Altlasten'}.`);
       analysis.push('Realitäts-Check: Die meisten Übernahmen scheitern nicht am Kaufpreis, sondern an der Integration (vgl. Fall-Bibliothek: Daimler-Chrysler, HP/Autonomy).');
+      break;
+    }
+    case 'IPO_SELECT_BANK': {
+      const bank = ipoBank(action.bankId);
+      state.ipo.status = 'preparing';
+      state.ipo.bankId = bank.id;
+      state.ipo.preparationStartWeek = week;
+      state.ipo.pendingAdhocTopicDe = null;
+      schedule(state, 0, `IPO-Vorbereitung W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: IPO_PREP_COST, labelDe: 'IPO-Vorbereitung: Prospekt, Audit, Kanzlei' });
+      summary = `IPO-Mandat an ${bank.name} (Fee ${(bank.feePct * 100).toFixed(1)} %)`;
+      analysis.push(`${bank.styleDe} — ${bank.tradeoffDe}`);
+      analysis.push(`Vorbereitung dauert ~${IPO_PREP_WEEKS} Wochen (Prospekt, Audit, ${fmt(IPO_PREP_COST)} sofort fällig), danach startet die 3-wöchige Roadshow mit Bookbuilding.`);
+      analysis.push('Ab jetzt schaut der Kapitalmarkt zu: Verschieben oder abbrechen kostet Glaubwürdigkeit — nicht nur Geld.');
+      break;
+    }
+    case 'IPO_PRICE': {
+      const ipo = state.ipo;
+      const ratio = subscriptionRatioFor(state, action.pricePerShare);
+      if (ratio < 0.9) {
+        // Buch nicht voll: IPO platzt öffentlich — die Gier-Lektion.
+        ipo.status = 'withdrawn';
+        ipo.bankId = null;
+        ipo.bookLow = null;
+        ipo.bookHigh = null;
+        ipo.roadshowEndsWeek = null;
+        ipo.preparationStartWeek = null;
+        state.ceo.boardTrust = Math.max(0, state.ceo.boardTrust - 6);
+        state.ceo.trustLog.push({ week, delta: -6, reasonDe: 'IPO geplatzt: Zeichnungsbuch bei diesem Preis nicht voll geworden.' });
+        state.reputation.investors = Math.max(0, state.reputation.investors - 8);
+        state.pressLog.push({ week, tone: 'negative', topicDe: `IPO von ${state.identity.companyName} abgesagt — „Bewertungsvorstellungen nicht durchsetzbar"` });
+        summary = `IPO GEPLATZT: Pricing ${action.pricePerShare.toFixed(2)} € fand keine Abnehmer (Zeichnungsquote ${ratio.toFixed(2)}×)`;
+        analysis.push('Das Buch war bei diesem Preis nicht voll — die Bank hat den Deal gezogen. Prospektkosten sind versenkt, die Presse schreibt „abgesagt", und der nächste Anlauf wird teurer.');
+        analysis.push('Lektion: Der letzte Euro Bewertung ist der teuerste. Ein IPO muss ZEICHNERN Rendite lassen, sonst kommt keiner.');
+      } else {
+        schedule(state, 0, `IPO-Pricing W${week}`, decisionId, { kind: 'IPO_LISTING', pricePerShare: action.pricePerShare, subscriptionRatio: ratio });
+        summary = `IPO gepreist: ${action.pricePerShare.toFixed(2)} €/Aktie (Zeichnungsquote ${ratio.toFixed(2)}×)`;
+        analysis.push(`Zeichnungsquote ${ratio.toFixed(2)}× — ${ratio >= 1.3 ? 'deutlich überzeichnet: sichere Platzierung, aber die Erstnotiz wird springen (Geld auf dem Tisch).' : ratio >= 1 ? 'solide gedeckt.' : 'knapp — die Bank stützt, aber die Erstnotiz könnte unter Druck geraten.'}`);
+        analysis.push('Listing und Mittelzufluss laufen mit dem Wochenabschluss: Bruttoerlös als Finanzierungs-Cashflow, Bank-Fee als Einmalaufwand, Streubesitz im Cap Table.');
+      }
       break;
     }
   }

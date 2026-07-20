@@ -86,6 +86,17 @@ export const api = {
   fundingOffers: (id: string) =>
     http<{ offers: import('@boardroom/shared').TermSheetOffer[]; week: number }>(`/games/${id}/funding/offers`),
 
+  // ── Phase 6: IPO, Logo, PDF ──
+  ipoStatus: (id: string, price?: number) =>
+    http<{
+      eligibility: { ok: boolean; criteria: { labelDe: string; ok: boolean }[] };
+      banks: import('@boardroom/shared').IpoBank[];
+      subscriptionPreview: number | null;
+    }>(`/games/${id}/ipo${price ? `?price=${price}` : ''}`),
+  getLogo: (id: string) => http<{ dataUrl: string | null }>(`/games/${id}/logo`),
+  uploadLogo: (id: string, dataUrl: string) =>
+    http<{ ok: boolean }>(`/games/${id}/logo`, { method: 'POST', body: JSON.stringify({ dataUrl }) }),
+
   // ── Phase 4 ──
   listConsultant: (id: string) => http<{ reports: ConsultantReport[] }>(`/games/${id}/consultant`),
   forkGame: (id: string, atWeek: number) => http<{ state: CompanyState }>(`/games/${id}/fork`, { method: 'POST', body: JSON.stringify({ atWeek }) }),

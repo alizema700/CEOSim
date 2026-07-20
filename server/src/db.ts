@@ -104,6 +104,12 @@ function migrate(d: DatabaseSync): void {
       fork_week      INTEGER NOT NULL
     );
 
+    -- Hochgeladenes Firmenlogo (Phase 6): Data-URL, nur Darstellung/PDF.
+    CREATE TABLE IF NOT EXISTS logos (
+      game_id  TEXT PRIMARY KEY,
+      data_url TEXT NOT NULL
+    );
+
     -- Pressemitteilungen + simuliertes Medienecho (Phase 3).
     CREATE TABLE IF NOT EXISTS press_releases (
       id          INTEGER PRIMARY KEY AUTOINCREMENT,

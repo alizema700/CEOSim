@@ -6,28 +6,31 @@ import { eur, num, dateDe } from '../format.js';
 
 /** Linke Navigation + Top-Bar (Cash · Runway · Board · Datum · Woche abschließen). */
 
-const NAV: { view: View | null; label: string; icon: string; phase?: number; badge?: 'unread' }[] = [
-  { view: 'dashboard', label: t('nav_dashboard'), icon: '▤' },
-  { view: 'inbox', label: t('nav_inbox'), icon: '✉', badge: 'unread' },
-  { view: 'chat', label: t('nav_chat'), icon: '💬' },
-  { view: 'calendar', label: t('nav_calendar'), icon: '📅' },
-  { view: 'decisions', label: t('nav_decisions'), icon: '⌘' },
-  { view: 'evaluations', label: t('nav_evaluations'), icon: '✎' },
-  { view: 'team', label: t('nav_team'), icon: '👥' },
-  { view: 'customers', label: t('nav_customers'), icon: '◎' },
-  { view: 'product', label: t('nav_product'), icon: '⚙' },
-  { view: 'market', label: t('nav_market'), icon: '⚔' },
-  { view: 'finance', label: t('nav_finance'), icon: '€' },
-  { view: 'legal', label: t('nav_legal'), icon: '§' },
-  { view: 'press', label: t('nav_press'), icon: '🗞' },
-  { view: 'strategy', label: t('nav_strategy'), icon: '♟' },
-  { view: 'learn', label: t('nav_learn'), icon: '🎓' },
-  { view: 'settings', label: t('nav_settings'), icon: '⚒' },
-];
-
 export function Layout({ children }: { children: ReactNode }) {
-  const { state, view, setView, closeWeek, busy, leaveGame, messageStatus } = useStore();
+  const { state, view, setView, closeWeek, busy, leaveGame, messageStatus, logoDataUrl } = useStore();
+  useStore((s) => s.lang); // Re-Render bei Sprachwechsel (t() liest das Modul-Locale)
   if (!state) return <>{children}</>;
+
+  // NAV pro Render aufgebaut, damit t() den aktuellen Sprachstand liefert.
+  const NAV: { view: View | null; label: string; icon: string; badge?: 'unread'; locked?: boolean }[] = [
+    { view: 'dashboard', label: t('nav_dashboard'), icon: '▤' },
+    { view: 'inbox', label: t('nav_inbox'), icon: '✉', badge: 'unread' },
+    { view: 'chat', label: t('nav_chat'), icon: '💬' },
+    { view: 'calendar', label: t('nav_calendar'), icon: '📅' },
+    { view: 'decisions', label: t('nav_decisions'), icon: '⌘' },
+    { view: 'evaluations', label: t('nav_evaluations'), icon: '✎' },
+    { view: 'team', label: t('nav_team'), icon: '👥' },
+    { view: 'customers', label: t('nav_customers'), icon: '◎' },
+    { view: 'product', label: t('nav_product'), icon: '⚙' },
+    { view: 'market', label: t('nav_market'), icon: '⚔' },
+    { view: 'finance', label: t('nav_finance'), icon: '€' },
+    { view: 'legal', label: t('nav_legal'), icon: '§' },
+    { view: 'press', label: t('nav_press'), icon: '🗞' },
+    { view: 'strategy', label: t('nav_strategy'), icon: '♟' },
+    { view: 'boerse', label: t('nav_boerse'), icon: '📈', locked: state.ipo.status === 'locked' },
+    { view: 'learn', label: t('nav_learn'), icon: '🎓' },
+    { view: 'settings', label: t('nav_settings'), icon: '⚒' },
+  ];
 
   const unread = state.comms.messages.filter((m) => messageStatus[m.id] === undefined).length;
 
@@ -41,9 +44,13 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="flex h-full">
       <aside className="flex w-52 shrink-0 flex-col border-r border-line bg-panel">
         <button className="flex items-center gap-2 border-b border-line px-3 py-3 text-left" onClick={leaveGame} title="Zur Spielstand-Übersicht">
-          <span className="flex h-7 w-7 items-center justify-center rounded text-base" style={{ background: state.identity.logoColor + '33', border: `1px solid ${state.identity.logoColor}` }}>
-            {state.identity.logoEmoji}
-          </span>
+          {logoDataUrl ? (
+            <img src={logoDataUrl} alt="" className="h-7 w-7 rounded object-cover" style={{ border: `1px solid ${state.identity.logoColor}` }} />
+          ) : (
+            <span className="flex h-7 w-7 items-center justify-center rounded text-base" style={{ background: state.identity.logoColor + '33', border: `1px solid ${state.identity.logoColor}` }}>
+              {state.identity.logoEmoji}
+            </span>
+          )}
           <span className="truncate text-xs font-bold">{state.identity.companyName}</span>
         </button>
         <nav className="flex-1 overflow-y-auto py-2">
@@ -61,7 +68,10 @@ export function Layout({ children }: { children: ReactNode }) {
               {item.badge === 'unread' && unread > 0 && (
                 <span className="num rounded-full bg-accent/20 px-1.5 text-[9px] text-accent">{unread}</span>
               )}
-              {item.phase && <span className="rounded border border-line px-1 text-[9px] text-dim/60">P{item.phase}</span>}
+              {item.locked && <span className="text-[9px] text-dim/60" title="Freischaltung ab Kennzahlen — Kriterien im Tab">🔒</span>}
+              {item.view === 'boerse' && state.ipo.status === 'public' && state.ipo.sharePrice !== null && (
+                <span className="num text-[9px] text-accent">{state.ipo.sharePrice.toFixed(2)} €</span>
+              )}
             </button>
           ))}
         </nav>

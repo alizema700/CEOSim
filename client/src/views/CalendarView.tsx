@@ -16,7 +16,7 @@ export function CalendarView() {
   const week = state.meta.week;
   const weeks = [week, week + 1, week + 2, week + 3];
   const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
-  const kindIcon: Record<Appointment['kind'], string> = { leadershipSync: '👔', boardCall: '🏛️', customerCall: '🤝', legal: '§', custom: '📌' };
+  const kindIcon: Record<Appointment['kind'], string> = { leadershipSync: '👔', boardCall: '🏛️', customerCall: '🤝', legal: '§', earningsCall: '📊', custom: '📌' };
 
   return (
     <div className="space-y-4">

@@ -1,6 +1,6 @@
 import { Router, json } from 'express';
 import { z } from 'zod';
-import { generateTermSheets, type CompanyState, type GameSetup, type PlayerAction } from '@boardroom/shared';
+import { generateTermSheets, IPO_BANKS, ipoEligibility, subscriptionRatioFor, type CompanyState, type GameSetup, type PlayerAction } from '@boardroom/shared';
 import {
   closeGameWeek,
   compareFamily,
@@ -24,6 +24,7 @@ import { usageSummary } from './llm.js';
 import { appendTurn, getThread, meetingRound, personaReply, resolvePersona } from './personas.js';
 import { classifyIdea, classifyPress, listPressReleases, savePressRelease } from './pressService.js';
 import { getDb } from './db.js';
+import { getLogo, quarterlyReportPdf, saveLogo } from './pdf.js';
 
 /**
  * REST-API. Alle Eingaben werden mit zod validiert, BEVOR sie die Engine
@@ -88,6 +89,9 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('RAISE_VENTURE_DEBT'), amount: zMoney.gt(0) }),
   z.object({ type: z.literal('MA_DUE_DILIGENCE'), targetId: z.string() }),
   z.object({ type: z.literal('MA_ACQUIRE'), targetId: z.string() }),
+  // Phase 6: IPO
+  z.object({ type: z.literal('IPO_SELECT_BANK'), bankId: z.string() }),
+  z.object({ type: z.literal('IPO_PRICE'), pricePerShare: z.number().positive().max(10_000) }),
 ]);
 
 const zHypothesis = z
@@ -315,6 +319,42 @@ export function buildRouter(): Router {
   router.get('/games/:id/funding/offers', (req, res) => {
     const state = loadState(req.params.id);
     res.json({ offers: generateTermSheets(state), week: state.meta.week });
+  });
+
+  // ── Phase 6: IPO, Logo, PDF-Quartalsbericht ──────────────────────
+  router.get('/games/:id/ipo', (req, res) => {
+    const state = loadState(req.params.id);
+    const price = req.query.price ? Number(req.query.price) : null;
+    res.json({
+      eligibility: ipoEligibility(state),
+      banks: IPO_BANKS,
+      // Live-Vorschau der Zeichnungsquote für den Pricing-Schieberegler:
+      subscriptionPreview:
+        state.ipo.status === 'roadshow' && price && Number.isFinite(price) && price > 0 ? subscriptionRatioFor(state, price) : null,
+    });
+  });
+
+  router.get('/games/:id/logo', (req, res) => {
+    res.json({ dataUrl: getLogo(req.params.id) });
+  });
+
+  router.post('/games/:id/logo', (req, res) => {
+    const dataUrl = z
+      .string()
+      .regex(/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/)
+      .max(400_000, 'Logo max. ~300 KB.')
+      .parse(req.body.dataUrl);
+    loadState(req.params.id); // 404, falls es das Spiel nicht gibt
+    saveLogo(req.params.id, dataUrl);
+    res.status(201).json({ ok: true });
+  });
+
+  router.get('/games/:id/report.pdf', async (req, res) => {
+    const state = loadState(req.params.id);
+    const pdf = await quarterlyReportPdf(state);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="quartalsbericht-${state.identity.companyName.replace(/[^\w-]+/g, '_')}-W${state.meta.week}.pdf"`);
+    res.send(pdf);
   });
 
   // ── Phase 4: Berater, Fork-Labor, Journal ────────────────────────

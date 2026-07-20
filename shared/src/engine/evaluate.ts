@@ -100,6 +100,12 @@ function buildCausalChain(state: CompanyState, d: DecisionRecord, now: Record<Kp
     case 'MA_DUE_DILIGENCE':
       chain.push('Mechanik: 15 k€ Einmalkosten gegen Information — die Red Flags des Ziels sind seitdem sichtbar und der Kaufpreis wurde ggf. nachverhandelt.');
       break;
+    case 'IPO_SELECT_BANK':
+      chain.push('Mechanik: Prospektkosten sofort, 8 Wochen Vorbereitung, dann 3 Wochen Roadshow. Die Bank-Wahl steuert Fee UND Zeichnungsnachfrage — billig kann teuer werden, wenn das Buch nicht voll wird.');
+      break;
+    case 'IPO_PRICE':
+      chain.push('Mechanik: Zeichnungsquote = f(Preis vs. Spanne, Bank-Platzierungskraft, Investoren-Reputation, Marktnachfrage). Unter 0,9× platzt der IPO; Überzeichnung erzeugt einen Erstnotiz-Pop — schön für Zeichner, entgangener Erlös für dich.');
+      break;
     default:
       break;
   }
@@ -222,6 +228,34 @@ function gradeProcess(state: CompanyState, d: DecisionRecord): Grade {
       reasons.push('Erst prüfen, dann kaufen: Due Diligence ist gekaufte Information — die billigste Versicherung im M&A-Geschäft.');
       break;
     }
+    case 'IPO_SELECT_BANK': {
+      if (runwayAtDecision > 40) {
+        timing += 15;
+        reasons.push('IPO aus einer Position der Stärke gestartet — kein Notverkauf, echte Wahlfreiheit beim Pricing.');
+      } else if (runwayAtDecision < 20) {
+        timing -= 20; risk -= 10;
+        reasons.push('IPO als Liquiditätsrettung: Der Markt riecht Verzweiflung — und preist sie ein (vgl. WeWork 2019).');
+      }
+      info += 10;
+      reasons.push('Banken-Trade-off (Fee vs. Platzierungskraft) war explizit Teil der Entscheidung.');
+      break;
+    }
+    case 'IPO_PRICE': {
+      const ipoNow = state.ipo;
+      if (ipoNow.status === 'withdrawn') {
+        risk -= 25; timing -= 10;
+        reasons.push('Das Buch wurde bei diesem Preis nicht voll — der geplatzte IPO war die teuerste Variante von Gier.');
+      } else if (ipoNow.subscriptionRatio !== null) {
+        if (ipoNow.subscriptionRatio >= 1.0 && ipoNow.subscriptionRatio <= 1.6) {
+          risk += 15;
+          reasons.push('Pricing mit gesund gedecktem Buch: Platzierung sicher, Pop moderat — handwerklich sauber.');
+        } else if (ipoNow.subscriptionRatio > 1.6) {
+          risk += 5; info -= 10;
+          reasons.push('Stark überzeichnet: sichere Platzierung, aber deutlich Geld auf dem Tisch gelassen — die Spanne hätte mehr hergegeben.');
+        }
+      }
+      break;
+    }
     case 'MA_ACQUIRE': {
       const targetId = d.action.targetId;
       const t = state.market.maTargets.find((x) => x.id === targetId);
@@ -308,6 +342,9 @@ function applySkillGains(state: CompanyState, d: DecisionRecord, grade: Grade): 
       s.governance = clamp(s.governance + gain * 0.5, 0, 100); break;
     case 'MA_DUE_DILIGENCE': case 'MA_ACQUIRE':
       s.strategie = clamp(s.strategie + gain, 0, 100); break;
+    case 'IPO_SELECT_BANK': case 'IPO_PRICE':
+      s.finanzen = clamp(s.finanzen + gain, 0, 100);
+      s.governance = clamp(s.governance + gain * 0.7, 0, 100); break;
     default: break;
   }
   // Werte-Konsistenz zahlt auf Governance ein.

@@ -48,7 +48,9 @@ export type EffectPayload =
   /** Eigenkapital-Zufluss aus akzeptiertem Term Sheet (Phase 5). */
   | { kind: 'EQUITY_INJECTION'; round: import('./funding.js').FundingRound; esopTopUp: number }
   /** Integration eines gekauften Unternehmens (Phase 5). */
-  | { kind: 'MA_INTEGRATION'; targetId: Id };
+  | { kind: 'MA_INTEGRATION'; targetId: Id }
+  /** Börsengang vollziehen: Zuteilung, Bruttoerlös, Fees, Erstnotiz (Phase 6). */
+  | { kind: 'IPO_LISTING'; pricePerShare: Money; subscriptionRatio: number };
 
 /** Zeitlich begrenzter Modifikator auf eine Systemgröße. */
 export interface ActiveModifier {

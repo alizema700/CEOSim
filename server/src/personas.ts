@@ -84,6 +84,18 @@ export function resolvePersona(state: CompanyState, threadKey: string): PersonaR
       fallbackDe: 'Notiert! Ich kümmere mich darum und lege dir alles Relevante ins nächste Briefing. Wenn es eilt: Die wichtigsten Punkte stehen im aktuellen Wochen-Briefing in deiner Inbox.',
     };
   }
+  if (threadKey === 'roadshow') {
+    const ipo = state.ipo;
+    if (ipo.status !== 'roadshow' && ipo.status !== 'public') return null;
+    const spanTxt = ipo.bookLow !== null && ipo.bookHigh !== null ? `Bookbuilding-Spanne ${ipo.bookLow.toFixed(2)}–${ipo.bookHigh.toFixed(2)} €` : 'Notiert';
+    return {
+      name: 'Investoren-Q&A',
+      roleDe: ipo.status === 'roadshow' ? 'Roadshow (institutionelle Investoren)' : 'Investor Relations',
+      execId: null,
+      systemDe: `Du spielst wechselnde institutionelle Investoren (Fondsmanager, Analysten) in der ${ipo.status === 'roadshow' ? `IPO-Roadshow (${spanTxt})` : 'IR-Sprechstunde einer börsennotierten Firma'} eines CEO-Trainings-Simulators. Stil: höflich, aber unbequem — ihr bohrt bei Churn, Unit Economics, Wettbewerbsvorteil, Use of Proceeds und Management-Track-Record. Jede Antwort: 1–2 harte Fragen oder eine pointierte Einschätzung, max. 100 Wörter, auf Deutsch, Anrede „Sie". Keine erfundenen Zahlen über die Firma — nur das Lagebild. Kauf-/Zeichnungszusagen gibst du NIE; die Nachfrage entscheidet die Simulation.`,
+      fallbackDe: 'Interessant. Zwei Fragen für die nächste Runde: Wie entwickelt sich die Netto-Kundenbindung der letzten Kohorten — und wofür genau ist der Emissionserlös eingeplant? Wir melden uns über die Bank. (Offline-Modus: Für lebendige Q&A ANTHROPIC_API_KEY hinterlegen.)',
+    };
+  }
   const exec = state.people.executives.find((e) => 'dm:' + e.id === threadKey);
   if (exec) return execPersona(state, exec);
   return null;
@@ -156,6 +168,12 @@ export async function meetingRound(
         { name: 'Dr. Martina Falk', roleDe: 'Lead-Investorin (Almberg Capital)', flavor: 'renditegetrieben, ungeduldig, fragt nach Zahlen und Zusagen' },
         { name: 'Prof. Heinrich Adam', roleDe: 'Unabhängiges Board-Mitglied', flavor: 'Governance-Gewissen, fragt nach Prozessen und Risiken' },
         { name: 'Sven Ostkamp', roleDe: 'Gründer-Vertreter', flavor: 'loyal, kennt jede Altlast, verteidigt das Team' },
+      ]
+    : apt.kind === 'earningsCall'
+    ? [
+        { name: 'Sandra Vieth', roleDe: 'Analystin, Bankhaus Cronberg', flavor: 'Sell-Side-Analystin: bohrt bei Guidance, Churn und Kohorten; will Zahlen, keine Adjektive' },
+        { name: 'Marc Delius', roleDe: 'Analyst, Rheintal Research', flavor: 'skeptisch, vergleicht gnadenlos mit Wettbewerbern und der letzten Guidance; zitiert frühere Aussagen des CEO zurück' },
+        { name: 'Investor Relations', roleDe: 'IR-Moderation', flavor: 'moderiert knapp, mahnt bei Aussagen, die eine Ad-hoc-Pflicht auslösen könnten (Safe-Harbour-Hinweise)' },
       ]
     : state.people.executives.map((ex) => {
         const emp = state.people.employees.find((e) => e.id === ex.employeeId);

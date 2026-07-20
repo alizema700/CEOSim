@@ -66,7 +66,7 @@ export type PlayerSkillArea =
 export interface CapTableEntry {
   id: Id;
   holder: string;
-  kind: 'founder' | 'investor' | 'esop' | 'ceo';
+  kind: 'founder' | 'investor' | 'esop' | 'ceo' | 'public';
   /** Anteil 0..1, Summe aller Einträge = 1. */
   share: Fraction;
 }

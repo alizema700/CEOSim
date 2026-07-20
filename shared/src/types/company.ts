@@ -62,6 +62,8 @@ export interface CompanyState {
   pressLog: PressLogEntry[];
   /** Fundraising-Historie (Phase 5). */
   funding: import('./funding.js').FundingState;
+  /** IPO-Prozess & Börsennotierung (Phase 6). */
+  ipo: import('./ipo.js').IpoState;
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];

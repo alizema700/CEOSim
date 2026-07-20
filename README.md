@@ -5,10 +5,12 @@ KI-gestützter Erzähl- und Bewertungsebene und einer starken Didaktik-Schicht.
 Zielgruppe: angehende Gründer:innen, CEOs, CTOs, die Unternehmensführung
 risikofrei trainieren wollen.
 
-**Status: Phase 1 (MVP) — voll lauffähig.** SaaS-Turnaround-Szenario, komplette
-Finanz-Engine mit harten Invarianten, Entscheidungs-Panel, Bewertungs-Pipeline
-(Hypothese → Resultat → Analyse → Note → Lektion), mehrere Spielstände,
-Event-Sourcing-Persistenz.
+**Status: Phasen 1–6 umgesetzt — voll lauffähig.** Zwei Szenarien
+(SaaS-Turnaround, Sanierungsfall), komplette Finanz-Engine mit harten
+Invarianten, Kommunikations-Schicht (Inbox, Chat, Kalender, Meetings),
+Presse & Anwältin, Ideen-System, Präzedenzfall-Bibliothek, Berater,
+Was-wäre-wenn-Labor, Konkurrenz-Agenten, Fundraising, M&A, IPO mit
+Earnings-Calls, Tutorial, EN-Grundlocale, PDF-Quartalsbericht.
 
 ---
 
@@ -100,11 +102,12 @@ Zufallsereignisse → Board-Vertrauen → KPI-Snapshot → Invarianten.
 | Phase | Inhalt | Status |
 |---|---|---|
 | 1 | Engine, CompanyState, SaaS-Szenario, Dashboard+KPIs mit Formeln, Wochen-Loop, Entscheidungs-Panel, Bewertungs-Pipeline, Persistenz, Invarianten-Tests | ✅ |
-| 2 | Inbox + Sekretärin/Chief-of-Staff, Kalender, Führungs-Personas (Mail/Chat), Event-Deck auf 10+ Karten (DSGVO-Breach 72h, Shitstorm, Covenant-Bruch …) | ⬜ |
-| 3 | Anwalts-Chat (frei chatbar, Stundenabrechnung, permanenter Disclaimer), Board-Meetings, Presse-Modul (PM-Editor + Medienecho), Ideen-System (freie Ideen → LLM-Intent → Engine-Projekt) | ⬜ |
-| 4 | Präzedenzfall-Bibliothek (100+ reale Cases, Embeddings), KI-Berater, **Was-wäre-wenn-Labor** (Fork per Event-Replay), Lern-Journal, Skill-Tree | ⬜ |
-| 5 | Konkurrenz-Agenten (kontern, wildern, Partnerschafts-Mails, Übernahmeangebote), Fundraising (Term Sheets, Cap-Table live), M&A beide Richtungen | ⬜ |
-| 6 | IPO + Earnings-Calls, weitere Szenarien (Produktion, E-Commerce, Gründung, Sanierung), Englisch, Tutorial-Kampagne, PDF-Berichte, Logo-Upload | ⬜ |
+| 2 | Inbox + Sekretärin/Chief-of-Staff, Kalender, Führungs-Personas (Mail/Chat), Event-Deck auf 13+ Karten (DSGVO-Breach 72h, Shitstorm, Covenant-Bruch …) | ✅ |
+| 3 | Anwalts-Chat (frei chatbar, Stundenabrechnung, permanenter Disclaimer), Board-Meetings, Presse-Modul (PM-Editor + Medienecho), Ideen-System (freie Ideen → LLM-Intent → Engine-Projekt) | ✅ |
+| 4 | Präzedenzfall-Bibliothek (60+ reale Cases, deterministisches Matching), KI-Berater, **Was-wäre-wenn-Labor** (Fork per Event-Replay), Lern-Journal, Skill-Tree | ✅ |
+| 5 | Konkurrenz-Agenten (kontern, wildern, Partnerschafts-Mails, Übernahmeangebote inkl. Nachverhandeln), Fundraising (Term Sheets, Cap-Table live, Venture Debt), M&A beide Richtungen (DD, Red Flags, Integration) | ✅ |
+| 6 | IPO (Banken-Wahl, Roadshow-Q&A, Bookbuilding, Pricing, Kurs) + Earnings-Calls + Ad-hoc-Pflicht, Sanierungs-Szenario, EN-Grundlocale, Tutorial-Checkliste, PDF-Quartalsbericht, Logo-Upload | ✅ |
+| 7+ | Weitere Szenarien (Produktion, E-Commerce, Gründung ab Tag 0), volle EN-Lokalisierung der Spielinhalte | ⬜ |
 
 Das Datenmodell trägt bereits Vorbauten für spätere Phasen (Cap Table,
 Covenants, Präzedenzfall-Referenzen, Persona-Gedächtnisfelder, Event-Deck-
@@ -112,14 +115,15 @@ Infrastruktur), damit keine Phase ein Schema-Rewrite braucht.
 
 ## Qualität
 
-- **28 Tests** (`shared/test/`): Invarianten über 52 Wochen, KPI-Formeln,
-  Delayed Effects, Determinismus, Golden-Master (fester Seed + Skript ⇒
-  eingefrorener Endzustand als Vitest-Snapshot).
+- **78 Tests** (`shared/test/`, eine Datei pro Phase): Invarianten über
+  52 Wochen, KPI-Formeln, Delayed Effects, Determinismus, Term-Sheet-
+  Manipulationsschutz, M&A-Red-Flags, IPO-Listing-Buchhaltung, Golden-Master
+  (fester Seed + Skript ⇒ eingefrorener Endzustand als Vitest-Snapshot).
 - **LLM-Verträge:** Ausgaben immer zod-validiert; bei Schema-Verletzung
   2 Retries mit Fehlerhinweis, dann regelbasierter Fallback. Response-Cache
   gegen Doppelkosten; Token-Kosten-Dashboard unter Einstellungen.
-- **i18n-Grundgerüst** (`client/src/i18n.ts`): Deutsch aktiv, Englisch als
-  zweite Locale vorbereitet (P6).
+- **i18n** (`client/src/i18n.ts`): Deutsch aktiv, Englisch für Chrome-Labels
+  umschaltbar (Einstellungen); volle Inhalts-Lokalisierung vorbereitet.
 
 ## Hinweis
 

@@ -18,7 +18,7 @@ const SCENARIOS: { id: ScenarioId; title: string; desc: string; available: boole
   { id: 'manufacturing-concentration', title: 'Produktionsbetrieb mit Klumpenrisiko', desc: 'Ein Großkunde = 60 % vom Umsatz …', available: false },
   { id: 'ecommerce-cash', title: 'E-Commerce mit Cash-Conversion-Problem', desc: 'Lager frisst Liquidität …', available: false },
   { id: 'founding', title: 'Eigene Gründung ab Tag 0', desc: 'Leeres Blatt, erste Kunden, erstes Team …', available: false },
-  { id: 'distressed', title: 'Sanierungsfall kurz vor Insolvenz', desc: '6 Wochen Cash. Viel Glück.', available: false },
+  { id: 'distressed', title: 'Sanierungsfall am Abgrund', desc: 'Dieselbe Firma, zwei Jahre schlechter geführt: Kasse fast leer, Lieferanten vertröstet, Bank nervös, Team zermürbt, Churn brutal. Hier zählt vom ersten Tag nur eine Uhr: der Runway. Für Fortgeschrittene.', available: true },
 ];
 
 const VALUE_SUGGESTIONS = ['Menschen zuerst', 'Ehrlichkeit', 'Kundenbesessenheit', 'Handwerk', 'Geschwindigkeit', 'Nachhaltigkeit', 'Sparsamkeit', 'Mut'];

@@ -79,6 +79,11 @@ export function ThreadPane({ threadKey, meetingAptId }: { threadKey: string; mee
         : await api.sendThread(state.meta.gameId, threadKey, text.trim());
       setTurns((t) => [...t, ...r.turns]);
       setText('');
+      try {
+        localStorage.setItem(`br-tut-chat-${state.meta.gameId}`, '1'); // Tutorial-Haken
+      } catch {
+        /* egal */
+      }
     } finally {
       setSending(false);
     }
