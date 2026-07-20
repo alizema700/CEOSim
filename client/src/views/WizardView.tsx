@@ -103,17 +103,19 @@ export function WizardView() {
 
       {step === 0 && (
         <div className="space-y-2">
-          <h2 className="mb-3 text-lg font-bold">Welches Unternehmen willst du führen?</h2>
+          <h2 className="mb-1 text-lg font-bold">Welches Unternehmen willst du führen?</h2>
+          <p className="mb-3 text-xs text-dim">Zwei Szenarien sind spielbar — „SaaS-Übernahme" (Einstieg) und „Sanierungsfall" (für Fortgeschrittene). Die ausgegrauten sind noch in Arbeit.</p>
           {SCENARIOS.map((s) => (
             <button
               key={s.id}
               disabled={!s.available}
               onClick={() => setScenarioId(s.id)}
-              className={`panel w-full p-4 text-left transition-colors ${scenarioId === s.id ? 'border-accent' : ''} ${!s.available ? 'opacity-40' : 'hover:border-accent/60'}`}
+              title={s.available ? '' : 'Dieses Szenario ist noch nicht fertig — bald verfügbar.'}
+              className={`panel w-full p-4 text-left transition-colors ${scenarioId === s.id ? 'border-accent' : ''} ${!s.available ? 'cursor-not-allowed opacity-50' : 'hover:border-accent/60'}`}
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold">{s.title}</span>
-                {!s.available && <span className="rounded border border-line px-1.5 py-0.5 text-[9px] text-dim">Phase 6</span>}
+                {!s.available && <span className="shrink-0 border border-warn/50 px-1.5 py-0.5 text-[9px] text-warn" style={{ borderRadius: 2 }}>🔒 Bald verfügbar</span>}
               </div>
               <p className="mt-1 text-xs leading-relaxed text-dim">{s.desc}</p>
             </button>
