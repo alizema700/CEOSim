@@ -1,5 +1,6 @@
 import { useState, type ReactNode } from 'react';
-import { KPI_DEFINITIONS, type KpiId } from '@boardroom/shared';
+import { Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from 'recharts';
+import { KPI_DEFINITIONS, type KpiId, type KpiSnapshot } from '@boardroom/shared';
 import { formatByUnit, healthColor } from '../format.js';
 
 /** Redaktionelle UI-Bausteine: Modal, Rubrik-Karte, KPI-Karte mit Formel. */
@@ -91,4 +92,119 @@ export function scoreColor(v: number): string {
 export function GradeBadge({ grade }: { grade: number }) {
   const color = grade <= 2 ? 'text-good border-good/50' : grade <= 4 ? 'text-warn border-warn/50' : 'text-bad border-bad/50';
   return <span className={`num inline-block border px-2 py-0.5 text-sm font-bold ${color}`} style={{ borderRadius: 2 }}>Note {grade}</span>;
+}
+
+/**
+ * Drill (Phase 8): aufklappbare Rubrik — „Tiefe auf Klick". Standardmäßig
+ * ZU: nur Rubriken-Zeile + Einzeiler-Zusammenfassung. Der Auf/Zu-Zustand
+ * wird pro Schlüssel gemerkt (localStorage), damit sich das UI der
+ * Arbeitsweise anpasst statt umgekehrt.
+ */
+export function Drill({ id, title, summary, defaultOpen = false, children }: {
+  id: string;
+  title: string;
+  /** Einzeiler rechts im Kopf — das Wichtigste, ohne aufzuklappen. */
+  summary?: ReactNode;
+  defaultOpen?: boolean;
+  children: ReactNode;
+}) {
+  const key = 'br-drill-' + id;
+  const [open, setOpen] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(key);
+      return saved === null ? defaultOpen : saved === '1';
+    } catch {
+      return defaultOpen;
+    }
+  });
+  const toggle = () => {
+    setOpen((o) => {
+      try {
+        localStorage.setItem(key, o ? '0' : '1');
+      } catch { /* egal */ }
+      return !o;
+    });
+  };
+  return (
+    <section className="rule-top pt-2.5">
+      <button className="group flex w-full items-baseline gap-3 py-1 text-left" onClick={toggle} aria-expanded={open}>
+        <span className={`num text-[11px] ${open ? 'text-accent' : 'text-dim'}`}>{open ? '▾' : '▸'}</span>
+        <span className="kicker text-ink group-hover:text-accent">{title}</span>
+        {!open && summary !== undefined && <span className="num min-w-0 flex-1 truncate text-right text-[11px] text-dim">{summary}</span>}
+      </button>
+      {open && <div className="pb-2 pt-2">{children}</div>}
+    </section>
+  );
+}
+
+/** Verlaufs-Chart für EINE Kennzahl über alle Spielwochen (aus der History). */
+export function KpiHistoryModal({ id, history, onClose }: { id: KpiId; history: KpiSnapshot[]; onClose: () => void }) {
+  const def = KPI_DEFINITIONS[id];
+  const data = history.map((h) => ({ week: h.week, v: h.values[id] }));
+  const last = data[data.length - 1]?.v ?? 0;
+  const first = data[0]?.v ?? 0;
+  return (
+    <Modal title={`Verlauf · ${def.labelDe}`} onClose={onClose} wide>
+      <div className="flex items-baseline justify-between">
+        <span className={`num text-[24px] ${healthColor(last, def)}`}>{formatByUnit(last, def.unit)}</span>
+        <span className="num text-[11px] text-dim">
+          Start {formatByUnit(first, def.unit)} · {data.length} Wochen
+        </span>
+      </div>
+      <div className="mt-3 h-64">
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+            <XAxis dataKey="week" stroke="#a3a8ad" fontSize={10} tickLine={false} axisLine={{ stroke: '#ddd9d0' }} />
+            <YAxis stroke="#a3a8ad" fontSize={10} tickLine={false} axisLine={false} width={64} domain={['auto', 'auto']} tickFormatter={(v: number) => formatByUnit(v, def.unit)} />
+            <ChartTooltip
+              contentStyle={{ background: '#fffdf8', border: '1px solid #ddd9d0', borderRadius: 2, fontSize: 11, fontFamily: 'Spline Sans Mono' }}
+              labelFormatter={(w) => `Woche ${w}`}
+              formatter={(v: number) => [formatByUnit(v, def.unit), def.labelDe]}
+            />
+            <Line type="monotone" dataKey="v" stroke="#2f7f79" strokeWidth={1.8} dot={false} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <p className="mt-3 border-t border-line pt-2 text-[11px] leading-relaxed text-dim">
+        <b className="text-ink">{def.formulaDe}</b> — {def.definitionDe}
+      </p>
+    </Modal>
+  );
+}
+
+/** Mehrserien-Verlaufs-Chart für Drills (z. B. Headcount + Zufriedenheit). */
+export function MultiLineChart({ data, series, height = 224, labelFormatter }: {
+  data: Record<string, number>[];
+  series: { key: string; label: string; color: string; formatter?: (v: number) => string }[];
+  height?: number;
+  labelFormatter?: (v: number | string) => string;
+}) {
+  return (
+    <div>
+      <div style={{ height }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 6, right: 8, bottom: 0, left: 0 }}>
+          <XAxis dataKey="week" stroke="#a3a8ad" fontSize={10} tickLine={false} axisLine={{ stroke: '#ddd9d0' }} />
+          <YAxis stroke="#a3a8ad" fontSize={10} tickLine={false} axisLine={false} width={56} domain={['auto', 'auto']} tickFormatter={(v: number) => (Math.abs(v) >= 1000 ? `${Math.round(v / 1000)}k` : String(Math.round(v)))} />
+          <ChartTooltip
+            contentStyle={{ background: '#fffdf8', border: '1px solid #ddd9d0', borderRadius: 2, fontSize: 11, fontFamily: 'Spline Sans Mono' }}
+            labelFormatter={(w) => (labelFormatter ? labelFormatter(w as number) : `Woche ${w}`)}
+            formatter={(v: number, name: string) => {
+              const s = series.find((x) => x.label === name);
+              return [s?.formatter ? s.formatter(v) : v.toLocaleString('de-DE'), name];
+            }}
+          />
+            {series.map((s) => (
+              <Line key={s.key} type="monotone" dataKey={s.key} name={s.label} stroke={s.color} strokeWidth={1.6} dot={false} />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
+        {series.map((s) => (
+          <span key={s.key} className="num text-[10px]" style={{ color: s.color }}>— {s.label}</span>
+        ))}
+      </div>
+    </div>
+  );
 }
