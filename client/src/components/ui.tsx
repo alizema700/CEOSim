@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from 'recharts';
 import { KPI_DEFINITIONS, type KpiId, type KpiSnapshot } from '@boardroom/shared';
 import { formatByUnit, healthColor } from '../format.js';
+import { Icon } from './Icon.js';
 
 /** Redaktionelle UI-Bausteine: Modal, Rubrik-Karte, KPI-Karte mit Formel. */
 
@@ -16,7 +17,7 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
         <div className="flex items-center justify-between border-b border-line px-4 py-3">
           <div className="kicker">{title}</div>
           <button className="text-dim hover:text-ink" onClick={onClose} aria-label="Schließen">
-            ✕
+            <Icon name="x" size={14} />
           </button>
         </div>
         <div className="p-4">{children}</div>
@@ -64,8 +65,8 @@ export function KpiCard({ id, value, contextDe, history }: { id: KpiId; value: n
           <div className="num mb-2 border border-line bg-panel2 p-2 text-[11px] text-accent">{def.formulaDe}</div>
           {contextDe && <p className="mb-2 text-[11px] leading-relaxed text-dim">→ {contextDe}</p>}
           {history && history.length >= 2 && (
-            <button className="edlink text-[11px]" onClick={() => setShowHistory(true)}>
-              📈 Verlauf über {history.length} Wochen
+            <button className="edlink inline-flex items-center gap-1 text-[11px]" onClick={() => setShowHistory(true)}>
+              <Icon name="trending-up" size={12} /> Verlauf über {history.length} Wochen
             </button>
           )}
         </div>

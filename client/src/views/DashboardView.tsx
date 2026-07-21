@@ -10,6 +10,7 @@ import {
 import { useStore } from '../store.js';
 import { eur, num, pct } from '../format.js';
 import { KpiCard, Panel } from '../components/ui.js';
+import { Icon, Glyph } from '../components/Icon.js';
 
 const KPI_GRID: KpiId[] = [
   'mrr', 'mrrGrowthMonthly', 'logoChurnMonthly', 'nrr',
@@ -134,7 +135,7 @@ export function DashboardView() {
       {state.takeover.status !== 'none' && (
         <section className="border-2 border-bad bg-bad/5 px-4 py-3" style={{ borderRadius: 3 }}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="kicker text-bad">🦈 Feindliche Übernahme · {state.takeover.bidderName}</span>
+            <span className="kicker inline-flex items-center gap-1.5 text-bad"><Icon name="fin" size={13} /> Feindliche Übernahme · {state.takeover.bidderName}</span>
             <button className="btn border-bad text-bad" onClick={() => useStore.getState().setTakeoverOpen(true)}>Verteidigung öffnen →</button>
           </div>
           <p className="mt-1 max-w-[70ch] text-[13px] leading-relaxed text-ink2">
@@ -270,8 +271,9 @@ export function DashboardView() {
             )) : <p className="py-3 text-[13px] italic text-dim">Noch keine Einträge.</p>}
           </div>
           {state.ceo.probation && (
-            <div className="mt-3 border-l-2 border-bad bg-bad/5 p-2.5 text-[13px] text-bad">
-              ⚠ BEWÄHRUNG bis Woche {state.ceo.probation.endsWeek}: {state.ceo.probation.targets.map((t) => t.labelDe).join(' · ')}
+            <div className="mt-3 flex items-start gap-1.5 border-l-2 border-bad bg-bad/5 p-2.5 text-[13px] text-bad">
+              <Icon name="alert" size={14} className="mt-0.5 shrink-0" />
+              <span>BEWÄHRUNG bis Woche {state.ceo.probation.endsWeek}: {state.ceo.probation.targets.map((t) => t.labelDe).join(' · ')}</span>
             </div>
           )}
         </div>
@@ -468,8 +470,8 @@ function NextMovesPanel() {
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         {top.map((m, i) => (
           <button key={i} onClick={m.go} className={`flex flex-col border-l-2 bg-panel p-3 text-left transition-colors hover:bg-panel2 ${toneCls[m.tone]}`} style={{ borderTopRightRadius: 2, borderBottomRightRadius: 2 }}>
-            <div className="flex items-baseline gap-2">
-              <span>{m.icon}</span>
+            <div className="flex items-center gap-2">
+              <Glyph e={m.icon} size={14} />
               <span className={`kicker text-[9px] ${toneCls[m.tone]}`}>{m.tone === 'bad' ? 'Dringend' : m.tone === 'warn' ? 'Bald' : 'Chance'}</span>
             </div>
             <p className="mt-1.5 flex-1 text-[13px] leading-[1.45] text-ink2">{m.textDe}</p>
@@ -516,7 +518,7 @@ function TutorialPanel() {
       <div className="mt-2 grid gap-x-6 gap-y-1 md:grid-cols-2">
         {steps.map((s, i) => (
           <button key={i} className={`flex items-center gap-2 py-0.5 text-left text-[13px] ${s.done ? 'text-good' : 'text-dim hover:text-ink'}`} onClick={() => !s.done && s.go?.()}>
-            <span>{s.done ? '☑' : '☐'}</span>
+            <Icon name={s.done ? 'check-square' : 'square'} size={14} />
             <span className={s.done ? 'line-through opacity-70' : ''}>{s.label}</span>
           </button>
         ))}

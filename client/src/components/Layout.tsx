@@ -3,6 +3,7 @@ import { runwayWeeks, totalMrr, weekToDateISO } from '@boardroom/shared';
 import { useStore, type View } from '../store.js';
 import { t } from '../i18n.js';
 import { eur, num } from '../format.js';
+import { Icon } from './Icon.js';
 
 /**
  * Redaktions-Chrome („Die Morgenlage"): Laufband oben (Cash · Runway · MRR ·
@@ -130,7 +131,7 @@ export function Layout({ children }: { children: ReactNode }) {
               >
                 {item.label}
                 {item.unread && unread > 0 && <span className="text-accent">·{unread}</span>}
-                {item.locked && <span className="text-faint"> 🔒</span>}
+                {item.locked && <Icon name="lock" size={10} className="ml-0.5 text-faint" />}
                 {item.view === 'boerse' && state.ipo.status === 'public' && state.ipo.sharePrice !== null && (
                   <span className="text-accent"> {state.ipo.sharePrice.toFixed(0)}€</span>
                 )}

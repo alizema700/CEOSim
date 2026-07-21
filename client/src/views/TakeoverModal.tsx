@@ -1,6 +1,7 @@
 import { acceptanceShare, type TakeoverRespondAction } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, Modal } from '../components/ui.js';
+import { Icon, type IconName } from '../components/Icon.js';
 import { eur, pct } from '../format.js';
 
 type Mode = TakeoverRespondAction['mode'];
@@ -29,11 +30,11 @@ export function TakeoverModal() {
     if (mode === 'accept' || mode === 'poison_pill') setTakeoverOpen(false);
   };
 
-  const defenses: { mode: Mode; label: string; desc: string; tone: string; show: boolean }[] = [
-    { mode: 'rally', label: '🗣️ Aktionäre überzeugen', desc: 'Die Standalone-Story verkaufen — wirkt über Board-Vertrauen, CEO-Marke & Kommunikation. Senkt die Annahmequote.', tone: 'text-ink', show: true },
-    { mode: 'negotiate', label: '📈 Höher nachverhandeln', desc: 'Die Prämie hochtreiben — mehr Wert für alle beim Exit. Zu gierig, und der Bieter springt ab.', tone: 'text-ink', show: isTender },
-    { mode: 'poison_pill', label: '☠️ Giftpille zünden', desc: 'Verwässert den Angreifer und sichert die Unabhängigkeit — aber Investoren strafen die Entrenchment (~120 k€, −Reputation, −Vertrauen).', tone: 'text-warn', show: true },
-    { mode: 'accept', label: '🤝 Angebot annehmen (Exit)', desc: 'Zum Höchstpreis verkaufen. Deine Amtszeit endet — die Prämie ist dafür sicher auf deinem Konto.', tone: 'text-accent', show: isTender },
+  const defenses: { mode: Mode; icon: IconName; label: string; desc: string; tone: string; show: boolean }[] = [
+    { mode: 'rally', icon: 'megaphone', label: 'Aktionäre überzeugen', desc: 'Die Standalone-Story verkaufen — wirkt über Board-Vertrauen, CEO-Marke & Kommunikation. Senkt die Annahmequote.', tone: 'text-ink', show: true },
+    { mode: 'negotiate', icon: 'trending-up', label: 'Höher nachverhandeln', desc: 'Die Prämie hochtreiben — mehr Wert für alle beim Exit. Zu gierig, und der Bieter springt ab.', tone: 'text-ink', show: isTender },
+    { mode: 'poison_pill', icon: 'skull', label: 'Giftpille zünden', desc: 'Verwässert den Angreifer und sichert die Unabhängigkeit — aber Investoren strafen die Entrenchment (~120 k€, −Reputation, −Vertrauen).', tone: 'text-warn', show: true },
+    { mode: 'accept', icon: 'handshake', label: 'Angebot annehmen (Exit)', desc: 'Zum Höchstpreis verkaufen. Deine Amtszeit endet — die Prämie ist dafür sicher auf deinem Konto.', tone: 'text-accent', show: isTender },
   ];
 
   return (
@@ -66,7 +67,7 @@ export function TakeoverModal() {
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {defenses.filter((d) => d.show).map((d) => (
           <button key={d.mode} className="flex flex-col items-start border border-line p-2.5 text-left transition-colors hover:border-accent disabled:opacity-50" style={{ borderRadius: 2 }} disabled={busy || !active} onClick={() => respond(d.mode)}>
-            <span className={`text-[13px] font-semibold ${d.tone}`}>{d.label}</span>
+            <span className={`flex items-center gap-1.5 text-[13px] font-semibold ${d.tone}`}><Icon name={d.icon} size={15} /> {d.label}</span>
             <span className="mt-0.5 text-[10.5px] leading-tight text-dim">{d.desc}</span>
           </button>
         ))}

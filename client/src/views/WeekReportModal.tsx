@@ -1,6 +1,7 @@
 import { KPI_DEFINITIONS, type KpiId } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Modal, GradeBadge } from '../components/ui.js';
+import { Icon, Glyph } from '../components/Icon.js';
 import { eur, num, dateDe, formatByUnit } from '../format.js';
 
 /** KPIs, die im „größten Mover" der Woche berücksichtigt werden. */
@@ -78,15 +79,15 @@ export function WeekReportModal() {
             <ul className="space-y-1.5">
               {r.occurrences.map((o, i) => (
                 <li key={i} className="flex gap-2 text-[13px] leading-snug">
-                  <span className="shrink-0">{o.icon}</span>
+                  <Glyph e={o.icon} size={14} className="mt-0.5 shrink-0" />
                   <span className={o.severity === 'bad' ? 'text-bad' : o.severity === 'good' ? 'text-good' : o.severity === 'warn' ? 'text-warn' : 'text-ink2'}>{o.textDe}</span>
                 </li>
               ))}
             </ul>
           )}
           {r.triggeredEvents.length > 0 && (
-            <div className="mt-3 border-l-2 border-warn bg-warn/5 px-2.5 py-2 text-[12px] text-warn">
-              🚨 {r.triggeredEvents.length} neue(s) Ereignis(se) wartet(en) auf deine Reaktion — siehe Dashboard.
+            <div className="mt-3 flex items-center gap-1.5 border-l-2 border-warn bg-warn/5 px-2.5 py-2 text-[12px] text-warn">
+              <Icon name="alert" size={13} className="shrink-0" /> {r.triggeredEvents.length} neue(s) Ereignis(se) wartet(en) auf deine Reaktion — siehe Dashboard.
             </div>
           )}
         </div>
