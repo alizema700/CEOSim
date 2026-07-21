@@ -29,6 +29,7 @@ export * from './types/ipo.js';
 export * from './types/labor.js';
 export * from './types/legal.js';
 export * from './types/board.js';
+export * from './types/takeover.js';
 export * from './types/company.js';
 export * from './types/game.js';
 
@@ -60,6 +61,7 @@ export * from './engine/legal.js';
 export * from './engine/governance.js';
 export * from './engine/equity.js';
 export * from './engine/ceo.js';
+export * from './engine/takeover.js';
 export * from './engine/legacy.js';
 
 // ── Kuratierte Daten (Phase 4) ───────────────────────────────────────

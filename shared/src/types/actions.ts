@@ -44,6 +44,7 @@ export type PlayerAction =
   | CeoRestAction
   | CeoPublicAppearanceAction
   | HireCoachAction
+  | TakeoverRespondAction
   | StepDownAction;
 
 /**
@@ -338,6 +339,16 @@ export interface CeoPublicAppearanceAction {
 export interface HireCoachAction {
   type: 'HIRE_COACH';
   skill: 'finanzen' | 'strategie' | 'leadership' | 'kommunikation' | 'krisenmanagement' | 'governance';
+}
+
+/**
+ * Antwort auf eine feindliche Übernahme (Phase 14): annehmen (Exit), höher
+ * nachverhandeln (Wert), Giftpille zünden (abwehren, entrenchment-Kosten) oder
+ * die Aktionäre überzeugen (rally).
+ */
+export interface TakeoverRespondAction {
+  type: 'TAKEOVER_RESPOND';
+  mode: 'accept' | 'negotiate' | 'poison_pill' | 'rally';
 }
 
 /**

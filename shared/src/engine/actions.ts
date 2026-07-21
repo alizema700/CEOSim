@@ -3,7 +3,8 @@ import type { CompanyState } from '../types/company.js';
 import type { DecisionRecord, Hypothesis } from '../types/evaluation.js';
 import type { EffectPayload } from '../types/effects.js';
 import { totalMrr, runwayWeeks } from './derive.js';
-import { computeKpis } from './kpis.js';
+import { computeKpis, computeValuation } from './kpis.js';
+import { acceptanceShare, defendedTakeover, succeedTakeover } from './takeover.js';
 import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
@@ -324,6 +325,18 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
     case 'STEP_DOWN': {
       if (state.meta.week < 4) warnings.push('So früh gibt es kaum eine Bilanz — ein Rücktritt jetzt bewertet vor allem den Startzustand.');
       else warnings.push('Endgültig: Mit dem Rücktritt endet die Amtszeit und die Legacy-Bilanz wird festgeschrieben.');
+      break;
+    }
+    case 'TAKEOVER_RESPOND': {
+      const t = state.takeover;
+      if (t.status === 'none') errors.push('Aktuell gibt es keine Übernahmesituation.');
+      if ((action.mode === 'accept' || action.mode === 'negotiate') && t.status !== 'tender') errors.push('Erst mit einem konkreten Übernahmeangebot möglich.');
+      if (action.mode === 'poison_pill') {
+        if (state.ceo.boardTrust < 45) errors.push('Der Aufsichtsrat trägt eine Giftpille bei diesem Vertrauen (< 45) nicht mit.');
+        if (f.cash < 120_000) errors.push('Zu wenig Liquidität für die Abwehrkosten (~120 k€).');
+        warnings.push('Giftpillen sichern die Unabhängigkeit, gelten Investoren aber als Entrenchment — die entgangene Prämie wird dir angekreidet.');
+      }
+      if (action.mode === 'accept') warnings.push('Endgültig: Die Annahme verkauft die Firma und beendet deine Amtszeit — dafür der Höchstpreis auf dein Konto.');
       break;
     }
   }
@@ -739,6 +752,54 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push('Du schließt deine Amtszeit selbst ab. Die vollständige Amtszeit-Bilanz bewertet Unternehmenswert, Kapitaleffizienz, Kunden, Menschen, Governance und dein persönliches Erbe.');
       break;
     }
+    case 'TAKEOVER_RESPOND': {
+      const t = state.takeover;
+      const takeoverOcc: Occurrence[] = [];
+      if (action.mode === 'accept') {
+        t.defensesUsed.push('Angebot angenommen');
+        succeedTakeover(state, takeoverOcc);
+        summary = `Übernahmeangebot von ${t.bidderName} angenommen — Exit`;
+        analysis.push('Ein Verkauf zum Höchstpreis ist keine Niederlage: Für die Eigentümer (und dich) ist die Prämie oft mehr wert als der unsichere Alleingang.');
+      } else if (action.mode === 'negotiate') {
+        const gain = clamp(0.04 + (state.ceo.skills.kommunikation + state.ceo.skills.strategie) / 2000, 0.04, 0.14);
+        const before = t.premiumPct;
+        t.premiumPct = Math.round((t.premiumPct + gain) * 100) / 100;
+        if (t.premiumPct > 0.62) {
+          defendedTakeover(state, takeoverOcc, `${t.bidderName} lehnt die überzogene Nachforderung ab und zieht sich zurück.`);
+          summary = `Nachverhandlung überreizt — ${t.bidderName} springt ab`;
+          analysis.push('Zu hart gepokert: Der Bieter zieht sich zurück. Die Firma bleibt unabhängig — aber der Wert-Aufschlag ist vom Tisch.');
+        } else {
+          t.offerValue = Math.round(computeValuation(state).value * (1 + t.premiumPct));
+          if (t.deadlineWeek !== null) t.deadlineWeek += 1;
+          t.defensesUsed.push(`Nachverhandelt auf +${(t.premiumPct * 100).toFixed(0)} %`);
+          summary = `Angebot hochverhandelt: +${(before * 100).toFixed(0)} % → +${(t.premiumPct * 100).toFixed(0)} % Prämie`;
+          analysis.push(`Wertmaximierung: Prämie von +${(before * 100).toFixed(0)} % auf +${(t.premiumPct * 100).toFixed(0)} % gehoben (${fmt(t.offerValue)}). Jetzt kannst du zum besseren Preis annehmen — oder weiter verteidigen.`);
+        }
+      } else if (action.mode === 'poison_pill') {
+        schedule(state, 0, `Übernahmeabwehr W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: 120_000, labelDe: 'Übernahmeabwehr: Investmentbank & Kanzlei (Giftpille)' });
+        state.ceo.boardTrust = Math.max(0, state.ceo.boardTrust - 4);
+        state.reputation.investors = clamp(state.reputation.investors - 8, 0, 100);
+        t.defensesUsed.push('Giftpille (Poison Pill)');
+        defendedTakeover(state, takeoverOcc, 'Die Giftpille verwässert den Angreifer und macht die Übernahme prohibitiv teuer — der Bieter gibt auf.');
+        summary = `Giftpille gezündet — ${t.bidderName} abgewehrt`;
+        analysis.push('Die Giftpille rettet die Unabhängigkeit, gilt Investoren aber als Entrenchment: Ihnen entgeht die Prämie (−8 Investoren-Reputation, −4 Board-Vertrauen, 120 k€ Abwehrkosten).');
+      } else {
+        const resist = clamp((state.ceo.boardTrust - 50) / 100 + state.ceo.reputation / 300 + state.ceo.skills.kommunikation / 400, 0, 0.35);
+        t.defenseResistance += resist;
+        t.defensesUsed.push('Aktionäre überzeugt');
+        const acc = acceptanceShare(state, t.premiumPct, t.defenseResistance);
+        if (acc <= 0.5) {
+          defendedTakeover(state, takeoverOcc, 'Die Aktionäre folgen deiner Standalone-Story und lehnen das Angebot ab.');
+          summary = `Aktionäre überzeugt — ${t.bidderName} abgewehrt`;
+          analysis.push('Deine Glaubwürdigkeit (Board-Vertrauen, CEO-Marke, Kommunikation) trägt: Die Eigentümer glauben an mehr Wert im Alleingang.');
+        } else {
+          summary = `Überzeugungsarbeit — aber der Druck bleibt (${(acc * 100).toFixed(0)} % würden annehmen)`;
+          analysis.push(`Es reicht noch nicht: ${(acc * 100).toFixed(0)} % der Anteile würden das Angebot annehmen (> 50 % = Übernahme). Nachverhandeln, Giftpille — oder annehmen.`);
+        }
+      }
+      for (const o of takeoverOcc) analysis.push(`${o.icon} ${o.textDe}`);
+      break;
+    }
     case 'DISTRIBUTE_DIVIDEND': {
       recordResolution(state, 'dividende', `Gewinnausschüttung ${fmt(action.amount)}`);
       schedule(state, 0, `Dividende W${week}`, decisionId, { kind: 'DIVIDEND_PAYOUT', amount: action.amount });
@@ -799,7 +860,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

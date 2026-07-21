@@ -54,6 +54,9 @@ interface BoardroomStore {
   /** Amtszeit-Bilanz (Legacy-Report) offen — bei Spielende oder als Vorschau. */
   legacyOpen: boolean;
   setLegacyOpen: (open: boolean) => void;
+  /** Übernahme-Verteidigungs-Modal offen. */
+  takeoverOpen: boolean;
+  setTakeoverOpen: (open: boolean) => void;
   /** UI-Sprache (Chrome-Labels; Spielinhalte bleiben Deutsch). */
   lang: Locale;
   /** Hochgeladenes Logo (Data-URL) des offenen Spielstands. */
@@ -93,12 +96,14 @@ export const useStore = create<BoardroomStore>((set, get) => ({
   messageStatus: {},
   showBriefing: false,
   legacyOpen: false,
+  takeoverOpen: false,
   lang: getLocale(),
   logoDataUrl: null,
   chatThread: null,
 
   openChatWith: (chatThread) => set({ chatThread, view: 'chat' }),
   setLegacyOpen: (legacyOpen) => set({ legacyOpen }),
+  setTakeoverOpen: (takeoverOpen) => set({ takeoverOpen }),
   setLang: (lang) => {
     setLocale(lang);
     set({ lang });
@@ -136,7 +141,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
       ]);
       const latestBriefing = [...state.comms.messages].reverse().find((m) => m.kind === 'briefing');
       const briefingUnread = latestBriefing ? status[latestBriefing.id] === undefined : false;
-      set({ state, evaluations, reports, view: 'dashboard', lastDecision: null, messageStatus: status, showBriefing: briefingUnread, legacyOpen: false });
+      set({ state, evaluations, reports, view: 'dashboard', lastDecision: null, messageStatus: status, showBriefing: briefingUnread, legacyOpen: false, takeoverOpen: false });
     } catch (e) {
       set({ error: (e as Error).message });
     } finally {
@@ -192,6 +197,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
         evaluations: [...prev.evaluations, ...evaluations],
       }));
       if (state.meta.status !== 'active') set({ legacyOpen: true }); // Game Over ⇒ Bilanz (nach Wochenbericht)
+      if (state.takeover.status === 'tender') set({ takeoverOpen: true }); // laufendes Angebot ⇒ Verteidigung
     } catch (e) {
       set({ error: (e as Error).message });
     } finally {
@@ -200,7 +206,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
   },
 
   leaveGame: () => {
-    set({ state: null, evaluations: [], reports: [], view: 'saves', weekReport: null, lastDecision: null, legacyOpen: false });
+    set({ state: null, evaluations: [], reports: [], view: 'saves', weekReport: null, lastDecision: null, legacyOpen: false, takeoverOpen: false });
     void get().loadGames();
   },
 }));

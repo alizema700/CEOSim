@@ -70,6 +70,8 @@ export interface CompanyState {
   legal: import('./legal.js').LegalState;
   /** Aufsichtsrat/Board: benannte Sitze + protokollierte Beschlüsse (Phase 10). */
   board: import('./board.js').BoardState;
+  /** Feindliche Übernahme: Bieter, Angebot, Verteidigung (Phase 14). */
+  takeover: import('./takeover.js').TakeoverState;
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];

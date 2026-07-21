@@ -4,6 +4,7 @@ import {
   ceoLifeSummaryDe,
   computeKpis,
   effectiveMonthlyChurn,
+  takeoverSummaryDe,
   laborSummaryDe,
   legalSummaryDe,
   runwayWeeks,
@@ -55,6 +56,7 @@ export function stateBriefDe(state: CompanyState): string {
     `Struktur: ${legalSummaryDe(state)}.`,
     `Aufsichtsrat: ${boardSummaryDe(state)}. Board-Vertrauen ${state.ceo.boardTrust}/100. Offene Ereignisse: ${state.openEvents.filter((e) => e.status === 'open').map((e) => e.cardId).join(', ') || 'keine'}.`,
     `CEO persönlich: ${ceoLifeSummaryDe(state)}.`,
+    ...(state.takeover.status !== 'none' ? [`⚠️ Übernahme: ${takeoverSummaryDe(state)}.`] : []),
   ].join('\n');
 }
 

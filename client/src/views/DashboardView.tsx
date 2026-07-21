@@ -130,6 +130,21 @@ export function DashboardView() {
         </div>
       </section>
 
+      {/* ── Übernahme-Alarm ───────────────────────────────────────────── */}
+      {state.takeover.status !== 'none' && (
+        <section className="border-2 border-bad bg-bad/5 px-4 py-3" style={{ borderRadius: 3 }}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="kicker text-bad">🦈 Feindliche Übernahme · {state.takeover.bidderName}</span>
+            <button className="btn border-bad text-bad" onClick={() => useStore.getState().setTakeoverOpen(true)}>Verteidigung öffnen →</button>
+          </div>
+          <p className="mt-1 max-w-[70ch] text-[13px] leading-relaxed text-ink2">
+            {state.takeover.status === 'tender'
+              ? `Angebot: ${eur(state.takeover.offerValue ?? 0)} (+${(state.takeover.premiumPct * 100).toFixed(0)} % Prämie). Annehmen, nachverhandeln oder abwehren — die Frist läuft.`
+              : `${state.takeover.bidderName} baut eine Beteiligung auf (${(state.takeover.toeholdStake * 100).toFixed(1)} %). Ein formelles Angebot ist absehbar — bereite die Verteidigung vor.`}
+          </p>
+        </section>
+      )}
+
       {/* ── Nächste Züge (kontextuelle Empfehlungen) ──────────────────── */}
       <NextMovesPanel />
 
@@ -432,6 +447,7 @@ function NextMovesPanel() {
   if (unhappyKey) push({ prio: 55, icon: '⭐', tone: 'warn', textDe: `${unhappyKey.firstName} ${unhappyKey.lastName} (Schlüsselperson) ist unzufrieden — Bindung über Optionen oder Gehalt lohnt sich, bevor sie geht.`, cta: 'Team', go: () => setView('team') });
   if (state.product.techDebt > 62) push({ prio: 50, icon: '🧱', tone: 'warn', textDe: `Tech-Debt bei ${Math.round(state.product.techDebt)}/100 — Ausfallrisiko steigt. R&D-Allokation nachjustieren.`, cta: 'Produkt', go: () => setView('product') });
   if (state.ceo.energy < 30) push({ prio: 63, icon: '🪫', tone: 'warn', textDe: `Deine Energie ist bei ${Math.round(state.ceo.energy)}/100 — Dauerlast kostet Urteilskraft. Auszeit oder mehr Delegation wäre klug.`, cta: 'CEO', go: () => setView('ceo') });
+  if (state.takeover.status !== 'none') push({ prio: 99, icon: '🦈', tone: 'bad', textDe: `Feindliche Übernahme durch ${state.takeover.bidderName}: ${state.takeover.status === 'tender' ? 'ein Angebot liegt vor' : 'ein Bieter sammelt Anteile'}. Verteidigen oder zum Höchstpreis aussteigen.`, cta: 'Verteidigung', go: () => useStore.getState().setTakeoverOpen(true) });
 
   moves.sort((a, b) => b.prio - a.prio);
   const top = moves.slice(0, 3);
