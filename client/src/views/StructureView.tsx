@@ -4,13 +4,18 @@ import {
   MIN_KAPITAL,
   displayRechtsform,
   effectiveCorporateTaxRate,
+  esopAllocated,
+  esopPool,
+  isPublicCapable,
+  legalFamily,
+  memberSupport,
   organNames,
   taxBreakdown,
+  type BoardMember,
   type CapTableEntry,
-  type Rechtsform,
 } from '@boardroom/shared';
 import { useStore } from '../store.js';
-import { Bar, Drill, Panel } from '../components/ui.js';
+import { Bar, Drill, Panel, scoreColor } from '../components/ui.js';
 import { eur, num, pct } from '../format.js';
 
 /**
@@ -76,9 +81,11 @@ export function StructureView() {
         <Panel title="Organe der Gesellschaft">
           <OrganChart />
           <p className="mt-3 text-[10.5px] leading-relaxed text-dim">
-            {l.rechtsform === 'AG'
-              ? 'Bei der AG leitet der Vorstand eigenverantwortlich, der Aufsichtsrat überwacht und bestellt ihn, die Hauptversammlung entscheidet über Grundlagen (Satzung, Gewinn, Entlastung).'
-              : 'Bei der GmbH führt die Geschäftsführung; die Gesellschafterversammlung ist das oberste Organ und kann der Geschäftsführung Weisungen erteilen.'}
+            {organNames(l.rechtsform).aufsicht === 'Board of Directors'
+              ? 'Einstufige Governance: Ein Board of Directors bestellt und überwacht die Officers (CEO/CFO); die Anteilseigner entscheiden auf der Hauptversammlung über Grundlagen.'
+              : l.rechtsform === 'AG'
+                ? 'Bei der AG leitet der Vorstand eigenverantwortlich, der Aufsichtsrat überwacht und bestellt ihn, die Hauptversammlung entscheidet über Grundlagen (Satzung, Gewinn, Entlastung).'
+                : 'Bei der GmbH führt die Geschäftsführung; die Gesellschafterversammlung ist das oberste Organ und kann der Geschäftsführung Weisungen erteilen.'}
           </p>
         </Panel>
 
@@ -87,6 +94,9 @@ export function StructureView() {
           <CapTableDonut />
         </Panel>
       </section>
+
+      {/* ── Aufsichtsrat / Board ────────────────────────────────────── */}
+      <BoardPanel />
 
       {/* ── Steuern (echte dt. Sätze) ───────────────────────────────── */}
       <Panel title="Ertragsteuer">
@@ -126,11 +136,14 @@ function FormwechselPanel() {
   const l = state.legal;
   const active = state.meta.status === 'active';
 
-  if (l.rechtsform === 'AG') {
+  const target = legalFamily(state.identity.location?.country ?? 'Deutschland').ipoTarget;
+
+  if (isPublicCapable(l.rechtsform)) {
+    const o = organNames(l.rechtsform);
     return (
       <div className="border-2 border-good/50 bg-panel2 p-3.5" style={{ borderRadius: 3 }}>
-        <div className="kicker text-good">Aktiengesellschaft · börsenfähig</div>
-        <p className="mt-1 text-xs text-dim">Der Weg an die Börse steht offen (Tab „Börse", sobald die Kennzahlen passen). Vorstand, Aufsichtsrat und Hauptversammlung sind die Organe.</p>
+        <div className="kicker text-good">{displayRechtsform(l.rechtsform)} · börsenfähig</div>
+        <p className="mt-1 text-xs text-dim">Der Weg an die Börse steht offen (Tab „Börse", sobald die Kennzahlen passen). {o.leitung}, {o.aufsicht} und {o.versammlung} sind die Organe.</p>
       </div>
     );
   }
@@ -140,14 +153,14 @@ function FormwechselPanel() {
     return (
       <div className="border-2 border-warn bg-panel2 p-3.5" style={{ borderRadius: 3 }}>
         <div className="kicker text-warn">Formwechsel zur {l.pendingConversion.toForm} läuft</div>
-        <p className="mt-1 text-xs text-dim">Notar, Umwandlungsbericht und Registeranmeldung sind unterwegs. Wirksam mit Eintragung ins Handelsregister — in ~{Math.max(0, weeksLeft)} Woche{weeksLeft === 1 ? '' : 'n'}.</p>
+        <p className="mt-1 text-xs text-dim">Beurkundung, Umwandlungsbericht und Registeranmeldung sind unterwegs. Wirksam mit Eintragung ins Register — in ~{Math.max(0, weeksLeft)} Woche{weeksLeft === 1 ? '' : 'n'}.</p>
       </div>
     );
   }
 
-  // GmbH/UG: Checkliste zur AG.
-  const capOk = l.nennkapital >= MIN_KAPITAL.AG;
-  const trustOk = state.ceo.boardTrust >= 45;
+  // Nicht börsenfähig: Checkliste zum Ziel-Formwechsel (z. B. GmbH→AG, Ltd→PLC).
+  const capOk = l.nennkapital >= MIN_KAPITAL[target];
+  const trustOk = state.ceo.boardTrust >= 54; // Satzungsänderung braucht klaren Rückhalt
   const cashOk = state.finance.cash >= 42_000;
   const canConvert = capOk && trustOk && cashOk && active;
   const Item = ({ ok, children }: { ok: boolean; children: React.ReactNode }) => (
@@ -160,22 +173,22 @@ function FormwechselPanel() {
   return (
     <div className="border border-line bg-panel2 p-3.5" style={{ borderRadius: 3 }}>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <div className="kicker text-ink">Formwechsel zur AG</div>
-        <span className="text-[10px] text-dim">nur eine AG ist börsenfähig (§ 2 AktG)</span>
+        <div className="kicker text-ink">Formwechsel zur {target}</div>
+        <span className="text-[10px] text-dim">nur eine börsenfähige Rechtsform kann an die Börse</span>
       </div>
       <ul className="mt-2 space-y-1">
-        <Item ok={capOk}>Grundkapital ≥ {eur(MIN_KAPITAL.AG, false)} (aktuell {eur(l.nennkapital, false)}{!capOk && ' — erst Kapitalerhöhung'})</Item>
-        <Item ok={trustOk}>Zustimmung des Gremiums: Board-Vertrauen ≥ 45 (aktuell {num(state.ceo.boardTrust)})</Item>
-        <Item ok={cashOk}>Liquidität für Notar/Umwandlung ≥ {eur(42_000, false)}</Item>
+        <Item ok={capOk}>Grundkapital ≥ {eur(MIN_KAPITAL[target], false)} (aktuell {eur(l.nennkapital, false)}{!capOk && ' — erst Kapitalerhöhung'})</Item>
+        <Item ok={trustOk}>75 % Gesellschafter-Zustimmung (Board-Rückhalt, aktuell {num(state.ceo.boardTrust)}/100)</Item>
+        <Item ok={cashOk}>Liquidität für Beurkundung/Umwandlung ≥ {eur(42_000, false)}</Item>
       </ul>
       <button
         className="btn-primary mt-3"
         disabled={!canConvert || busy}
-        onClick={() => void act({ type: 'CONVERT_LEGAL_FORM', toForm: 'AG' }, null)}
+        onClick={() => void act({ type: 'CONVERT_LEGAL_FORM', toForm: target }, null)}
       >
-        Formwechsel zur AG einleiten (~4 Wochen, {eur(42_000, false)})
+        Formwechsel zur {target} einleiten (~4 Wochen, {eur(42_000, false)})
       </button>
-      {!capOk && <p className="mt-1.5 text-[10px] text-warn">Tipp: Unten unter „Kapitalmaßnahmen" das Nennkapital auf {eur(MIN_KAPITAL.AG, false)} erhöhen.</p>}
+      {!capOk && <p className="mt-1.5 text-[10px] text-warn">Tipp: Unten unter „Kapitalmaßnahmen" das Nennkapital auf {eur(MIN_KAPITAL[target], false)} erhöhen.</p>}
     </div>
   );
 }
@@ -198,11 +211,11 @@ function OrganChart() {
     <div className="mx-auto max-w-[280px]">
       <Box label={o.versammlung} sub="oberstes Organ" />
       <Connector />
-      <Box label={`Aufsichtsrat${l.rechtsform === 'AG' ? '' : '/Beirat'}`} sub={`Überwachung${mb}`} />
+      <Box label={o.aufsicht} sub={`Überwachung${mb}`} />
       <Connector />
       <Box label={o.leitung} accent />
       <Connector />
-      <Box label={`${state.playerProfile.ceoName} (CEO)`} sub={l.rechtsform === 'AG' ? 'Vorstandsvorsitz' : 'Geschäftsführer:in'} />
+      <Box label={`${state.playerProfile.ceoName} (CEO)`} sub={o.aufsicht === 'Board of Directors' ? 'Chief Executive Officer' : l.rechtsform === 'AG' ? 'Vorstandsvorsitz' : 'Geschäftsführer:in'} />
     </div>
   );
 }
@@ -238,8 +251,75 @@ function CapTableDonut() {
             <span className="num w-12 shrink-0 text-right">{pct(e.share, 1)}</span>
           </div>
         ))}
+        <div className="mt-1 border-t border-line pt-1.5 text-[10px] text-dim">
+          ESOP-Pool: {pct(esopAllocated(state), 1)} an Mitarbeitende vergeben von {pct(esopPool(state), 0)} (Vesting im Team-Steckbrief).
+        </div>
       </div>
     </div>
+  );
+}
+
+const SEAT_LABEL: Record<BoardMember['seatType'], string> = {
+  chair: 'Vorsitz',
+  investor: 'Investor',
+  founder: 'Gründer',
+  independent: 'Unabhängig',
+  employee: 'Belegschaft',
+  ceo: 'CEO',
+};
+const VOTE_STYLE: Record<string, string> = { ja: 'text-good', nein: 'text-bad', enthaltung: 'text-dim' };
+
+/** Aufsichtsrat/Board: benannte Sitze mit Rückhalt + letzte Beschlüsse. */
+function BoardPanel() {
+  const { state } = useStore();
+  if (!state) return null;
+  const members = state.board.members;
+  const o = organNames(state.legal.rechtsform);
+  const recent = [...state.board.resolutions].reverse().slice(0, 4);
+
+  return (
+    <Panel title={o.aufsicht === 'Board of Directors' ? 'Board of Directors' : 'Aufsichtsrat'}>
+      <div className="grid gap-6 md:grid-cols-2">
+        <div className="space-y-2.5">
+          {members.map((m) => {
+            const sup = memberSupport(state, m);
+            return (
+              <div key={m.id} className="text-xs">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="truncate">{m.name} <span className="kicker text-[8.5px] text-dim">{SEAT_LABEL[m.seatType]}</span></span>
+                  <span className="num shrink-0">{sup}</span>
+                </div>
+                <div className="mt-0.5"><Bar value={sup} color={scoreColor(sup)} /></div>
+                <div className="mt-0.5 text-[10px] leading-tight text-dim">{m.affiliationDe}</div>
+              </div>
+            );
+          })}
+        </div>
+        <div>
+          <div className="kicker mb-1 text-[9px]">Letzte Beschlüsse</div>
+          {recent.length === 0 ? (
+            <p className="text-[11px] text-dim">Noch keine förmlichen Beschlüsse. Formwechsel und Ausschüttungen laufen über den Aufsichtsrat.</p>
+          ) : (
+            <div className="space-y-2">
+              {recent.map((r, i) => (
+                <div key={i} className="border-b border-line/40 pb-1.5 text-[11px] last:border-0">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="truncate">{r.titleDe}</span>
+                    <span className={`kicker shrink-0 text-[9px] ${r.passed ? 'text-good' : 'text-bad'}`}>{r.passed ? 'angenommen' : 'abgelehnt'}</span>
+                  </div>
+                  <div className="mt-0.5 text-dim">
+                    W{r.week} · {(r.forShare * 100).toFixed(0)} % Zustimmung ({(r.requiredShare * 100).toFixed(0)} % nötig) ·{' '}
+                    {r.votes.map((v, j) => (
+                      <span key={j} className={VOTE_STYLE[v.vote]}>{v.name.split(' ')[0]}{j < r.votes.length - 1 ? ', ' : ''}</span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </Panel>
   );
 }
 

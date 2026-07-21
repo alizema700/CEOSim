@@ -112,13 +112,13 @@ describe('IPO-Gate: nur die AG ist börsenfähig (§ 2 AktG)', () => {
   it('als GmbH ist das Rechtsform-Kriterium hart verletzt; als AG erfüllt', () => {
     const s = newGame(9040);
     const asGmbh = ipoEligibility(s);
-    const agCrit = asGmbh.criteria.find((c) => /Rechtsform ist AG/.test(c.labelDe))!;
+    const agCrit = asGmbh.criteria.find((c) => /Börsenfähige Rechtsform/.test(c.labelDe))!;
     expect(agCrit.ok).toBe(false);
     expect(asGmbh.ok).toBe(false);
     // Als AG ist genau dieses Kriterium erfüllt.
     s.legal.rechtsform = 'AG';
     const asAg = ipoEligibility(s);
-    expect(asAg.criteria.find((c) => /Rechtsform ist AG/.test(c.labelDe))!.ok).toBe(true);
+    expect(asAg.criteria.find((c) => /Börsenfähige Rechtsform/.test(c.labelDe))!.ok).toBe(true);
   });
 });
 

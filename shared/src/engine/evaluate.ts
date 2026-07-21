@@ -128,6 +128,9 @@ function buildCausalChain(state: CompanyState, d: DecisionRecord, now: Record<Kp
     case 'DISTRIBUTE_DIVIDEND':
       chain.push('Mechanik: Ausschüttung = Finanzierungs-Cashflow (kein Aufwand!); Gewinnrücklage und Cash sinken um denselben Betrag, die Bilanz-Identität bleibt gewahrt. Weniger Puffer, dafür ein Rendite-Signal an die Eigentümer.');
       break;
+    case 'GRANT_OPTIONS':
+      chain.push('Mechanik: Optionen aus dem ESOP-Pool binden ohne Cash — Vesting über 4 Jahre (1-Jahr-Cliff) macht das Bleiben attraktiv; Zufriedenheit ↑, Kündigungsrisiko ↓. Der unverdiente Teil verfällt bei Abgang zurück in den Pool.');
+      break;
     default:
       break;
   }
@@ -357,13 +360,11 @@ function gradeProcess(state: CompanyState, d: DecisionRecord): Grade {
       break;
     }
     case 'CONVERT_LEGAL_FORM': {
-      if (d.action.toForm === 'AG') {
-        info += 10; timing += 10;
-        reasons.push('Formwechsel zur AG als bewusster Schritt Richtung Kapitalmarkt — die einzige börsenfähige Rechtsform. Sauberes Sequencing, wenn ein IPO das Ziel ist.');
-        if (state.ipo.status === 'locked' && runwayAtDecision < 20) {
-          timing -= 15;
-          reasons.push('Teurer Formwechsel bei knappem Runway, ohne dass ein IPO unmittelbar ansteht — die Kosten binden Liquidität, die woanders fehlt.');
-        }
+      info += 10; timing += 10;
+      reasons.push(`Formwechsel zur ${d.action.toForm} als bewusster Schritt Richtung Kapitalmarkt — nur eine börsenfähige Rechtsform kann an die Börse. Sauberes Sequencing, wenn ein IPO das Ziel ist.`);
+      if (state.ipo.status === 'locked' && runwayAtDecision < 20) {
+        timing -= 15;
+        reasons.push('Teurer Formwechsel bei knappem Runway, ohne dass ein IPO unmittelbar ansteht — die Kosten binden Liquidität, die woanders fehlt.');
       }
       break;
     }
@@ -384,6 +385,16 @@ function gradeProcess(state: CompanyState, d: DecisionRecord): Grade {
       } else {
         risk += 5;
         reasons.push('Ausschüttung aus komfortabler Liquiditätslage: legitime Kapitalrückführung, wenn das Geld intern keine bessere Rendite findet.');
+      }
+      break;
+    }
+    case 'GRANT_OPTIONS': {
+      const emp = state.people.employees.find((e) => e.id === (d.action as { employeeId: string }).employeeId);
+      values += 8; comms += 5;
+      reasons.push('Beteiligung statt reiner Gehaltszahlung: bindet über Vesting und teilt den Erfolg — kulturell stark und liquiditätsschonend.');
+      if (emp?.keyPerson) {
+        risk += 10;
+        reasons.push('Gezielt an eine Schlüsselperson: Golden Handcuffs genau dort, wo ein Abgang am teuersten wäre.');
       }
       break;
     }
@@ -472,6 +483,8 @@ function applySkillGains(state: CompanyState, d: DecisionRecord, grade: Grade): 
     case 'DISTRIBUTE_DIVIDEND':
       s.finanzen = clamp(s.finanzen + gain, 0, 100);
       s.governance = clamp(s.governance + gain * 0.5, 0, 100); break;
+    case 'GRANT_OPTIONS':
+      s.leadership = clamp(s.leadership + gain, 0, 100); break;
     default: break;
   }
   // Werte-Konsistenz zahlt auf Governance ein.

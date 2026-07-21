@@ -45,6 +45,23 @@ export interface Employee {
   personalityDe: string;
   hobbyDe: string;
   strengthDe: string;
+  /** ESOP-Beteiligung (Phase 10): Optionen mit Cliff-/Vesting-Plan, optional. */
+  equityGrant?: EquityGrant;
+}
+
+/**
+ * Mitarbeiterbeteiligung (ESOP, Phase 10). Standard: 4 Jahre Vesting mit
+ * 1-Jahr-Cliff. Vor dem Cliff vestet nichts; danach linear bis 100 %. Bei
+ * Abgang verfällt der unverdiente Teil (fällt in den ESOP-Pool zurück).
+ */
+export interface EquityGrant {
+  /** Zugesagter Unternehmensanteil (0..1), aus dem ESOP-Pool. */
+  percent: Fraction;
+  grantWeek: WeekIndex;
+  /** Cliff in Wochen (relativ zum Grant): vorher vestet nichts. */
+  cliffWeeks: number;
+  /** Gesamte Vesting-Dauer in Wochen (typisch 208 = 4 Jahre). */
+  vestWeeks: number;
 }
 
 /** Führungskraft = Employee-Verweis + Persona-Daten für die LLM-Ebene. */

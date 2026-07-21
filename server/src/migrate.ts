@@ -1,4 +1,4 @@
-import { fnv1a, generateMaTargets, initialIpoState, initialLaborState, initialLegalState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
+import { buildInitialBoard, fnv1a, generateMaTargets, initialIpoState, initialLaborState, initialLegalState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
 
 /**
  * Sanfte Snapshot-Migration: füllt Felder auf, die neuere Engine-Versionen
@@ -49,6 +49,10 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   if (!s.legal) {
     const loc = s.identity.location ?? resolveLocationProfile(s.identity.locationId);
     s.legal = initialLegalState(s.meta.seed, loc);
+  }
+  // Phase 10: Aufsichtsrat/Board-Roster (ESOP-Grants sind optional → keine Migration).
+  if (!s.board) {
+    s.board = buildInitialBoard(s.meta.seed, s.playerProfile.ceoName);
   }
   return state;
 }

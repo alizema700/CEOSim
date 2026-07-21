@@ -41,6 +41,7 @@ import { applyIpoListing, tickIpo } from './ipo.js';
 import { coveredEmployees, tickLabor } from './labor.js';
 import { tickLegal } from './legal.js';
 import { effectiveCorporateTaxRate } from '../types/legal.js';
+import { tickGovernance } from './governance.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -114,6 +115,7 @@ export function closeWeek(state: CompanyState): WeekReport {
   tickIpo(state, occurrences);
   tickLabor(state, occurrences);
   tickLegal(state, occurrences);
+  tickGovernance(state, occurrences);
 
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);

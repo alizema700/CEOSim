@@ -19,6 +19,8 @@ import { generateMaTargets } from './ma.js';
 import { initialIpoState } from '../types/ipo.js';
 import { initialLaborState } from '../types/labor.js';
 import { initialLegalState } from './legal.js';
+import { buildInitialBoard } from './governance.js';
+import { ESOP_CLIFF_WEEKS, ESOP_VEST_WEEKS, defaultGrantPercent } from './equity.js';
 
 /**
  * Spielinitialisierung: baut aus GameSetup + Seed den Start-CompanyState.
@@ -137,6 +139,19 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
         rampWeeksRemaining: 0,
         ...personaBits(rngPeople, seniority),
       });
+    }
+  }
+
+  // ESOP-Grants (Phase 10): Schlüsselpersonen halten Optionen, die seit ihrem
+  // Eintritt vesten (4 Jahre / 1-Jahr-Cliff). Bleibt unter dem 10-%-Pool.
+  {
+    let esopAlloc = 0;
+    for (const e of employees) {
+      if (!e.keyPerson) continue;
+      const pct = defaultGrantPercent(e);
+      if (esopAlloc + pct > 0.09) break; // Puffer im Pool lassen
+      e.equityGrant = { percent: pct, grantWeek: e.hiredWeek, cliffWeeks: ESOP_CLIFF_WEEKS, vestWeeks: ESOP_VEST_WEEKS };
+      esopAlloc += pct;
     }
   }
 
@@ -371,6 +386,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
     ipo: initialIpoState(),
     labor: initialLaborState(loc.regulationDensity, dz),
     legal: initialLegalState(seed, loc),
+    board: buildInitialBoard(seed, setup.playerProfile.ceoName),
     history: [],
     decisionLog: [],
     evaluations: [],

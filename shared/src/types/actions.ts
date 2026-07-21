@@ -38,7 +38,8 @@ export type PlayerAction =
   | ConvertLegalFormAction
   | CapitalIncreaseAction
   | HoldShareholderMeetingAction
-  | DistributeDividendAction;
+  | DistributeDividendAction
+  | GrantOptionsAction;
 
 /**
  * Listenpreis ändern (± %). Sofort: Neugeschäfts-ARPA. Verzögert: Bestand wird
@@ -291,6 +292,17 @@ export interface HoldShareholderMeetingAction {
 export interface DistributeDividendAction {
   type: 'DISTRIBUTE_DIVIDEND';
   amount: Money;
+}
+
+/**
+ * ESOP-Optionen an eine Person vergeben (Phase 10): Bindung über Vesting
+ * (4 Jahre / 1-Jahr-Cliff) statt Cash. Aus dem ESOP-Pool.
+ */
+export interface GrantOptionsAction {
+  type: 'GRANT_OPTIONS';
+  employeeId: Id;
+  /** Zugesagter Unternehmensanteil (0.0005 .. 0.02). */
+  percent: Fraction;
 }
 
 /** Ergebnis der Aktions-Validierung durch die Engine. */

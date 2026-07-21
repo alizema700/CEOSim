@@ -2,8 +2,8 @@ import { clamp } from '../types/common.js';
 import type { CompanyState } from '../types/company.js';
 import type { Occurrence } from '../types/game.js';
 import type { LocationProfile } from '../types/identity.js';
-import type { Groessenklasse, LegalState, Mitbestimmung } from '../types/legal.js';
-import { HEBESATZ_BY_CITY, HEBESATZ_DEFAULT, organNames } from '../types/legal.js';
+import type { Groessenklasse, HandelsregisterEntry, LegalState, Mitbestimmung } from '../types/legal.js';
+import { HEBESATZ_BY_CITY, HEBESATZ_DEFAULT, MIN_KAPITAL, isPublicCapable, legalFamily, organNames } from '../types/legal.js';
 import { headcount, locationOf, totalMrr } from './derive.js';
 import { addMessage, assistantSender } from './comms.js';
 
@@ -29,12 +29,20 @@ export function hebesatzFor(loc: LocationProfile): number {
   return HEBESATZ_BY_CITY[loc.id] ?? HEBESATZ_DEFAULT;
 }
 
+/** Registereintrag je Rechtsraum (Amtsgericht/HRB, Delaware/File, Companies House/CRN). */
+function registerFor(seed: number, loc: LocationProfile): HandelsregisterEntry {
+  const n = Math.abs(seed);
+  if (loc.country === 'USA') return { courtDe: 'Delaware Secretary of State', type: 'File', number: `File ${7_000_000 + (n % 2_000_000)}` };
+  if (loc.country === 'Großbritannien') return { courtDe: 'Companies House', type: 'CRN', number: `${(10_000_000 + (n % 89_999_999))}` };
+  return { courtDe: amtsgerichtFor(loc), type: 'HRB', number: `HRB ${100_000 + (n % 800_000)}` };
+}
+
 export function initialLegalState(seed: number, loc: LocationProfile): LegalState {
-  const hrb = 100_000 + (Math.abs(seed) % 800_000);
+  const start = legalFamily(loc.country).start;
   return {
-    rechtsform: 'GmbH',
-    nennkapital: 25_000,
-    handelsregister: { courtDe: amtsgerichtFor(loc), type: 'HRB', number: `HRB ${hrb}` },
+    rechtsform: start,
+    nennkapital: MIN_KAPITAL[start],
+    handelsregister: registerFor(seed, loc),
     aufsichtsrat: true, // Lead-Investor hält einen Board-/Beiratssitz
     mitbestimmung: 'keine',
     hebesatz: hebesatzFor(loc),
@@ -126,13 +134,13 @@ export function completeConversion(state: CompanyState, occ: Occurrence[]): void
   // Professionalisierungs-Signal an den Kapitalmarkt.
   state.ceo.boardTrust = clamp(state.ceo.boardTrust + 3, 0, 100);
   state.ceo.trustLog.push({ week: state.meta.week, delta: 3, reasonDe: `Formwechsel zur ${to} vollzogen — professionellere Governance.` });
-  if (to === 'AG') state.reputation.investors = clamp(state.reputation.investors + 5, 0, 100);
+  if (isPublicCapable(to)) state.reputation.investors = clamp(state.reputation.investors + 5, 0, 100);
   const o = organNames(to);
-  occ.push({ icon: '⚖️', textDe: `Formwechsel wirksam: Aus der ${from} ist eine ${to} geworden. Ab jetzt ${o.leitung}, Aufsichtsrat und ${o.versammlung}${to === 'AG' ? ' — und der Weg an die Börse ist offen.' : '.'}`, severity: 'good' });
+  occ.push({ icon: '⚖️', textDe: `Formwechsel wirksam: Aus der ${from} ist eine ${to} geworden. Ab jetzt ${o.leitung}, ${o.aufsicht} und ${o.versammlung}${isPublicCapable(to) ? ' — und der Weg an die Börse ist offen.' : '.'}`, severity: 'good' });
   addMessage(state, {
     from: { name: 'Dr. Katharina Brandt', roleDe: 'Kanzlei Brandt & Kollegen', refId: null, company: 'Notariat & Gesellschaftsrecht' },
-    subjectDe: `Formwechsel zur ${to} im Handelsregister eingetragen`,
-    bodyDe: `sehr geehrte Geschäftsführung, die Umwandlung Ihrer Gesellschaft in eine ${to} ist heute im Handelsregister (${l.handelsregister.number}, ${l.handelsregister.courtDe}) eingetragen und damit wirksam. ${to === 'AG' ? 'Die Leitung liegt nun beim Vorstand, überwacht vom Aufsichtsrat; oberstes Organ ist die Hauptversammlung. Erst diese Rechtsform ist börsenfähig (§ 2 AktG) — ein Börsengang ist jetzt rechtlich möglich.' : 'Die Haftungsverhältnisse und Organpflichten ändern sich entsprechend.'} Für Rückfragen stehen wir bereit. Mit besten Grüßen, Brandt & Kollegen.`,
+    subjectDe: `Formwechsel zur ${to} eingetragen`,
+    bodyDe: `sehr geehrte Geschäftsführung, die Umwandlung Ihrer Gesellschaft in eine ${to} ist heute im Register (${l.handelsregister.number}, ${l.handelsregister.courtDe}) eingetragen und damit wirksam. ${isPublicCapable(to) ? `Die Leitung liegt nun beim ${o.leitung}, überwacht vom ${o.aufsicht}; oberstes Organ ist die ${o.versammlung}. Erst diese Rechtsform ist börsenfähig — ein Börsengang ist jetzt rechtlich möglich.` : 'Die Haftungsverhältnisse und Organpflichten ändern sich entsprechend.'} Für Rückfragen stehen wir bereit. Mit besten Grüßen, Brandt & Kollegen.`,
     kind: 'external',
     eventInstanceId: null,
     delegable: false,

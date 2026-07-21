@@ -3,6 +3,7 @@ import type { CompanyState } from '../types/company.js';
 import type { Occurrence } from '../types/game.js';
 import { IPO_FLOAT_SHARE, PRE_IPO_SHARES, type IpoBank } from '../types/ipo.js';
 import { IPO_PREP_WEEKS, IPO_ROADSHOW_WEEKS } from '../types/actions.js';
+import { isPublicCapable, legalFamily } from '../types/legal.js';
 import { computeValuation, mrrGrowthMonthly } from './kpis.js';
 import { modifierProduct, totalMrr } from './derive.js';
 import { stream } from './rng.js';
@@ -58,7 +59,7 @@ export function ipoEligibility(state: CompanyState): { ok: boolean; criteria: { 
     { labelDe: `Board-Vertrauen ≥ 55 (aktuell ${Math.round(state.ceo.boardTrust)})`, ok: state.ceo.boardTrust >= 55 },
     { labelDe: `Mindestens 30 Wochen Historie (aktuell ${state.meta.week})`, ok: state.meta.week >= 30 },
     { labelDe: 'Keine laufende Covenant-Verletzung', ok: state.finance.consecutiveMinCashBreachWeeks === 0 },
-    { labelDe: `Rechtsform ist AG (§ 2 AktG — nur AGs sind börsenfähig, aktuell ${state.legal.rechtsform})`, ok: state.legal.rechtsform === 'AG' },
+    { labelDe: `Börsenfähige Rechtsform (AG/Inc/PLC — aktuell ${state.legal.rechtsform})`, ok: isPublicCapable(state.legal.rechtsform) },
   ];
   return { ok: criteria.every((c) => c.ok), criteria };
 }
@@ -87,18 +88,19 @@ export function tickIpo(state: CompanyState, occ: Occurrence[]): void {
         priority: 'hoch',
       });
     } else {
-      // Nudge: Alle Geschäftskriterien erfüllt, nur die Rechtsform (AG) fehlt.
+      // Nudge: Alle Geschäftskriterien erfüllt, nur die Rechtsform fehlt.
+      const fam = legalFamily(state.identity.location?.country ?? 'Deutschland');
       const onlyLegalMissing =
-        state.legal.rechtsform !== 'AG' &&
+        !isPublicCapable(state.legal.rechtsform) &&
         state.legal.pendingConversion === null &&
-        elig.criteria.every((c) => c.ok || /Rechtsform ist AG/.test(c.labelDe));
+        elig.criteria.every((c) => c.ok || /Börsenfähige Rechtsform/.test(c.labelDe));
       const alreadyNudged = state.comms.messages.some((m) => m.templateId === 'ipo-needs-ag');
       if (onlyLegalMissing && !alreadyNudged) {
-        occ.push({ icon: '⚖️', textDe: 'Die Zahlen wären reif für einen Börsengang — aber nur eine AG ist börsenfähig. Der Formwechsel wäre der nächste Schritt (Struktur → Formwechsel).', severity: 'warn' });
+        occ.push({ icon: '⚖️', textDe: `Die Zahlen wären reif für einen Börsengang — aber nur eine ${fam.ipoTarget} ist börsenfähig. Der Formwechsel wäre der nächste Schritt (Struktur → Formwechsel).`, severity: 'warn' });
         addMessage(state, {
           from: assistantSender(state),
-          subjectDe: 'IPO-reif — aber ihr seid eine GmbH',
-          bodyDe: `gute Nachricht und ein Haken: Eure Kennzahlen erfüllen inzwischen die IPO-Schwellen. Aber an die Börse geht nur eine Aktiengesellschaft (§ 2 AktG) — als GmbH fehlt die Rechtsform. Der saubere Weg wäre ein Formwechsel zur AG (ggf. vorher eine kleine Kapitalerhöhung auf 50.000 € Grundkapital). Das findest du unter „Struktur". Kein Muss — aber ohne AG kein IPO.`,
+          subjectDe: `IPO-reif — aber ihr seid eine ${state.legal.rechtsform}`,
+          bodyDe: `gute Nachricht und ein Haken: Eure Kennzahlen erfüllen inzwischen die IPO-Schwellen. Aber an die Börse geht nur eine börsenfähige Rechtsform (${fam.ipoTarget}) — aktuell fehlt sie. Der saubere Weg wäre ein Formwechsel zur ${fam.ipoTarget} (ggf. vorher eine kleine Kapitalerhöhung auf das nötige Grundkapital). Das findest du unter „Struktur". Kein Muss — aber ohne ${fam.ipoTarget} kein IPO.`,
           kind: 'system',
           eventInstanceId: null,
           delegable: false,

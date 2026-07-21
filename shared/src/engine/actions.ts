@@ -14,7 +14,9 @@ import { maTarget } from './ma.js';
 import { IPO_BANKS, ipoBank, ipoEligibility, subscriptionRatioFor } from './ipo.js';
 import { applyTarifBinding, applyTarifOffer } from './labor.js';
 import type { Occurrence } from '../types/game.js';
-import { FORMWECHSEL_FEE_AG, FORMWECHSEL_WEEKS, MIN_KAPITAL, NOTARY_CAPITAL_FEE_MIN, NOTARY_CAPITAL_FEE_RATE, organNames } from '../types/legal.js';
+import { FORMWECHSEL_FEE_AG, FORMWECHSEL_WEEKS, MIN_KAPITAL, NOTARY_CAPITAL_FEE_MIN, NOTARY_CAPITAL_FEE_RATE, isPublicCapable, legalFamily, organNames } from '../types/legal.js';
+import { computeResolution, recordResolution } from './governance.js';
+import { ESOP_CLIFF_WEEKS, ESOP_VEST_WEEKS, esopUnallocated } from './equity.js';
 
 export { deptDe };
 
@@ -235,14 +237,19 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
     }
     case 'CONVERT_LEGAL_FORM': {
       const l = state.legal;
-      const order: Record<import('../types/legal.js').Rechtsform, number> = { UG: 0, GmbH: 1, AG: 2 };
+      const country = state.identity.location?.country ?? 'Deutschland';
+      const fam = legalFamily(country);
       if (l.pendingConversion) errors.push('Es läuft bereits ein Formwechsel.');
       if (action.toForm === l.rechtsform) errors.push('Diese Rechtsform besteht bereits.');
-      else if (order[action.toForm] <= order[l.rechtsform]) errors.push('Ein Rückwechsel in eine „kleinere" Rechtsform ist im Simulator nicht vorgesehen.');
+      else if (action.toForm !== fam.ipoTarget) errors.push(`In ${country} führt der Weg zur Börsenfähigkeit über die ${fam.ipoTarget} — ein anderer Formwechsel ist hier nicht vorgesehen.`);
       if (l.nennkapital < MIN_KAPITAL[action.toForm]) errors.push(`Für die ${action.toForm} sind mindestens ${MIN_KAPITAL[action.toForm].toLocaleString('de-DE')} € Nennkapital nötig — erst Kapitalerhöhung (aktuell ${Math.round(l.nennkapital).toLocaleString('de-DE')} €).`);
-      if (state.ceo.boardTrust < 45) errors.push('Der Aufsichtsrat/die Gesellschafter tragen den Formwechsel bei diesem Vertrauen (< 45) nicht mit.');
+      if (!l.pendingConversion && action.toForm !== l.rechtsform) {
+        // Formwechsel ist eine Satzungsänderung: 75 % Zustimmung der Gesellschafter.
+        const res = computeResolution(state, 'formwechsel', `Formwechsel zur ${action.toForm}`);
+        if (!res.passed) errors.push(`Die Gesellschafter tragen den Formwechsel nicht mit: nur ${(res.forShare * 100).toFixed(0)} % Zustimmung, ${(res.requiredShare * 100).toFixed(0)} % nötig (Satzungsänderung). Es braucht mehr Rückhalt im Aufsichtsrat.`);
+      }
       if (f.cash < FORMWECHSEL_FEE_AG) errors.push(`Für Notar, Umwandlungsbericht und Prüfung sind ${FORMWECHSEL_FEE_AG.toLocaleString('de-DE')} € nötig — die Liquidität reicht nicht.`);
-      if (action.toForm === 'AG') warnings.push('Als AG gelten strengere Publizitäts- und Governance-Pflichten (Vorstand, Aufsichtsrat, Hauptversammlung) — dafür wird ein Börsengang erst möglich.');
+      if (isPublicCapable(action.toForm)) warnings.push('Als börsenfähige Gesellschaft gelten strengere Publizitäts- und Governance-Pflichten — dafür wird ein Börsengang erst möglich.');
       break;
     }
     case 'CAPITAL_INCREASE': {
@@ -263,7 +270,20 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       if (action.amount > f.retainedEarnings) errors.push(`Es lässt sich nur aus der Gewinnrücklage ausschütten (max. ${Math.max(0, Math.round(f.retainedEarnings)).toLocaleString('de-DE')} €).`);
       const minCashCov = f.debt.covenants.find((c) => c.type === 'minCash');
       if (minCashCov && minCashCov.type === 'minCash' && f.cash - action.amount < minCashCov.value) errors.push('Die Ausschüttung würde die Mindestliquidität (Covenant) reißen.');
+      if (action.amount > 0 && action.amount <= f.retainedEarnings) {
+        // Ausschüttung ist ein Gesellschafterbeschluss (einfache Mehrheit).
+        const divRes = computeResolution(state, 'dividende', 'Gewinnausschüttung');
+        if (!divRes.passed) errors.push(`Die Gesellschafterversammlung lehnt die Ausschüttung ab (${(divRes.forShare * 100).toFixed(0)} % Zustimmung, ${(divRes.requiredShare * 100).toFixed(0)} % nötig).`);
+      }
       if (runwayWeeks(state) < 30) warnings.push('Ausschüttung bei knappem Runway: Das Kapital fehlt dann für Wachstum und Puffer — der Aufsichtsrat schaut genau hin.');
+      break;
+    }
+    case 'GRANT_OPTIONS': {
+      const emp = state.people.employees.find((e) => e.id === action.employeeId);
+      if (!emp) errors.push('Unbekannte Person.');
+      else if (emp.equityGrant) errors.push(`${emp.firstName} ${emp.lastName} hat bereits einen Options-Grant.`);
+      if (action.percent < 0.0005 || action.percent > 0.02) errors.push('Grant: 0,05 % bis 2,0 % pro Person.');
+      if (action.percent > esopUnallocated(state)) errors.push(`Der ESOP-Pool hat nur noch ${(esopUnallocated(state) * 100).toFixed(2)} % frei.`);
       break;
     }
   }
@@ -572,11 +592,13 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     }
     case 'CONVERT_LEGAL_FORM': {
       const l = state.legal;
+      const res = recordResolution(state, 'formwechsel', `Formwechsel zur ${action.toForm}`);
       l.pendingConversion = { toForm: action.toForm, startedWeek: week, effectiveWeek: week + FORMWECHSEL_WEEKS };
       schedule(state, 0, `Formwechsel W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: FORMWECHSEL_FEE_AG, labelDe: `Formwechsel zur ${action.toForm}: Notar, Umwandlungsbericht, Prüfung` });
       summary = `Formwechsel zur ${action.toForm} eingeleitet — wirksam in ~${FORMWECHSEL_WEEKS} Wochen`;
-      analysis.push(`Notarielle Beurkundung, Umwandlungsbericht und Registeranmeldung laufen (${fmt(FORMWECHSEL_FEE_AG)} sofort fällig). Erst mit der Eintragung ins Handelsregister ist die ${action.toForm} wirksam.`);
-      if (action.toForm === 'AG') analysis.push('Ab dann leitet ein Vorstand die Gesellschaft, überwacht vom Aufsichtsrat; oberstes Organ ist die Hauptversammlung. Erst als AG ist ein Börsengang rechtlich möglich (§ 2 AktG).');
+      analysis.push(`Gesellschafterbeschluss: ${(res.forShare * 100).toFixed(0)} % Zustimmung (${res.votes.filter((v) => v.vote === 'ja').length}/${res.votes.length} Sitze dafür).`);
+      analysis.push(`Beurkundung, Umwandlungsbericht und Registeranmeldung laufen (${fmt(FORMWECHSEL_FEE_AG)} sofort fällig). Erst mit der Eintragung ins Register ist die ${action.toForm} wirksam.`);
+      if (isPublicCapable(action.toForm)) analysis.push(`Ab dann gilt die zweistufige/überwachte Governance der ${action.toForm} — und erst diese Rechtsform ist börsenfähig, ein Börsengang wird rechtlich möglich.`);
       break;
     }
     case 'CAPITAL_INCREASE': {
@@ -604,7 +626,19 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push(`Ordentliche ${o.versammlung}: Feststellung des Jahresabschlusses, Ergebnisverwendung und Entlastung. Nächste turnusmäßige Versammlung in 52 Wochen.`);
       break;
     }
+    case 'GRANT_OPTIONS': {
+      const emp = state.people.employees.find((e) => e.id === action.employeeId)!;
+      emp.equityGrant = { percent: action.percent, grantWeek: week, cliffWeeks: ESOP_CLIFF_WEEKS, vestWeeks: ESOP_VEST_WEEKS };
+      // Bindung ohne Cash: Zufriedenheit hoch, Kündigungsrisiko runter.
+      emp.satisfaction = Math.min(100, emp.satisfaction + 8);
+      emp.attritionRiskWeekly = Math.max(0.0015, emp.attritionRiskWeekly * 0.8);
+      summary = `Optionen vergeben: ${(action.percent * 100).toFixed(2)} % an ${emp.firstName} ${emp.lastName}`;
+      analysis.push(`Vesting über 4 Jahre mit 1-Jahr-Cliff (§ Golden Handcuffs): erst nach 12 Monaten vestet der erste Teil, dann linear. Bindung ohne Gehaltssprung — der unverdiente Teil verfällt bei Abgang zurück in den Pool.`);
+      analysis.push(`Zufriedenheit steigt, das Kündigungsrisiko sinkt — besonders wirksam bei Schlüsselpersonen, deren Abgang Wissen und Velocity kostet.`);
+      break;
+    }
     case 'DISTRIBUTE_DIVIDEND': {
+      recordResolution(state, 'dividende', `Gewinnausschüttung ${fmt(action.amount)}`);
       schedule(state, 0, `Dividende W${week}`, decisionId, { kind: 'DIVIDEND_PAYOUT', amount: action.amount });
       const ceoCut = action.amount * state.ceo.equityShare;
       summary = `Gewinnausschüttung ${fmt(action.amount)} beschlossen`;

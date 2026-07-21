@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DEPARTMENTS, deptDe, EMPLOYER_COST_FACTOR, laborSummaryDe, type Employee, type TarifStatus } from '@boardroom/shared';
+import { DEPARTMENTS, deptDe, EMPLOYER_COST_FACTOR, esopUnallocated, laborSummaryDe, vestedFraction, vestedPercent, type Employee, type TarifStatus } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, Drill, GradeBadge, Modal, Panel, scoreColor } from '../components/ui.js';
 import { eur, num, pct } from '../format.js';
@@ -344,9 +344,13 @@ function NegotiationBox({ demandPct, floorPct, deadlineWeek, round, lastOfferPct
 function EmployeeModal({ emp, onClose }: { emp: Employee; onClose: () => void }) {
   const { state, act, busy, openChatWith } = useStore();
   const [raise, setRaise] = useState(5);
+  const [grantPct, setGrantPct] = useState(0.3);
   if (!state) return null;
   const tenureYears = Math.max(0, (state.meta.week - emp.hiredWeek) / 52);
   const exec = state.people.executives.find((x) => x.employeeId === emp.id);
+  const grant = emp.equityGrant;
+  const vestedPct = grant ? vestedFraction(grant, state.meta.week) : 0;
+  const poolFree = esopUnallocated(state);
 
   return (
     <Modal title={`Steckbrief · ${deptDe(emp.dept)}`} onClose={onClose} wide>
@@ -369,6 +373,24 @@ function EmployeeModal({ emp, onClose }: { emp: Employee; onClose: () => void })
         <p><span className="kicker text-[9px]">Hobby </span> {emp.hobbyDe ?? '—'}</p>
         {exec && <p><span className="kicker text-[9px]">Agenda </span> {exec.agendaDe}</p>}
       </div>
+
+      {/* ESOP-Beteiligung (Phase 10) */}
+      {grant && (
+        <div className="mt-4 border border-line bg-panel2 p-3" style={{ borderRadius: 2 }}>
+          <div className="flex items-baseline justify-between">
+            <span className="kicker text-[9px] text-accent">ESOP-Beteiligung</span>
+            <span className="num text-xs">{pct(grant.percent, 2)} zugesagt · {pct(vestedPercent(grant, state.meta.week), 2)} gevestet</span>
+          </div>
+          <div className="mt-1.5"><Bar value={vestedPct * 100} color="bg-accent" /></div>
+          <p className="mt-1 text-[10px] text-dim">
+            {vestedPct === 0
+              ? `Noch im 1-Jahr-Cliff — vor Woche ${grant.grantWeek + grant.cliffWeeks} vestet nichts.`
+              : vestedPct >= 1
+                ? 'Voll gevestet (4 Jahre erreicht).'
+                : `${(vestedPct * 100).toFixed(0)} % gevestet, linear bis Woche ${grant.grantWeek + grant.vestWeeks}. Bei Abgang verfällt der Rest.`}
+          </p>
+        </div>
+      )}
 
       <div className="mt-5 border-t-2 border-ink pt-3">
         <div className="kicker mb-2 text-[10px]">Aktionen</div>
@@ -393,6 +415,23 @@ function EmployeeModal({ emp, onClose }: { emp: Employee; onClose: () => void })
           </div>
         </div>
         <p className="mt-2 text-[10px] text-dim">Erhöhung wirkt sofort auf Bindung & Stimmung dieser Person; über ~12 % spricht es sich in der Abteilung herum (Neid-Effekt).</p>
+
+        {/* Optionen gewähren (ESOP) */}
+        {!grant && poolFree >= 0.0005 && (
+          <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3">
+            <span className="text-xs text-dim">ESOP-Optionen</span>
+            <input type="range" min={0.05} max={Math.min(2, poolFree * 100)} step={0.05} value={grantPct} onChange={(e) => setGrantPct(Number(e.target.value))} className="w-28" />
+            <span className="num w-14 text-xs">{grantPct.toFixed(2)} %</span>
+            <button
+              className="btn"
+              disabled={busy || state.meta.status !== 'active' || grantPct / 100 > poolFree}
+              onClick={() => { onClose(); void act({ type: 'GRANT_OPTIONS', employeeId: emp.id, percent: grantPct / 100 }, null); }}
+            >
+              Optionen gewähren
+            </button>
+            <span className="w-full text-[10px] text-dim">Bindung über 4 Jahre Vesting (1-Jahr-Cliff) statt Cash. Pool frei: {pct(poolFree, 2)}.</span>
+          </div>
+        )}
       </div>
     </Modal>
   );

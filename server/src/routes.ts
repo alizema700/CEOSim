@@ -104,10 +104,11 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   }),
   z.object({ type: z.literal('SET_TARIF_BINDING'), status: z.enum(['none', 'verband', 'haustarif']) }),
   z.object({ type: z.literal('NEGOTIATE_TARIF'), offerPct: z.number().min(0).max(0.15) }),
-  z.object({ type: z.literal('CONVERT_LEGAL_FORM'), toForm: z.enum(['UG', 'GmbH', 'AG']) }),
+  z.object({ type: z.literal('CONVERT_LEGAL_FORM'), toForm: z.enum(['UG', 'GmbH', 'AG', 'LLC', 'Inc', 'Ltd', 'PLC']) }),
   z.object({ type: z.literal('CAPITAL_INCREASE'), targetNennkapital: zMoney.gt(0) }),
   z.object({ type: z.literal('HOLD_SHAREHOLDER_MEETING') }),
   z.object({ type: z.literal('DISTRIBUTE_DIVIDEND'), amount: zMoney.gt(0) }),
+  z.object({ type: z.literal('GRANT_OPTIONS'), employeeId: z.string(), percent: z.number().min(0.0005).max(0.02) }),
 ]);
 
 const zHypothesis = z

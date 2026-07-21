@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  boardSummaryDe,
   computeKpis,
   effectiveMonthlyChurn,
   laborSummaryDe,
@@ -51,7 +52,7 @@ export function stateBriefDe(state: CompanyState): string {
     `Team ${state.people.employees.length} Köpfe · Ø-Zufriedenheit ${Math.round(k.avgSatisfaction)} · Tech-Debt ${Math.round(state.product.techDebt)}/100 · NPS ${Math.round(state.product.nps)}.`,
     `Arbeitsbeziehungen: ${laborSummaryDe(state.labor)}${state.labor.negotiation ? ` · laufende Tarifrunde: Forderung +${(state.labor.negotiation.demandPct * 100).toFixed(1)} %` : ''}.`,
     `Struktur: ${legalSummaryDe(state)}.`,
-    `Board-Vertrauen ${state.ceo.boardTrust}/100. Offene Ereignisse: ${state.openEvents.filter((e) => e.status === 'open').map((e) => e.cardId).join(', ') || 'keine'}.`,
+    `Aufsichtsrat: ${boardSummaryDe(state)}. Board-Vertrauen ${state.ceo.boardTrust}/100. Offene Ereignisse: ${state.openEvents.filter((e) => e.status === 'open').map((e) => e.cardId).join(', ') || 'keine'}.`,
   ].join('\n');
 }
 

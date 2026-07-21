@@ -13,14 +13,34 @@ import type { Money, WeekIndex } from './common.js';
  * Formwechsel GmbH → AG ist damit die harte Voraussetzung fürs IPO.
  */
 
-export type Rechtsform = 'UG' | 'GmbH' | 'AG';
+export type Rechtsform = 'UG' | 'GmbH' | 'AG' | 'LLC' | 'Inc' | 'Ltd' | 'PLC';
 
-/** Mindest-Nennkapital je Rechtsform (§ 5 GmbHG, § 7 AktG, § 5a GmbHG). */
+/** Mindest-Nennkapital je Rechtsform (dt. §§ GmbHG/AktG; US/UK vereinfacht). */
 export const MIN_KAPITAL: Record<Rechtsform, Money> = {
   UG: 1,
   GmbH: 25_000,
   AG: 50_000,
+  LLC: 0,
+  Inc: 1,
+  Ltd: 1,
+  PLC: 50_000, // £50.000 Mindest-Grundkapital einer PLC
 };
+
+/**
+ * Rechtsform-Familie je Land: mit welcher Form startet man, und welche ist
+ * börsenfähig (Ziel eines Formwechsels). Deutschland GmbH→AG, UK Ltd→PLC,
+ * USA Inc (C-Corp) ist bereits börsenfähig — kein Formwechsel nötig.
+ */
+export function legalFamily(country: string): { start: Rechtsform; ipoTarget: Rechtsform } {
+  if (country === 'USA') return { start: 'Inc', ipoTarget: 'Inc' };
+  if (country === 'Großbritannien') return { start: 'Ltd', ipoTarget: 'PLC' };
+  return { start: 'GmbH', ipoTarget: 'AG' };
+}
+
+/** Börsenfähige Rechtsformen (nur diese dürfen an die Börse). */
+export function isPublicCapable(f: Rechtsform): boolean {
+  return f === 'AG' || f === 'Inc' || f === 'PLC';
+}
 
 /** Deutsche Ertragsteuer-Bausteine (Kapitalgesellschaft). */
 export const KOERPERSCHAFTSTEUER = 0.15; // § 23 KStG
@@ -42,10 +62,10 @@ export const HEBESATZ_BY_CITY: Record<string, number> = {
 export const HEBESATZ_DEFAULT = 400;
 
 export interface HandelsregisterEntry {
-  /** Registergericht (Amtsgericht des Standorts). */
+  /** Registerbehörde (Amtsgericht / Secretary of State / Companies House). */
   courtDe: string;
-  /** Registerart: HRB für Kapitalgesellschaften. */
-  type: 'HRB';
+  /** Registerart: HRB (DE), File (US), CRN (UK). */
+  type: 'HRB' | 'File' | 'CRN';
   /** Registernummer (deterministisch aus dem Seed). */
   number: string;
 }
@@ -96,12 +116,20 @@ export function displayRechtsform(f: Rechtsform): string {
   return f === 'UG' ? 'UG (haftungsbeschränkt)' : f;
 }
 
-/** Organbezeichnungen je Rechtsform (GmbH vs. AG). */
-export function organNames(f: Rechtsform): { leitung: string; versammlung: string; anteil: string; anteilseigner: string } {
-  if (f === 'AG') {
-    return { leitung: 'Vorstand', versammlung: 'Hauptversammlung', anteil: 'Aktie', anteilseigner: 'Aktionär:innen' };
+/** Organbezeichnungen je Rechtsform (DE zweistufig, US/UK einstufig). */
+export function organNames(f: Rechtsform): { leitung: string; aufsicht: string; versammlung: string; anteil: string; anteilseigner: string } {
+  switch (f) {
+    case 'AG':
+      return { leitung: 'Vorstand', aufsicht: 'Aufsichtsrat', versammlung: 'Hauptversammlung', anteil: 'Aktie', anteilseigner: 'Aktionär:innen' };
+    case 'Inc':
+    case 'LLC':
+      return { leitung: 'Officers (CEO/CFO)', aufsicht: 'Board of Directors', versammlung: "Stockholders' Meeting", anteil: 'Share', anteilseigner: 'Stockholders' };
+    case 'Ltd':
+    case 'PLC':
+      return { leitung: 'Executive Directors', aufsicht: 'Board of Directors', versammlung: 'General Meeting', anteil: 'Share', anteilseigner: 'Shareholders' };
+    default:
+      return { leitung: 'Geschäftsführung', aufsicht: 'Aufsichtsrat/Beirat', versammlung: 'Gesellschafterversammlung', anteil: 'Geschäftsanteil', anteilseigner: 'Gesellschafter:innen' };
   }
-  return { leitung: 'Geschäftsführung', versammlung: 'Gesellschafterversammlung', anteil: 'Geschäftsanteil', anteilseigner: 'Gesellschafter:innen' };
 }
 
 /**
