@@ -106,7 +106,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </span>
           </button>
 
-          <h1 className="serif m-0 text-center text-[46px] leading-none tracking-[0.01em]">BOARDROOM</h1>
+          <h1 className="serif m-0 text-center text-[50px] leading-none tracking-[0.015em]">BOARDROOM</h1>
 
           <div className="flex justify-end">
             <button className="btn-primary" onClick={() => void closeWeek()} disabled={busy || gameOver}>
@@ -143,7 +143,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* ── Papierspalte ─────────────────────────────────────────────── */}
       <main className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-[1280px] px-5 py-7">{children}</div>
+        <div key={view} className="reveal mx-auto max-w-[1280px] px-5 py-7">{children}</div>
       </main>
     </div>
   );

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type CSSProperties } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   EVENT_CARDS,
@@ -11,6 +11,7 @@ import { useStore } from '../store.js';
 import { eur, num, pct } from '../format.js';
 import { KpiCard, Panel } from '../components/ui.js';
 import { Icon, Glyph } from '../components/Icon.js';
+import { CountUp } from '../components/CountUp.js';
 
 const KPI_GRID: KpiId[] = [
   'mrr', 'mrrGrowthMonthly', 'logoChurnMonthly', 'nrr',
@@ -57,14 +58,14 @@ export function DashboardView() {
   const todays = state.calendar.appointments.filter((a) => a.week === state.meta.week).sort((a, b) => a.weekday - b.weekday);
 
   return (
-    <div className="space-y-10">
+    <div className="space-y-10 reveal-stagger">
       <TutorialPanel />
 
       {/* ── Aufmacher: Morgen-Briefing + Zahlen des Tages ─────────────── */}
       <section className="grid grid-cols-1 gap-0 lg:grid-cols-[1.5fr_1px_1fr] lg:gap-x-9">
         <div>
           <div className={`kicker ${hero.color}`}>{hero.kicker}</div>
-          <h2 className="serif mt-3 text-[38px] leading-[1.08] tracking-[-0.005em] text-ink" style={{ textWrap: 'balance' }}>
+          <h2 className="serif mt-3 text-[44px] leading-[1.04] tracking-[-0.012em] text-ink md:text-[54px]" style={{ textWrap: 'balance' }}>
             {hero.headline}
           </h2>
           {briefing && (
@@ -87,11 +88,19 @@ export function DashboardView() {
                 <span className="num text-[11px] text-good">{sparkPts.deltaPct >= 0 ? '▲' : '▼'} {Math.abs(sparkPts.deltaPct).toFixed(1)} % seit Start</span>
               </div>
               <svg viewBox="0 0 560 180" className="mt-3 block w-full">
+                <defs>
+                  <linearGradient id="mrrArea" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#2f7f79" stopOpacity="0.22" />
+                    <stop offset="100%" stopColor="#2f7f79" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
                 <line x1="0" y1="172" x2="560" y2="172" stroke="#171a1c" strokeWidth="1" />
                 <line x1="0" y1="96" x2="560" y2="96" stroke="#e7e3da" strokeWidth="1" />
                 <line x1="0" y1="24" x2="560" y2="24" stroke="#e7e3da" strokeWidth="1" />
-                <polyline points={sparkPts.points} fill="none" stroke="#2f7f79" strokeWidth="2" />
-                <circle cx={sparkPts.lastX} cy={sparkPts.lastY} r="3.5" fill="#2f7f79" />
+                <polygon points={`${sparkPts.points} ${sparkPts.lastX},172 ${sparkPts.firstX},172`} fill="url(#mrrArea)" />
+                <polyline className="draw-line" style={{ ['--len' as string]: sparkPts.length } as React.CSSProperties} points={sparkPts.points} fill="none" stroke="#2f7f79" strokeWidth="2.4" strokeLinejoin="round" strokeLinecap="round" />
+                <circle cx={sparkPts.lastX} cy={sparkPts.lastY} r="4" fill="#2f7f79" />
+                <circle cx={sparkPts.lastX} cy={sparkPts.lastY} r="8" fill="#2f7f79" opacity="0.14" />
                 <text x="556" y="20" textAnchor="end" fill="#a3a8ad" fontSize="10" fontFamily="Spline Sans Mono">{Math.round(sparkPts.max / 1000)}k</text>
                 <text x="556" y="168" textAnchor="end" fill="#a3a8ad" fontSize="10" fontFamily="Spline Sans Mono">{Math.round(sparkPts.min / 1000)}k</text>
               </svg>
@@ -103,7 +112,16 @@ export function DashboardView() {
 
         <div>
           <div className="rule-top pt-2.5 kicker text-ink">Zahlen des Tages</div>
-          <BigStat label="Cash" value={eur(state.finance.cash)} delta={lastReport?.cashFlow.netChange ?? null} money warnLow={state.finance.cash < 150_000} />
+          {/* Front-Page-Ziffer: Cash als Riesenzahl, die beim Wochenwechsel hochzählt. */}
+          <div className="border-b border-line pb-4 pt-2">
+            <div className="flex items-baseline justify-between">
+              <span className="kicker text-[9px]">Cash · Liquidität</span>
+              {lastReport && Math.abs(lastReport.cashFlow.netChange) > 1 && (
+                <span className={`num text-[12px] ${lastReport.cashFlow.netChange >= 0 ? 'text-good' : 'text-bad'}`}>{lastReport.cashFlow.netChange >= 0 ? '▲' : '▼'} {eur(Math.abs(lastReport.cashFlow.netChange))}/Wo</span>
+              )}
+            </div>
+            <CountUp value={state.finance.cash} format={(v) => eur(v)} className={`mega mt-1 block text-[clamp(40px,3.8vw,58px)] ${state.finance.cash < 150_000 ? 'text-bad' : 'text-ink'}`} />
+          </div>
           <BigStat label="Runway" value={runwayWeeks(state) >= 900 ? '∞' : `${num(runwayWeeks(state))} W`} delta={prev && kpis ? kpis.runwayWeeks - prev.runwayWeeks : null} unit="W" tint={runwayWeeks(state) < 26 ? 'text-warn' : undefined} />
           <BigStat label="MRR" value={eur(mrr)} delta={prev && kpis ? kpis.mrr - prev.mrr : null} money />
           <BigStat label="EBITDA" value={`${eur(kpis?.ebitdaMonthly ?? 0)}/M`} delta={prev && kpis ? kpis.ebitdaMonthly - prev.ebitdaMonthly : null} money tint={(kpis?.ebitdaMonthly ?? 0) < 0 ? 'text-bad' : 'text-good'} />
@@ -133,9 +151,9 @@ export function DashboardView() {
 
       {/* ── Übernahme-Alarm ───────────────────────────────────────────── */}
       {state.takeover.status !== 'none' && (
-        <section className="border-2 border-bad bg-bad/5 px-4 py-3" style={{ borderRadius: 3 }}>
+        <section className="breaking border-2 border-bad bg-bad/5 px-4 py-3" style={{ borderRadius: 3 }}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="kicker inline-flex items-center gap-1.5 text-bad"><Icon name="fin" size={13} /> Feindliche Übernahme · {state.takeover.bidderName}</span>
+            <span className="breaking-kicker kicker inline-flex items-center gap-1.5 px-1 text-bad"><Icon name="fin" size={13} /> Feindliche Übernahme · {state.takeover.bidderName}</span>
             <button className="btn border-bad text-bad" onClick={() => useStore.getState().setTakeoverOpen(true)}>Verteidigung öffnen →</button>
           </div>
           <p className="mt-1 max-w-[70ch] text-[13px] leading-relaxed text-ink2">
@@ -148,9 +166,9 @@ export function DashboardView() {
 
       {/* ── Krisen-Alarm ──────────────────────────────────────────────── */}
       {state.crisis.status === 'active' && (
-        <section className="border-2 border-bad bg-bad/5 px-4 py-3" style={{ borderRadius: 3 }}>
+        <section className="breaking border-2 border-bad bg-bad/5 px-4 py-3" style={{ borderRadius: 3 }}>
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <span className="kicker inline-flex items-center gap-1.5 text-bad"><Icon name="flame" size={13} /> Öffentliche Krise · Stufe {state.crisis.stage}</span>
+            <span className="breaking-kicker kicker inline-flex items-center gap-1.5 px-1 text-bad"><Icon name="flame" size={13} /> Öffentliche Krise · Stufe {state.crisis.stage}</span>
             <button className="btn border-bad text-bad" onClick={() => useStore.getState().setCrisisOpen(true)}>Reaktion öffnen →</button>
           </div>
           <p className="mt-1 max-w-[70ch] text-[13px] leading-relaxed text-ink2">
@@ -422,16 +440,19 @@ function deriveHero(
   return { kicker: 'Lagebild · Morgen-Briefing', color: 'text-accent', headline: 'Ruhige Lage — die beste Zeit, den nächsten Zug zu planen, bevor das Ereignis ihn erzwingt.' };
 }
 
-function sparkline(values: number[]): { points: string; lastX: number; lastY: number; min: number; max: number; deltaPct: number } | null {
+function sparkline(values: number[]): { points: string; firstX: number; lastX: number; lastY: number; length: number; min: number; max: number; deltaPct: number } | null {
   if (values.length < 2) return null;
-  const w = 560, h = 180, pad = 8;
+  const w = 560, pad = 8;
   const min = Math.min(...values), max = Math.max(...values);
   const range = max - min || 1;
   const n = values.length;
   const x = (i: number) => pad + (i / (n - 1)) * (w - 2 * pad);
   const y = (v: number) => 172 - ((v - min) / range) * (172 - 24);
-  const points = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
-  return { points, lastX: x(n - 1), lastY: y(values[n - 1]!), min, max, deltaPct: values[0]! > 0 ? (values[n - 1]! / values[0]! - 1) * 100 : 0 };
+  const coords = values.map((v, i) => ({ x: x(i), y: y(v) }));
+  const points = coords.map((c) => `${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(' ');
+  let length = 0;
+  for (let i = 1; i < coords.length; i++) length += Math.hypot(coords[i]!.x - coords[i - 1]!.x, coords[i]!.y - coords[i - 1]!.y);
+  return { points, firstX: x(0), lastX: x(n - 1), lastY: y(values[n - 1]!), length: Math.ceil(length), min, max, deltaPct: values[0]! > 0 ? (values[n - 1]! / values[0]! - 1) * 100 : 0 };
 }
 
 interface Move { prio: number; icon: string; textDe: string; cta: string; go: () => void; tone: 'bad' | 'warn' | 'accent' | 'good' }
@@ -483,7 +504,7 @@ function NextMovesPanel() {
       <div className="kicker text-ink">Nächste Züge · nach Dringlichkeit</div>
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
         {top.map((m, i) => (
-          <button key={i} onClick={m.go} className={`flex flex-col border-l-2 bg-panel p-3 text-left transition-colors hover:bg-panel2 ${toneCls[m.tone]}`} style={{ borderTopRightRadius: 2, borderBottomRightRadius: 2 }}>
+          <button key={i} onClick={m.go} className={`lift flex flex-col border-l-2 bg-panel p-3 text-left ${toneCls[m.tone]}`} style={{ borderTopRightRadius: 2, borderBottomRightRadius: 2 }}>
             <div className="flex items-center gap-2">
               <Glyph e={m.icon} size={14} />
               <span className={`kicker text-[9px] ${toneCls[m.tone]}`}>{m.tone === 'bad' ? 'Dringend' : m.tone === 'warn' ? 'Bald' : 'Chance'}</span>

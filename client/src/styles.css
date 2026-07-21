@@ -303,6 +303,78 @@ body::after {
   }
 }
 
+/* ═══ BEWEGUNG & DRAMATIK (D5) ══════════════════════════════════════════
+   Dezent, aber lebendig: Sektionen fahren beim Betreten ein, Karten heben
+   auf Hover an, Charts zeichnen sich, große Zahlen zählen hoch. Alles hinter
+   prefers-reduced-motion abschaltbar. */
+
+@keyframes reveal-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes draw-in { to { stroke-dashoffset: 0; } }
+@keyframes pulse-edge {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(194, 69, 61, 0.0); }
+  50% { box-shadow: 0 0 0 3px rgba(194, 69, 61, 0.16); }
+}
+@keyframes sheen {
+  0% { background-position: -140% 0; }
+  100% { background-position: 240% 0; }
+}
+
+.reveal { animation: reveal-up 0.5s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+/* Gestaffeltes Einlaufen der direkten Kinder. */
+.reveal-stagger > * { animation: reveal-up 0.55s cubic-bezier(0.2, 0.7, 0.3, 1) both; }
+.reveal-stagger > *:nth-child(1) { animation-delay: 0.03s; }
+.reveal-stagger > *:nth-child(2) { animation-delay: 0.09s; }
+.reveal-stagger > *:nth-child(3) { animation-delay: 0.15s; }
+.reveal-stagger > *:nth-child(4) { animation-delay: 0.21s; }
+.reveal-stagger > *:nth-child(5) { animation-delay: 0.27s; }
+.reveal-stagger > *:nth-child(6) { animation-delay: 0.33s; }
+.reveal-stagger > *:nth-child(7) { animation-delay: 0.39s; }
+.reveal-stagger > *:nth-child(n + 8) { animation-delay: 0.45s; }
+
+/* Karten heben beim Überfahren dezent an. */
+.lift { transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease; }
+.lift:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(23, 26, 28, 0.09); }
+
+/* Sich zeichnende Chart-Linie (Länge via --len setzen). */
+.draw-line {
+  stroke-dasharray: var(--len, 1200);
+  stroke-dashoffset: var(--len, 1200);
+  animation: draw-in 1.15s cubic-bezier(0.3, 0.7, 0.3, 1) forwards 0.15s;
+}
+
+/* „Breaking News": pulsierende Krisenkante + Aufmerksamkeits-Sheen. */
+.breaking { animation: pulse-edge 2.2s ease-in-out infinite; }
+.breaking-kicker {
+  position: relative;
+  overflow: hidden;
+}
+.breaking-kicker::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(194, 69, 61, 0.14) 50%, transparent 70%);
+  background-size: 220% 100%;
+  animation: sheen 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Riesenzahl im „Aufmacher" (Front-Page-Ziffer). */
+.mega {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 0.92;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal, .reveal-stagger > *, .draw-line, .breaking, .breaking-kicker::after { animation: none; }
+  .draw-line { stroke-dashoffset: 0; }
+  .lift:hover { transform: none; }
+}
+
 /* ── Scrollbar (hell, dezent) ───────────────────────────────────────── */
 ::-webkit-scrollbar {
   width: 9px;
