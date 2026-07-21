@@ -371,6 +371,19 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       if (action.mode === 'ignore') warnings.push('Aushalten spart Ressourcen — aber ohne Antwort kann der Angriff sich verschärfen.');
       break;
     }
+
+    case 'CEO_INVEST': {
+      if (action.amount <= 0) errors.push('Betrag muss positiv sein.');
+      if (action.amount > state.ceo.personalNetCash) errors.push(`Dein angespartes Netto-Cash reicht nicht (verfügbar ${fmt(state.ceo.personalNetCash)}).`);
+      if (action.instrument === 'angel') warnings.push('Angel-Wetten sind hochriskant: seltene Exits, aber auch Totalausfälle.');
+      break;
+    }
+    case 'CEO_DIVEST': {
+      const held = state.ceo.portfolio[action.instrument];
+      if (action.amount <= 0) errors.push('Betrag muss positiv sein.');
+      if (action.amount > held) errors.push(`So viel ist in diesem Instrument nicht angelegt (aktuell ${fmt(held)}).`);
+      break;
+    }
   }
   return { ok: errors.length === 0, errorsDe: errors, warningsDe: warnings };
 }
@@ -895,6 +908,23 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       for (const o of strikeOcc) analysis.push(`${o.icon} ${o.textDe}`);
       break;
     }
+    case 'CEO_INVEST': {
+      const labels = { geldmarkt: 'Geldmarkt', aktienindex: 'Aktienindex', angel: 'Angel-Portfolio' };
+      state.ceo.personalNetCash -= action.amount;
+      state.ceo.portfolio[action.instrument] += action.amount;
+      summary = `Privatanlage: ${fmt(action.amount)} in ${labels[action.instrument]}`;
+      analysis.push(action.instrument === 'geldmarkt' ? 'Geldmarkt ist sicher und folgt dem Leitzins — parkt Liquidität, wenn die Zinsen hoch sind.' : action.instrument === 'aktienindex' ? 'Der Aktienindex folgt dem Kapitalmarkt: im Bullenmarkt Rendite, im Bärenmarkt Verluste — mit Schwankung.' : 'Angel-Wetten sind hochriskant: die meisten Beteiligungen bringen wenig, seltene Exits vervielfachen sich, Ausfälle halbieren.');
+      analysis.push('Dein Privatvermögen ist getrennt vom Firmenkonto — Anlageerfolg zahlt aufs persönliche Netto ein, nicht in die Firma.');
+      break;
+    }
+    case 'CEO_DIVEST': {
+      const labels = { geldmarkt: 'Geldmarkt', aktienindex: 'Aktienindex', angel: 'Angel-Portfolio' };
+      state.ceo.portfolio[action.instrument] -= action.amount;
+      state.ceo.personalNetCash += action.amount;
+      summary = `Ausstieg: ${fmt(action.amount)} aus ${labels[action.instrument]} realisiert`;
+      analysis.push('Der aktuelle Marktwert fließt auf dein Netto-Cash zurück — Gewinne (oder Verluste) sind damit realisiert.');
+      break;
+    }
     case 'DISTRIBUTE_DIVIDEND': {
       recordResolution(state, 'dividende', `Gewinnausschüttung ${fmt(action.amount)}`);
       schedule(state, 0, `Dividende W${week}`, decisionId, { kind: 'DIVIDEND_PAYOUT', amount: action.amount });
@@ -955,7 +985,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

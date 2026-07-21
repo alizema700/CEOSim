@@ -49,6 +49,8 @@ export type PlayerAction =
   | HoldBoardMeetingAction
   | CeoPersonalTimeAction
   | CounterCompetitorAction
+  | CeoInvestAction
+  | CeoDivestAction
   | StepDownAction;
 
 /**
@@ -392,6 +394,23 @@ export interface CeoPersonalTimeAction {
 export interface CounterCompetitorAction {
   type: 'COUNTER_COMPETITOR';
   mode: 'match' | 'differentiate' | 'ignore' | 'counter';
+}
+
+/** Privates Anlageinstrument des CEO (Phase 22). */
+export type InvestInstrument = 'geldmarkt' | 'aktienindex' | 'angel';
+
+/** Privatvermögen in ein Instrument anlegen (aus dem Netto-Cash). */
+export interface CeoInvestAction {
+  type: 'CEO_INVEST';
+  instrument: InvestInstrument;
+  amount: number;
+}
+
+/** Aus einem Instrument aussteigen (realisiert Gewinn/Verlust aufs Netto-Cash). */
+export interface CeoDivestAction {
+  type: 'CEO_DIVEST';
+  instrument: InvestInstrument;
+  amount: number;
 }
 
 /**

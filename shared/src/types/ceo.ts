@@ -33,6 +33,27 @@ export interface CeoState {
   publicLog: CeoPublicEvent[];
   /** ── Privatleben & Netzwerk (Phase 23) ── */
   personal: CeoPersonal;
+  /** ── Privates Anlageportfolio (Phase 22) ── */
+  portfolio: CeoPortfolio;
+}
+
+/**
+ * Privates Anlageportfolio des CEO (Phase 22). Drei Instrumente mit
+ * unterschiedlichem Risiko/Ertrag, gekoppelt an die Makrolage. Die Beträge sind
+ * der aktuelle Marktwert (Renditen verzinsen sich in place). Golden-Master-
+ * sicher: leer per Default, wächst nur durch bewusste Anlageentscheidungen.
+ */
+export interface CeoPortfolio {
+  /** Geldmarkt/Tagesgeld — sicher, folgt dem Leitzins. */
+  geldmarkt: Money;
+  /** Aktienindex/ETF — folgt dem Kapitalmarkt, mit Volatilität. */
+  aktienindex: Money;
+  /** Angel-/Startup-Wetten — hohes Risiko, seltene Exits & Totalausfälle. */
+  angel: Money;
+}
+
+export function initialCeoPortfolio(): CeoPortfolio {
+  return { geldmarkt: 0, aktienindex: 0, angel: 0 };
 }
 
 /**

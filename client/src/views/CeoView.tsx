@@ -53,6 +53,7 @@ export function CeoView() {
           <div className="mt-3 space-y-2 text-xs">
             <VwRow label="Anteilswert (Equity)" v={nw.equityValue} total={nw.total} color="#2f7f79" hint={nw.sharePrice !== null ? `${pct(ceo.equityShare, 1)} × Börsenwert (Kurs ${eur(nw.sharePrice, false)})` : `${pct(ceo.equityShare, 1)} × Unternehmensbewertung`} />
             <VwRow label="Angespartes Netto (Gehalt + Dividenden)" v={nw.netCash} total={nw.total} color="#b8791f" hint="kumuliert, nach ~42 % persönlicher Steuer" />
+            {nw.portfolio > 0 && <VwRow label="Anlageportfolio (Geldmarkt/Aktien/Angel)" v={nw.portfolio} total={nw.total} color="#6d5bd0" hint="aktueller Marktwert deiner Privatanlagen" />}
           </div>
           <p className="mt-3 text-[10px] leading-relaxed text-dim">
             Der Löwenanteil deines Vermögens steckt im Anteil — er lebt und stirbt mit der Bewertung. Deshalb wirken Fundraising (Verwässerung), Dividende (Auszahlung) und IPO (Liquidität) direkt auf dein privates Konto.
@@ -69,6 +70,9 @@ export function CeoView() {
       {/* Privatleben & Netzwerk */}
       <PersonalPanel />
 
+      {/* Investments · Privatportfolio */}
+      <InvestPanel />
+
       {/* Öffentliche Rolle */}
       <PublicPanel />
 
@@ -78,6 +82,54 @@ export function CeoView() {
       {/* Amtszeit-Bilanz & Rücktritt */}
       <TenurePanel />
     </div>
+  );
+}
+
+/** Investments (Phase 22): privates Portfolio, gekoppelt an die Makrolage. */
+function InvestPanel() {
+  const { state, act, busy } = useStore();
+  const [amount, setAmount] = useState(20_000);
+  if (!state) return null;
+  const active = state.meta.status === 'active';
+  const p = state.ceo.portfolio;
+  const cash = state.ceo.personalNetCash;
+  const m = state.macro;
+  const total = p.geldmarkt + p.aktienindex + p.angel;
+  const items: { key: 'geldmarkt' | 'aktienindex' | 'angel'; icon: IconName; label: string; riskDe: string; retDe: string }[] = [
+    { key: 'geldmarkt', icon: 'bank', label: 'Geldmarkt', riskDe: 'sicher', retDe: `~${m.interestRatePct.toFixed(1)} % p. a. · folgt dem Leitzins` },
+    { key: 'aktienindex', icon: 'trending-up', label: 'Aktienindex (ETF)', riskDe: 'mittel', retDe: `folgt dem Kapitalmarkt (Index ${Math.round(m.capitalIndex)})` },
+    { key: 'angel', icon: 'rocket', label: 'Angel-Wetten', riskDe: 'hoch', retDe: 'seltene Exits, aber auch Totalausfälle' },
+  ];
+  return (
+    <Panel icon="coins" title="Investments · Privatportfolio">
+      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <p className="max-w-[62ch] text-[11.5px] leading-relaxed text-dim">Leg dein angespartes Privatvermögen an — getrennt vom Firmenkonto. Geldmarkt folgt dem Zins, der Aktienindex dem Kapitalmarkt, Angel-Wetten sind Hochrisiko. Der Erfolg zahlt aufs persönliche Netto ein.</p>
+        <span className="num text-[13px] text-purple">Depotwert {eur(total)}</span>
+      </div>
+      <div className="grid gap-2.5 md:grid-cols-3">
+        {items.map((it) => (
+          <div key={it.key} className="border border-line p-2.5" style={{ borderRadius: 2 }}>
+            <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><Icon name={it.icon} size={15} /> {it.label}</div>
+            <div className="num mt-1 text-[18px] text-ink">{eur(p[it.key])}</div>
+            <div className="kicker mt-0.5 text-[8px]">Risiko {it.riskDe}</div>
+            <div className="mt-0.5 text-[10px] leading-tight text-dim">{it.retDe}</div>
+            <div className="mt-2 flex gap-1.5">
+              <button className="btn flex-1 justify-center py-1 text-[11px]" disabled={busy || !active || amount <= 0 || amount > cash} onClick={() => void act({ type: 'CEO_INVEST', instrument: it.key, amount }, null)}>Anlegen</button>
+              <button className="btn flex-1 justify-center py-1 text-[11px]" disabled={busy || !active || p[it.key] <= 0} onClick={() => void act({ type: 'CEO_DIVEST', instrument: it.key, amount: Math.min(amount, p[it.key]) }, null)}>Ausstieg</button>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="kicker text-[9px]">Betrag</span>
+        <input type="number" className="input w-32 py-1 text-[13px]" value={amount} min={0} step={5000} onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))} />
+        {[10_000, 25_000, 50_000].map((q) => (
+          <button key={q} className="chip" onClick={() => setAmount(q)}>{eur(q, false)}</button>
+        ))}
+        <button className="chip" onClick={() => setAmount(Math.round(cash))}>Alles</button>
+        <span className="num ml-auto text-[11px] text-dim">verfügbar: {eur(cash)} Netto-Cash</span>
+      </div>
+    </Panel>
   );
 }
 

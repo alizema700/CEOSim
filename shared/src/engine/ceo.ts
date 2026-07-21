@@ -5,6 +5,7 @@ import type { CeoFocus } from '../types/ceo.js';
 import { FOCUS_POINTS } from '../types/ceo.js';
 import { computeValuation } from './kpis.js';
 import { nextId } from './stateHelpers.js';
+import { stream } from './rng.js';
 
 /**
  * „Der CEO als Mensch" (Phase 12). Deterministische Schicht rund um die Person:
@@ -24,7 +25,7 @@ const ENERGY_BASELINE = 78;
 const FOCUS_SOURCE = 'CEO-Fokus';
 
 /** Persönliches Vermögen des CEO: kumuliertes Netto + Wert des Anteils. */
-export function ceoNetWorth(state: CompanyState): { netCash: number; equityValue: number; total: number; sharePrice: number | null } {
+export function ceoNetWorth(state: CompanyState): { netCash: number; equityValue: number; portfolio: number; total: number; sharePrice: number | null } {
   const ipo = state.ipo;
   let equityValue: number;
   let sharePrice: number | null = null;
@@ -34,7 +35,8 @@ export function ceoNetWorth(state: CompanyState): { netCash: number; equityValue
   } else {
     equityValue = state.ceo.equityShare * computeValuation(state).value;
   }
-  return { netCash: state.ceo.personalNetCash, equityValue, total: state.ceo.personalNetCash + equityValue, sharePrice };
+  const portfolio = portfolioValue(state);
+  return { netCash: state.ceo.personalNetCash, equityValue, portfolio, total: state.ceo.personalNetCash + equityValue + portfolio, sharePrice };
 }
 
 /** Zuspitzung des Fokus: 0 = ausgeglichen, →1 = alles auf ein Feld. */
@@ -80,6 +82,54 @@ export function tickCeo(state: CompanyState, occ: Occurrence[]): void {
   // 5) Privatleben & Netzwerk driften passiv (Golden-Master-sicher: schreibt
   //    NUR personal.*, greift nicht in Energie/Vertrauen/KPIs ein).
   tickCeoPersonal(state);
+
+  // 6) Privates Portfolio verzinst/bewegt sich (nur bei Anlage; sonst no-op).
+  tickCeoPortfolio(state, occ);
+}
+
+/**
+ * Wöchentliche Wertentwicklung des CEO-Portfolios, gekoppelt an die Makrolage.
+ * Golden-Master-sicher: bei leerem Portfolio passiert nichts.
+ */
+export function tickCeoPortfolio(state: CompanyState, occ: Occurrence[]): void {
+  const p = state.ceo.portfolio;
+  if (p.geldmarkt <= 0 && p.aktienindex <= 0 && p.angel <= 0) return;
+  const m = state.macro;
+  const rng = stream(state.meta.seed, 'ceo-invest', state.meta.week);
+
+  // Geldmarkt: sicher, Leitzins p. a. → wöchentlich.
+  if (p.geldmarkt > 0) p.geldmarkt = Math.round(p.geldmarkt * (1 + m.interestRatePct / 100 / 52));
+
+  // Aktienindex: folgt der Marktstimmung mit Volatilität (±).
+  if (p.aktienindex > 0) {
+    const ret = m.sentiment / 6000 + (rng() - 0.5) * 0.03;
+    p.aktienindex = Math.max(0, Math.round(p.aktienindex * (1 + ret)));
+  }
+
+  // Angel: seltene Exits/Ausfälle, sonst leichter Drift mit der Stimmung.
+  if (p.angel > 0) {
+    const roll = rng();
+    if (roll < 0.02) {
+      const mult = 1.8 + rng() * 2.2;
+      const before = p.angel;
+      p.angel = Math.round(p.angel * mult);
+      occ.push({ icon: '🚀', textDe: `Exit in deinem Angel-Portfolio: eine Beteiligung vervielfacht sich (${eurShort(before)} → ${eurShort(p.angel)}).`, severity: 'good' });
+    } else if (roll < 0.06) {
+      const before = p.angel;
+      p.angel = Math.round(p.angel * 0.5);
+      occ.push({ icon: '💀', textDe: `Ausfall im Angel-Portfolio: eine Wette geht pleite (${eurShort(before)} → ${eurShort(p.angel)}).`, severity: 'bad' });
+    } else {
+      p.angel = Math.max(0, Math.round(p.angel * (1 + m.sentiment / 5000 + (rng() - 0.5) * 0.02)));
+    }
+  }
+}
+
+const eurShort = (v: number) => (Math.abs(v) >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)} M€` : `${Math.round(v / 1000)} k€`);
+
+/** Gesamtwert des privaten Portfolios. */
+export function portfolioValue(state: CompanyState): number {
+  const p = state.ceo.portfolio;
+  return p.geldmarkt + p.aktienindex + p.angel;
 }
 
 /** Passive Drift von Gesundheit, Work-Life-Balance & Netzwerk. */
