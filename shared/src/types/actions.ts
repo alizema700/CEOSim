@@ -39,7 +39,11 @@ export type PlayerAction =
   | CapitalIncreaseAction
   | HoldShareholderMeetingAction
   | DistributeDividendAction
-  | GrantOptionsAction;
+  | GrantOptionsAction
+  | SetCeoFocusAction
+  | CeoRestAction
+  | CeoPublicAppearanceAction
+  | HireCoachAction;
 
 /**
  * Listenpreis ändern (± %). Sofort: Neugeschäfts-ARPA. Verzögert: Bestand wird
@@ -303,6 +307,36 @@ export interface GrantOptionsAction {
   employeeId: Id;
   /** Zugesagter Unternehmensanteil (0.0005 .. 0.02). */
   percent: Fraction;
+}
+
+/**
+ * Wöchentliches CEO-Fokus-Budget setzen (Phase 12): FOCUS_POINTS Punkte auf
+ * fünf Bereiche verteilen. Über 1 = Rückenwind, unter 1 = Gegenwind.
+ */
+export interface SetCeoFocusAction {
+  type: 'SET_CEO_FOCUS';
+  focus: import('./ceo.js').CeoFocus;
+}
+
+/** Auszeit nehmen (Phase 12): stellt Energie wieder her — kostet etwas Momentum. */
+export interface CeoRestAction {
+  type: 'CEO_REST';
+}
+
+/**
+ * Öffentlicher Auftritt (Phase 12): Interview, Keynote oder Fachbeitrag baut die
+ * CEO-Marke (Reputation) auf — kostet Energie, etwas Geld und trägt ein
+ * Fettnäpfchen-Risiko (abhängig von Kommunikation & Energie).
+ */
+export interface CeoPublicAppearanceAction {
+  type: 'CEO_PUBLIC_APPEARANCE';
+  kind: 'interview' | 'keynote' | 'thought-leadership';
+}
+
+/** Executive-Coaching beauftragen (Phase 12): hebt eine Kompetenz über Wochen. */
+export interface HireCoachAction {
+  type: 'HIRE_COACH';
+  skill: 'finanzen' | 'strategie' | 'leadership' | 'kommunikation' | 'krisenmanagement' | 'governance';
 }
 
 /** Ergebnis der Aktions-Validierung durch die Engine. */

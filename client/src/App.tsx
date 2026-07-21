@@ -7,6 +7,7 @@ import { DecisionsView } from './views/DecisionsView.js';
 import { EvaluationsView } from './views/EvaluationsView.js';
 import { FinanceView } from './views/FinanceView.js';
 import { StructureView } from './views/StructureView.js';
+import { CeoView } from './views/CeoView.js';
 import { TeamView } from './views/TeamView.js';
 import { CustomersView } from './views/CustomersView.js';
 import { MarketView } from './views/MarketView.js';
@@ -46,6 +47,7 @@ export function App() {
       {view === 'evaluations' && <EvaluationsView />}
       {view === 'finance' && <FinanceView />}
       {view === 'structure' && <StructureView />}
+      {view === 'ceo' && <CeoView />}
       {view === 'team' && <TeamView />}
       {view === 'customers' && <CustomersView />}
       {view === 'product' && <ProductView />}

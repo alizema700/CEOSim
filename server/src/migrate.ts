@@ -1,4 +1,4 @@
-import { buildInitialBoard, fnv1a, generateMaTargets, initialIpoState, initialLaborState, initialLegalState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
+import { balancedFocus, buildInitialBoard, fnv1a, generateMaTargets, initialIpoState, initialLaborState, initialLegalState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
 
 /**
  * Sanfte Snapshot-Migration: füllt Felder auf, die neuere Engine-Versionen
@@ -53,6 +53,14 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   // Phase 10: Aufsichtsrat/Board-Roster (ESOP-Grants sind optional → keine Migration).
   if (!s.board) {
     s.board = buildInitialBoard(s.meta.seed, s.playerProfile.ceoName);
+  }
+  // Phase 12: Der CEO als Mensch (Energie, Fokus, Netto-Vermögen, Coach, Public-Log).
+  if (typeof s.ceo.energy !== 'number') {
+    s.ceo.energy = 78;
+    s.ceo.focus = balancedFocus();
+    s.ceo.personalNetCash = 0;
+    s.ceo.coach = null;
+    s.ceo.publicLog = [];
   }
   return state;
 }

@@ -131,6 +131,18 @@ function buildCausalChain(state: CompanyState, d: DecisionRecord, now: Record<Kp
     case 'GRANT_OPTIONS':
       chain.push('Mechanik: Optionen aus dem ESOP-Pool binden ohne Cash — Vesting über 4 Jahre (1-Jahr-Cliff) macht das Bleiben attraktiv; Zufriedenheit ↑, Kündigungsrisiko ↓. Der unverdiente Teil verfällt bei Abgang zurück in den Pool.');
       break;
+    case 'SET_CEO_FOCUS':
+      chain.push('Mechanik: Punkte über 1 erzeugen einen Rückenwind-Modifikator (Velocity/Leads/Bindung bzw. Vertrauen/Marke), Felder unter 1 bekommen Gegenwind; die Stärke skaliert mit deiner Energie. Ausgeglichen ist neutral.');
+      break;
+    case 'CEO_REST':
+      chain.push('Mechanik: Energie steigt sofort. Ausgeruht bleibt ein zugespitzter Fokus länger wirksam und die Urteilskraft hoch — Erholung ist eine Investition, kein Ausfall.');
+      break;
+    case 'CEO_PUBLIC_APPEARANCE':
+      chain.push('Mechanik: Bei gelungenem Auftritt steigen Presse-, Arbeitgeber- und Investoren-Reputation; ein seed- & kommunikationsabhängiges Fettnäpfchen-Risiko kann das Vorzeichen drehen. Kostet Energie und PR-Budget.');
+      break;
+    case 'HIRE_COACH':
+      chain.push('Mechanik: Der Coach hebt die Zielkompetenz wöchentlich (energieabhängig) und erhöht die Energie-Resilienz — gegen laufende G&A-Kosten. Wirkung kumuliert über Wochen.');
+      break;
     default:
       break;
   }
@@ -398,6 +410,35 @@ function gradeProcess(state: CompanyState, d: DecisionRecord): Grade {
       }
       break;
     }
+    case 'SET_CEO_FOCUS': {
+      info += 8;
+      reasons.push('Bewusste Priorisierung der eigenen Zeit: Wer den Fokus setzt, überlässt die Wirkung nicht dem Zufall — Führung ist auch Aufmerksamkeits-Steuerung.');
+      break;
+    }
+    case 'CEO_REST': {
+      if (state.ceo.energy <= 40 + 28) { // war vor der Auszeit niedrig
+        timing += 12; values += 8;
+        reasons.push('Erholung, bevor Erschöpfung zu Fehlern führt: Selbstführung ist Teil der Chefaufgabe, kein Luxus.');
+      } else {
+        timing -= 10;
+        reasons.push('Auszeit bei ohnehin hoher Energie: gut gemeint, aber die sichtbare Abwesenheit kostet mehr, als sie bringt.');
+      }
+      break;
+    }
+    case 'CEO_PUBLIC_APPEARANCE': {
+      comms += 10;
+      reasons.push('Aktiver Aufbau der CEO-Marke: Sichtbarkeit hilft Talentgewinnung, Presse-Resilienz und Fundraising.');
+      if (state.ceo.skills.kommunikation < 35) {
+        risk -= 12;
+        reasons.push('Öffentlicher Auftritt bei noch schwacher Kommunikationskompetenz: erhöhtes Fettnäpfchen-Risiko — Vorbereitung/Coaching wäre vorher klug.');
+      }
+      break;
+    }
+    case 'HIRE_COACH': {
+      info += 10; values += 6;
+      reasons.push('In die eigene Entwicklung investieren: einen blinden Fleck gezielt schließen zeugt von Selbstreflexion — die seltenste CEO-Tugend.');
+      break;
+    }
     default:
       break;
   }
@@ -485,6 +526,10 @@ function applySkillGains(state: CompanyState, d: DecisionRecord, grade: Grade): 
       s.governance = clamp(s.governance + gain * 0.5, 0, 100); break;
     case 'GRANT_OPTIONS':
       s.leadership = clamp(s.leadership + gain, 0, 100); break;
+    case 'SET_CEO_FOCUS': case 'CEO_REST': case 'HIRE_COACH':
+      s.leadership = clamp(s.leadership + gain, 0, 100); break;
+    case 'CEO_PUBLIC_APPEARANCE':
+      s.kommunikation = clamp(s.kommunikation + gain, 0, 100); break;
     default: break;
   }
   // Werte-Konsistenz zahlt auf Governance ein.

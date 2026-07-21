@@ -431,6 +431,7 @@ function NextMovesPanel() {
   const unhappyKey = state.people.employees.find((e) => e.keyPerson && e.satisfaction < 50 && !e.equityGrant);
   if (unhappyKey) push({ prio: 55, icon: '⭐', tone: 'warn', textDe: `${unhappyKey.firstName} ${unhappyKey.lastName} (Schlüsselperson) ist unzufrieden — Bindung über Optionen oder Gehalt lohnt sich, bevor sie geht.`, cta: 'Team', go: () => setView('team') });
   if (state.product.techDebt > 62) push({ prio: 50, icon: '🧱', tone: 'warn', textDe: `Tech-Debt bei ${Math.round(state.product.techDebt)}/100 — Ausfallrisiko steigt. R&D-Allokation nachjustieren.`, cta: 'Produkt', go: () => setView('product') });
+  if (state.ceo.energy < 30) push({ prio: 63, icon: '🪫', tone: 'warn', textDe: `Deine Energie ist bei ${Math.round(state.ceo.energy)}/100 — Dauerlast kostet Urteilskraft. Auszeit oder mehr Delegation wäre klug.`, cta: 'CEO', go: () => setView('ceo') });
 
   moves.sort((a, b) => b.prio - a.prio);
   const top = moves.slice(0, 3);

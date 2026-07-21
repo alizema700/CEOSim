@@ -18,6 +18,7 @@ import { addMessage, execSender, upkeepCalendar } from './comms.js';
 import { generateMaTargets } from './ma.js';
 import { initialIpoState } from '../types/ipo.js';
 import { initialLaborState } from '../types/labor.js';
+import { balancedFocus } from '../types/ceo.js';
 import { initialLegalState } from './legal.js';
 import { buildInitialBoard } from './governance.js';
 import { ESOP_CLIFF_WEEKS, ESOP_VEST_WEEKS, defaultGrantPercent } from './equity.js';
@@ -373,6 +374,11 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
       equityShare: 0.05,
       probation: null,
       skills: { finanzen: 20, strategie: 20, leadership: 20, kommunikation: 20, krisenmanagement: 20, governance: 20 },
+      energy: dz ? 68 : 78,
+      focus: balancedFocus(),
+      personalNetCash: 0,
+      coach: null,
+      publicLog: [],
     },
     scheduledEffects: [],
     activeModifiers: [],

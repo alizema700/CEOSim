@@ -42,6 +42,7 @@ import { coveredEmployees, tickLabor } from './labor.js';
 import { tickLegal } from './legal.js';
 import { effectiveCorporateTaxRate } from '../types/legal.js';
 import { tickGovernance } from './governance.js';
+import { tickCeo } from './ceo.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -95,6 +96,10 @@ export function closeWeek(state: CompanyState): WeekReport {
   for (const fx of due) {
     applyEffect(state, fx.effect, fx.sourceDe, ledger, occurrences);
   }
+
+  // ── 1b. CEO als Mensch: Energie, Vermögen, Fokus-Modifikatoren ─────
+  // Früh, damit der Wochenfokus Velocity/Leads/Bindung DIESER Woche prägt.
+  tickCeo(state, occurrences);
 
   // ── 2. Personal ───────────────────────────────────────────────────
   tickPeople(state, ledger, occurrences);
@@ -695,7 +700,8 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   ledger.cogsBooked = ledger.revenueRecognized * f.cogsRate;
   const b = f.budgetsMonthly;
   const projectsCostM = projectsMonthlyCost(state);
-  const otherOpexMonthly = b.marketing + b.customerSuccess + b.rndTools + b.gaOther + officeCostMonthly(state) + projectsCostM;
+  const coachFee = state.ceo.coach?.monthlyFee ?? 0; // Executive-Coaching (Phase 12)
+  const otherOpexMonthly = b.marketing + b.customerSuccess + b.rndTools + b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee;
   ledger.otherOpexBooked = otherOpexMonthly * wf;
   f.accountsPayable += ledger.cogsBooked + ledger.otherOpexBooked;
   const payRate = Math.min(1, 7 / f.dpoDays);
@@ -716,7 +722,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
     salesMarketing: { payroll: payrollByDept.sales + payrollByDept.marketing, other: b.marketing * wf },
     rnd: { payroll: payrollByDept.engineering, other: b.rndTools * wf },
     customerSuccess: { payroll: payrollByDept.cs, other: b.customerSuccess * wf },
-    ga: { payroll: payrollByDept.ga + ceoPay, other: (b.gaOther + officeCostMonthly(state) + projectsCostM) * wf },
+    ga: { payroll: payrollByDept.ga + ceoPay, other: (b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee) * wf },
   };
   const opexTotal = Object.values(opex).reduce((s, o) => s + o.payroll + o.other, 0);
   const grossProfit = ledger.revenueRecognized - ledger.cogsBooked;

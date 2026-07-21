@@ -59,6 +59,7 @@ export * from './engine/labor.js';
 export * from './engine/legal.js';
 export * from './engine/governance.js';
 export * from './engine/equity.js';
+export * from './engine/ceo.js';
 
 // ── Kuratierte Daten (Phase 4) ───────────────────────────────────────
 // BEWUSST explizite Re-Exporte statt `export *`: Diese Module sind Blätter,

@@ -17,6 +17,8 @@ import type { Occurrence } from '../types/game.js';
 import { FORMWECHSEL_FEE_AG, FORMWECHSEL_WEEKS, MIN_KAPITAL, NOTARY_CAPITAL_FEE_MIN, NOTARY_CAPITAL_FEE_RATE, isPublicCapable, legalFamily, organNames } from '../types/legal.js';
 import { computeResolution, recordResolution } from './governance.js';
 import { ESOP_CLIFF_WEEKS, ESOP_VEST_WEEKS, esopUnallocated } from './equity.js';
+import { FOCUS_POINTS } from '../types/ceo.js';
+import { clamp } from '../types/common.js';
 
 export { deptDe };
 
@@ -30,6 +32,16 @@ export { deptDe };
  */
 
 const PRICE_COOLDOWN_WEEKS = 8;
+
+/** Öffentliche Auftritte (Phase 12): Kosten & Reputationswirkung je Format. */
+const PUBLIC_SPECS = {
+  interview: { labelDe: 'Medien-Interview', fee: 3_000, energy: 8, press: 4, labor: 2, investors: 1, ceoRep: 4 },
+  keynote: { labelDe: 'Konferenz-Keynote', fee: 9_000, energy: 14, press: 7, labor: 5, investors: 3, ceoRep: 7 },
+  'thought-leadership': { labelDe: 'Fachbeitrag (Thought Leadership)', fee: 1_500, energy: 6, press: 3, labor: 4, investors: 2, ceoRep: 5 },
+} as const;
+const COACH_MONTHLY_FEE = 6_000;
+const CEO_SKILL_LABELS: Record<string, string> = { finanzen: 'Finanzen', strategie: 'Strategie', leadership: 'Leadership', kommunikation: 'Kommunikation', krisenmanagement: 'Krisenmanagement', governance: 'Governance' };
+const FOCUS_LABELS: Record<string, string> = { produkt: 'Produkt', vertrieb: 'Vertrieb', team: 'Team', investoren: 'Investoren', aussenwirkung: 'Außenwirkung' };
 
 export function validateAction(state: CompanyState, action: PlayerAction): ActionValidation {
   const errors: string[] = [];
@@ -284,6 +296,28 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       else if (emp.equityGrant) errors.push(`${emp.firstName} ${emp.lastName} hat bereits einen Options-Grant.`);
       if (action.percent < 0.0005 || action.percent > 0.02) errors.push('Grant: 0,05 % bis 2,0 % pro Person.');
       if (action.percent > esopUnallocated(state)) errors.push(`Der ESOP-Pool hat nur noch ${(esopUnallocated(state) * 100).toFixed(2)} % frei.`);
+      break;
+    }
+    case 'SET_CEO_FOCUS': {
+      const f = action.focus;
+      const vals = [f.produkt, f.vertrieb, f.team, f.investoren, f.aussenwirkung];
+      if (vals.some((v) => !Number.isInteger(v) || v < 0 || v > FOCUS_POINTS)) errors.push(`Jeder Bereich: 0..${FOCUS_POINTS} Punkte (ganzzahlig).`);
+      const sum = vals.reduce((a, b2) => a + b2, 0);
+      if (sum !== FOCUS_POINTS) errors.push(`Genau ${FOCUS_POINTS} Fokuspunkte verteilen (aktuell ${sum}).`);
+      if (state.ceo.energy < 25) warnings.push('Bei niedriger Energie verpufft ein zugespitzter Fokus — Erholung wirkt gerade mehr.');
+      break;
+    }
+    case 'CEO_REST': {
+      if (state.ceo.energy > 82) warnings.push('Deine Energie ist bereits hoch — eine Auszeit bringt jetzt wenig und kostet sichtbare Präsenz.');
+      break;
+    }
+    case 'CEO_PUBLIC_APPEARANCE': {
+      if (state.ceo.energy < 12) errors.push('Zu wenig Energie für einen öffentlichen Auftritt — erst erholen.');
+      break;
+    }
+    case 'HIRE_COACH': {
+      if (state.ceo.coach && state.ceo.coach.skill === action.skill) errors.push('Genau dieses Coaching läuft bereits.');
+      if (runwayWeeks(state) < 16) warnings.push('Coaching bei knappem Runway ist Luxus — der Aufsichtsrat könnte fragen.');
       break;
     }
   }
@@ -635,6 +669,60 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       summary = `Optionen vergeben: ${(action.percent * 100).toFixed(2)} % an ${emp.firstName} ${emp.lastName}`;
       analysis.push(`Vesting über 4 Jahre mit 1-Jahr-Cliff (§ Golden Handcuffs): erst nach 12 Monaten vestet der erste Teil, dann linear. Bindung ohne Gehaltssprung — der unverdiente Teil verfällt bei Abgang zurück in den Pool.`);
       analysis.push(`Zufriedenheit steigt, das Kündigungsrisiko sinkt — besonders wirksam bei Schlüsselpersonen, deren Abgang Wissen und Velocity kostet.`);
+      break;
+    }
+    case 'SET_CEO_FOCUS': {
+      state.ceo.focus = { ...action.focus };
+      const strong = (Object.entries(action.focus) as [string, number][]).filter(([, v]) => v > 1).map(([k]) => FOCUS_LABELS[k]);
+      const weak = (Object.entries(action.focus) as [string, number][]).filter(([, v]) => v === 0).map(([k]) => FOCUS_LABELS[k]);
+      summary = strong.length ? `Wochenfokus: Schwerpunkt ${strong.join(' & ')}` : 'Wochenfokus: ausgeglichen';
+      analysis.push('Der Fokus wirkt ab dieser Woche: mehr Punkte = spürbarer Rückenwind (Velocity/Leads/Bindung/Vertrauen/Marke), vernachlässigte Felder bekommen leichten Gegenwind. Ausgeglichen ist neutral und nachhaltig.');
+      if (weak.length) analysis.push(`Bewusst vernachlässigt: ${weak.join(', ')} — dort ist mit Gegenwind zu rechnen.`);
+      analysis.push('Zugespitzter Fokus zehrt an der Energie; bei niedriger Energie fällt die Wirkung kleiner aus.');
+      break;
+    }
+    case 'CEO_REST': {
+      const before = state.ceo.energy;
+      state.ceo.energy = Math.min(100, state.ceo.energy + 28);
+      if (before > 70) {
+        state.ceo.boardTrust = Math.max(0, state.ceo.boardTrust - 1);
+        state.ceo.trustLog.push({ week, delta: -1, reasonDe: 'CEO nimmt sich bei hoher Energie eine Auszeit — das Board registriert die Abwesenheit.' });
+      }
+      summary = `Auszeit genommen — Energie ${Math.round(before)} → ${Math.round(state.ceo.energy)}`;
+      analysis.push('Erholung ist kein Nichtstun: Ausgeruht triffst du bessere Entscheidungen, hältst zugespitzten Fokus länger durch und beugst Burnout vor.');
+      break;
+    }
+    case 'CEO_PUBLIC_APPEARANCE': {
+      const spec = PUBLIC_SPECS[action.kind];
+      schedule(state, 0, `PR-Auftritt W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: spec.fee, labelDe: `Öffentlicher Auftritt: ${spec.labelDe}` });
+      state.ceo.energy = Math.max(0, state.ceo.energy - spec.energy);
+      const rng = stream(state.meta.seed, 'ceo-public', week);
+      const gaffeProb = clamp(0.28 - state.ceo.skills.kommunikation / 400 - state.ceo.energy / 500, 0.05, 0.4);
+      const gaffe = rng() < gaffeProb;
+      if (gaffe) {
+        const hit = Math.round(spec.press * 0.8);
+        state.reputation.press = clamp(state.reputation.press - hit, 0, 100);
+        state.ceo.reputation = clamp(state.ceo.reputation - 4, 0, 100);
+        state.ceo.publicLog.push({ week, kindDe: spec.labelDe, outcomeDe: 'Fettnäpfchen', reputationDelta: -hit });
+        summary = `${spec.labelDe} ging daneben — die Presse zitiert die falschen Sätze`;
+        analysis.push('Ein unglücklicher Auftritt: Ohne Vorbereitung und Kommunikationsstärke wird aus Sichtbarkeit ein Bumerang — die Reputation leidet.');
+      } else {
+        state.reputation.press = clamp(state.reputation.press + spec.press, 0, 100);
+        state.reputation.laborMarket = clamp(state.reputation.laborMarket + spec.labor, 0, 100);
+        state.reputation.investors = clamp(state.reputation.investors + spec.investors, 0, 100);
+        state.ceo.reputation = clamp(state.ceo.reputation + spec.ceoRep, 0, 100);
+        state.ceo.publicLog.push({ week, kindDe: spec.labelDe, outcomeDe: 'gelungen', reputationDelta: spec.press });
+        summary = `${spec.labelDe}: die CEO-Marke wächst`;
+        analysis.push('Sichtbarkeit zahlt auf mehrere Konten ein: Presse, Arbeitgebermarke (zieht Talent an) und Investoren-Wahrnehmung. Der Effekt ist weich, aber real — und kostet Energie.');
+      }
+      break;
+    }
+    case 'HIRE_COACH': {
+      const prev = state.ceo.coach;
+      state.ceo.coach = { skill: action.skill, sinceWeek: week, monthlyFee: COACH_MONTHLY_FEE };
+      summary = `Executive-Coaching: Schwerpunkt ${CEO_SKILL_LABELS[action.skill]}`;
+      analysis.push(`Ein Coach hebt „${CEO_SKILL_LABELS[action.skill]}" langsam über die Wochen und stärkt deine Energie-Resilienz. Laufende Kosten ~${fmt(COACH_MONTHLY_FEE)}/Monat (G&A).`);
+      if (prev) analysis.push(`Wechsel vom bisherigen Schwerpunkt „${CEO_SKILL_LABELS[prev.skill]}".`);
       break;
     }
     case 'DISTRIBUTE_DIVIDEND': {

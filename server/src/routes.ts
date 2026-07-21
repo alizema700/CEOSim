@@ -109,6 +109,19 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('HOLD_SHAREHOLDER_MEETING') }),
   z.object({ type: z.literal('DISTRIBUTE_DIVIDEND'), amount: zMoney.gt(0) }),
   z.object({ type: z.literal('GRANT_OPTIONS'), employeeId: z.string(), percent: z.number().min(0.0005).max(0.02) }),
+  z.object({
+    type: z.literal('SET_CEO_FOCUS'),
+    focus: z.object({
+      produkt: z.number().int().min(0).max(5),
+      vertrieb: z.number().int().min(0).max(5),
+      team: z.number().int().min(0).max(5),
+      investoren: z.number().int().min(0).max(5),
+      aussenwirkung: z.number().int().min(0).max(5),
+    }),
+  }),
+  z.object({ type: z.literal('CEO_REST') }),
+  z.object({ type: z.literal('CEO_PUBLIC_APPEARANCE'), kind: z.enum(['interview', 'keynote', 'thought-leadership']) }),
+  z.object({ type: z.literal('HIRE_COACH'), skill: z.enum(['finanzen', 'strategie', 'leadership', 'kommunikation', 'krisenmanagement', 'governance']) }),
 ]);
 
 const zHypothesis = z

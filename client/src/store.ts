@@ -22,6 +22,7 @@ export type View =
   | 'decisions'
   | 'evaluations'
   | 'finance'
+  | 'ceo'
   | 'structure'
   | 'team'
   | 'customers'

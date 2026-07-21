@@ -35,6 +35,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { view: 'calendar', label: t('nav_calendar') },
     { view: 'decisions', label: t('nav_decisions') },
     { view: 'evaluations', label: t('nav_evaluations') },
+    { view: 'ceo', label: t('nav_ceo') },
     { view: 'team', label: t('nav_team') },
     { view: 'customers', label: t('nav_customers') },
     { view: 'product', label: t('nav_product') },
