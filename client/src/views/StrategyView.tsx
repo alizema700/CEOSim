@@ -4,6 +4,7 @@ import { CONSULTANT_FEE, MA_DD_FEE } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { api, type ConsultantReport } from '../api.js';
 import { Bar, Modal, Panel } from '../components/ui.js';
+import { Icon } from '../components/Icon.js';
 import { eur, pct } from '../format.js';
 
 /**
@@ -19,13 +20,13 @@ export function StrategyView() {
       <div className="mb-4 flex gap-1.5">
         {(
           [
-            ['ideen', '💡 Ideen & Projekte'],
-            ['funding', '💎 Fundraising'],
-            ['ma', '🤝 M&A-Zukäufe'],
+            ['ideen', 'bulb', 'Ideen & Projekte'],
+            ['funding', 'diamond', 'Fundraising'],
+            ['ma', 'handshake', 'M&A-Zukäufe'],
           ] as const
-        ).map(([id, label]) => (
-          <button key={id} className={`chip ${tab === id ? 'chip-on' : ''}`} onClick={() => setTab(id)}>
-            {label}
+        ).map(([id, icon, label]) => (
+          <button key={id} className={`chip inline-flex items-center gap-1.5 ${tab === id ? 'chip-on' : ''}`} onClick={() => setTab(id)}>
+            <Icon name={icon} size={12} /> {label}
           </button>
         ))}
       </div>
@@ -75,7 +76,7 @@ function IdeasTab() {
           </p>
         </Panel>
 
-        <Panel title="💡 Ideen-System — bring JEDE Idee ein">
+        <Panel icon="bulb" title="Ideen-System — bring JEDE Idee ein">
           <textarea
             className="input mb-2 h-24 resize-none"
             placeholder={'„Wir starten einen Podcast" · „Wir bieten Schulungen an" · „4-Tage-Woche testen" · …\n\nDie KI klassifiziert Kosten, Dauer, Risiko und Erfolgswahrscheinlichkeit — du entscheidest, ob es ein Projekt wird.'}
@@ -92,7 +93,7 @@ function IdeasTab() {
           <Panel title="Abgeschlossene Projekte">
             {done.slice(-8).reverse().map((p) => (
               <div key={p.id} className="mb-1.5 flex items-baseline justify-between text-xs">
-                <span>{p.status === 'succeeded' ? '🎉' : '🪦'} {p.titleDe}</span>
+                <span className="inline-flex items-center gap-1.5">{p.status === 'succeeded' ? <Icon name="party" size={13} className="text-good" /> : <Icon name="skull" size={13} className="text-bad" />} {p.titleDe}</span>
                 <span className="text-[10px] text-dim">W{p.startWeek}–{p.resolvedWeek}</span>
               </div>
             ))}
@@ -173,7 +174,7 @@ function IdeasTab() {
                 void act({ type: 'START_PROJECT', classification: c }, null);
               }}
             >
-              ✅ Als Projekt starten
+              <Icon name="check" size={13} /> Als Projekt starten
             </button>
           </div>
         </Modal>
@@ -211,7 +212,7 @@ function FundingTab() {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-4 lg:col-span-2">
-        <Panel title="💎 Aktuelle Term Sheets — Angebote verfallen wöchentlich">
+        <Panel icon="diamond" title="Aktuelle Term Sheets — Angebote verfallen wöchentlich">
           {!loaded ? (
             <p className="text-xs text-dim">Lade Angebote …</p>
           ) : offers.length === 0 ? (
@@ -279,7 +280,7 @@ function FundingTab() {
         </Panel>
       </div>
 
-      <Panel title="🏦 Venture Debt — Fremdkapital ohne Verwässerung">
+      <Panel icon="bank" title="Venture Debt — Fremdkapital ohne Verwässerung">
         <p className="mb-2 text-[11px] leading-relaxed text-dim">
           Schneller Puffer für wachstumsstarke Firmen: teurer Zins (~13 % aufs Neuvolumen), aber keine Anteile. Bedingungen: ≥ 1,5 M€
           ARR, max. 25 % vom ARR, Runway ≥ 8 Wochen, nur einmal verfügbar.
@@ -374,7 +375,7 @@ function MaCard({
   const multiple = t.askPrice / (t.mrr * 12);
   const affordable = t.askPrice <= cash * 0.85;
   return (
-    <Panel title={`${t.name} ${t.status === 'acquired' ? '· ✅ übernommen' : t.status === 'withdrawn' ? '· zurückgezogen' : ''}`}>
+    <Panel title={`${t.name} ${t.status === 'acquired' ? '· übernommen' : t.status === 'withdrawn' ? '· zurückgezogen' : ''}`}>
       <p className="mb-2 text-[11px] leading-relaxed text-dim">{t.pitchDe}</p>
       <div className="mb-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs md:grid-cols-3">
         <div><span className="text-dim">Kaufpreis</span><div className="num">{eur(t.askPrice)}</div></div>
@@ -402,7 +403,7 @@ function MaCard({
         )
       ) : (
         <p className="mb-2 rounded border border-line bg-panel2 p-2 text-[11px] text-dim">
-          ❓ Versteckte Risiken unbekannt. Eine Due Diligence ({eur(MA_DD_FEE)}) deckt sie auf — und liefert Verhandlungshebel.
+          <Icon name="alert" size={13} className="mr-1 inline text-warn" />Versteckte Risiken unbekannt. Eine Due Diligence ({eur(MA_DD_FEE)}) deckt sie auf — und liefert Verhandlungshebel.
         </p>
       )}
 
@@ -410,7 +411,7 @@ function MaCard({
         <div className="flex gap-2">
           {!t.ddDone && (
             <button className="btn flex-1" disabled={busy || !active} onClick={() => void act({ type: 'MA_DUE_DILIGENCE', targetId: t.id }, null)}>
-              🔍 Due Diligence ({eur(MA_DD_FEE)})
+              <Icon name="search" size={13} /> Due Diligence ({eur(MA_DD_FEE)})
             </button>
           )}
           <button
@@ -446,7 +447,7 @@ function ConsultantPanel() {
     ['costs', 'Kostenstruktur-Analyse'],
   ] as const;
   return (
-    <Panel title={`🎩 Berater buchen (${eur(CONSULTANT_FEE)} pro Engagement)`}>
+    <Panel icon="crown" title={`Berater buchen (${eur(CONSULTANT_FEE)} pro Engagement)`}>
       <div className="mb-2 flex flex-wrap gap-1.5">
         {topics.map(([id, label]) => (
           <button key={id} className={`chip ${topic === id ? 'chip-on' : ''}`} onClick={() => setTopic(id)}>

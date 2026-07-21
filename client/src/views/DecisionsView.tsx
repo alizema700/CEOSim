@@ -4,6 +4,7 @@ import { deptDe } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { api } from '../api.js';
 import { Modal, Panel } from '../components/ui.js';
+import { Icon } from '../components/Icon.js';
 import { eur } from '../format.js';
 
 /**
@@ -143,7 +144,7 @@ function PricingCard({ onSubmit, busy }: { onSubmit: SubmitFn; busy: boolean }) 
   const [pctVal, setPctVal] = useState(10);
   const [existing, setExisting] = useState(false);
   return (
-    <Panel title="🏷️ Preis ändern">
+    <Panel icon="tag" title="Preis ändern">
       <p className="mb-2 text-[11px] text-dim">Neugeschäft sofort; Bestand optional beim Renewal (Churn-Spike-Risiko nach 4–12 Wochen). Cooldown 8 Wochen.</p>
       <div className="mb-2 flex items-center gap-2">
         <input type="range" min={-30} max={30} step={1} value={pctVal} onChange={(e) => setPctVal(Number(e.target.value))} className="flex-1 accent-sky-400" />
@@ -166,7 +167,7 @@ function HiringCard({ onSubmit, busy }: { onSubmit: SubmitFn; busy: boolean }) {
   const [count, setCount] = useState(1);
   const [specialist, setSpecialist] = useState('');
   return (
-    <Panel title="👋 Einstellen">
+    <Panel icon="users" title="Einstellen">
       <p className="mb-2 text-[11px] text-dim">Time-to-Fill hängt an Arbeitsmarkt-Reputation & Standort-Talentpool. Kosten erst ab Besetzung.</p>
       <div className="mb-2 grid grid-cols-2 gap-2">
         <select className="input" value={dept} onChange={(e) => setDept(e.target.value as Department)}>
@@ -204,7 +205,7 @@ function LayoffCard({ onSubmit, busy }: { onSubmit: SubmitFn; busy: boolean }) {
   const [count, setCount] = useState(1);
   const [generous, setGenerous] = useState(true);
   return (
-    <Panel title="📦 Stellen abbauen">
+    <Panel icon="scissors" title="Stellen abbauen">
       <p className="mb-2 text-[11px] text-dim">Abfindung sofort zahlungswirksam, Payroll ↓ ab Folgewoche. Folgekosten: Moral, Arbeitsmarkt-Reputation, Kündigungswelle.</p>
       <div className="mb-2 grid grid-cols-2 gap-2">
         <select className="input" value={dept} onChange={(e) => setDept(e.target.value as Department)}>
@@ -226,7 +227,7 @@ function LayoffCard({ onSubmit, busy }: { onSubmit: SubmitFn; busy: boolean }) {
 function BudgetCard({ title, hint, current, onSubmit, busy }: { title: string; hint: string; current: number; onSubmit: (v: number) => void; busy: boolean }) {
   const [value, setValue] = useState(Math.round(current));
   return (
-    <Panel title={`💶 ${title}`}>
+    <Panel icon="coins" title={title}>
       <p className="mb-2 text-[11px] text-dim">{hint}</p>
       <div className="mb-3 flex items-center gap-2">
         <input className="input" type="number" min={0} step={1000} value={value} onChange={(e) => setValue(Number(e.target.value))} />
@@ -244,7 +245,7 @@ function RndCard({ onSubmit, busy, current }: { onSubmit: SubmitFn; busy: boolea
   const [debt, setDebt] = useState(Math.round(current.techDebt * 100));
   const bugs = 100 - features - debt;
   return (
-    <Panel title="⚙ R&D-Allokation">
+    <Panel icon="sliders" title="R&D-Allokation">
       <p className="mb-2 text-[11px] text-dim">Features treiben Wettbewerb & Bugs; Tech-Debt-Arbeit schützt Velocity & senkt Outage-Risiko.</p>
       <Slider label="Features" value={features} onChange={(v) => setFeatures(Math.min(v, 100 - debt))} />
       <Slider label="Tech-Debt" value={debt} onChange={(v) => setDebt(Math.min(v, 100 - features))} />
@@ -276,7 +277,7 @@ function Slider({ label, value, onChange }: { label: string; value: number; onCh
 function SalaryCard({ onSubmit, busy }: { onSubmit: SubmitFn; busy: boolean }) {
   const [pctVal, setPctVal] = useState(4);
   return (
-    <Panel title="💚 Gehaltsrunde">
+    <Panel icon="coins" title="Gehaltsrunde">
       <p className="mb-2 text-[11px] text-dim">Zufriedenheit & Bindung ↑ sofort — Payroll ↑ dauerhaft. Einmal beschlossen, nicht rückholbar.</p>
       <div className="mb-3 flex items-center gap-2">
         <input type="range" min={1} max={15} value={pctVal} onChange={(e) => setPctVal(Number(e.target.value))} className="flex-1 accent-sky-400" />
@@ -292,7 +293,7 @@ function SalaryCard({ onSubmit, busy }: { onSubmit: SubmitFn; busy: boolean }) {
 function DebtCard({ onSubmit, busy, principal, creditLine }: { onSubmit: SubmitFn; busy: boolean; principal: number; creditLine: number }) {
   const [amount, setAmount] = useState(100_000);
   return (
-    <Panel title="🏦 Kreditlinie">
+    <Panel icon="bank" title="Kreditlinie">
       <p className="mb-2 text-[11px] text-dim">
         Gezogen: {eur(principal)} von {eur(creditLine)} · 8 % p. a. · Covenants beachten (Finanzen-Tab).
       </p>

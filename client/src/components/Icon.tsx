@@ -18,7 +18,9 @@ export type IconName =
   | 'sliders' | 'hourglass' | 'flask' | 'mic' | 'fin' | 'skull' | 'alert' | 'info'
   | 'heart-pulse' | 'search' | 'trash' | 'grid' | 'sitemap' | 'clock' | 'anchor'
   | 'leaf' | 'scissors' | 'handshake-break' | 'eye' | 'graduation'
-  | 'droplet' | 'wall' | 'battery-low' | 'square' | 'check-square';
+  | 'droplet' | 'wall' | 'battery-low' | 'square' | 'check-square'
+  | 'wrench' | 'diamond' | 'tag' | 'brain' | 'file' | 'image' | 'send' | 'dumbbell'
+  | 'magnet' | 'party';
 
 /** Innerer SVG-Inhalt je Icon (24×24-Raster). `f` markiert gefüllte Formen. */
 const P: Record<IconName, { d?: string; extra?: string; f?: boolean }> = {
@@ -96,6 +98,16 @@ const P: Record<IconName, { d?: string; extra?: string; f?: boolean }> = {
   'battery-low': { d: 'M2.5 8h15v8h-15zM20 11v2M5 10.5v3' },
   'square': { d: 'M5 5h14v14H5z' },
   'check-square': { d: 'M9 12l2 2 4-4M5 5h14v14H5z' },
+  'wrench': { d: 'M15.5 5.2a3.6 3.6 0 0 0-4.4 4.9l-6 6a1.5 1.5 0 0 0 2.1 2.1l6-6a3.6 3.6 0 0 0 4.9-4.4l-2.3 2.3-2-.6-.6-2z' },
+  'diamond': { d: 'M3 9l3-5h12l3 5-9 11zM3 9h18M9 4l-3 5 6 11M15 4l3 5-6 11' },
+  'tag': { d: 'M3 12l8.4-8.4a2 2 0 0 1 1.4-.6H19a2 2 0 0 1 2 2v6.2a2 2 0 0 1-.6 1.4L12 21z', extra: '<circle cx="16" cy="8" r="1.4"/>' },
+  'brain': { d: 'M9.5 4a2.5 2.5 0 0 0-2.5 2.5A3 3 0 0 0 5 12a3 3 0 0 0 2 4.2A2.5 2.5 0 0 0 12 17V5.5A1.5 1.5 0 0 0 9.5 4zM14.5 4a2.5 2.5 0 0 1 2.5 2.5A3 3 0 0 1 19 12a3 3 0 0 1-2 4.2A2.5 2.5 0 0 1 12 17' },
+  'file': { d: 'M7 3h7l4 4v13a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1zM13 3v5h5' },
+  'image': { d: 'M5 5h14v14H5zM5 16l4-4 4 4 3-3 2 2', extra: '<circle cx="9" cy="9" r="1.5"/>' },
+  'send': { d: 'M21 3L11 14M21 3l-7 18-3.5-7.5L3 10z' },
+  'dumbbell': { d: 'M6.5 8v8M9.5 6v12M14.5 6v12M17.5 8v8M9.5 12h5M3.5 10.5v3M20.5 10.5v3' },
+  'magnet': { d: 'M6.5 4v8a5.5 5.5 0 0 0 11 0V4h-4v8a1.5 1.5 0 0 1-3 0V4zM6.5 8h4M13.5 8h4' },
+  'party': { d: 'M3 21l5-13 9 9zM8 8l-.01.01M14 4c1 1 1 2.2 0 3.2M18 6c0 1.4 1 2 2.2 2M17.5 11c-1.2.4-1.8 1.4-1.4 2.6' },
 };
 
 export function Icon({ name, size = 16, className, style, strokeWidth = 1.6 }: {
@@ -147,6 +159,12 @@ export const EMOJI_ICON: Record<string, IconName> = {
   '🎓': 'graduation', '🌱': 'leaf', '✂️': 'scissors', '👁️': 'eye', '🔴': 'dot', '⚓': 'anchor',
   '🕐': 'clock', '🕒': 'clock', '⏰': 'clock', '💧': 'droplet', '🧱': 'wall', '🪫': 'battery-low',
   '🔋': 'battery-low', '☑': 'check-square', '☐': 'square', '✅': 'check-square', '🏗️': 'wall',
+  '🛠️': 'wrench', '🔧': 'wrench', '💎': 'diamond', '🏷️': 'tag', '🧠': 'brain', '📄': 'file',
+  '📃': 'file', '🖼': 'image', '🖼️': 'image', '📤': 'send', '📥': 'mail', '✈️': 'send',
+  '💪': 'dumbbell', '🧲': 'magnet', '🎉': 'party', '🎊': 'party', '🪦': 'skull', '💀': 'skull',
+  '🌿': 'leaf', '🌊': 'droplet', '🎙️': 'mic', '👋': 'user', '🧯': 'shield', '🐣': 'leaf',
+  '🦉': 'book', '🏔️': 'flag', '♟️': 'target', '♟': 'target', '📓': 'book',
+  '🟢': 'dot', '⚪': 'dot', '🟡': 'dot', '🧑‍⚖️': 'scale',
 };
 
 /**

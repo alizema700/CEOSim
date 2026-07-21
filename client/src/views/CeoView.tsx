@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { balancedFocus, ceoNetWorth, FOCUS_POINTS, type CeoFocus } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, Drill, Panel } from '../components/ui.js';
+import { Icon, type IconName } from '../components/Icon.js';
 import { eur, num, pct } from '../format.js';
 
 /**
@@ -36,7 +37,7 @@ export function CeoView() {
       {/* Kopf */}
       <section>
         <div className="kicker">Du als CEO</div>
-        <h2 className="serif text-[34px] leading-tight">🎩 {state.playerProfile.ceoName}</h2>
+        <h2 className="serif inline-flex items-center gap-2 text-[34px] leading-tight"><Icon name="crown" size={26} /> {state.playerProfile.ceoName}</h2>
         <div className="kicker mt-1 text-dim">
           {state.legal.rechtsform === 'AG' ? 'Vorstandsvorsitz' : 'Geschäftsführung'} · {eur(ceo.salaryMonthly)}/M · Anteil {pct(ceo.equityShare, 1)} · CEO-Marke {Math.round(ceo.reputation)}/100
         </div>
@@ -134,7 +135,7 @@ function EnergyPanel() {
       <div className="mt-2"><Bar value={e} color={energyColor(e)} /></div>
       <div className="mt-1 text-[11px] text-dim">{energyLabel(e)}</div>
       <button className="btn mt-4 w-full" disabled={busy || !active} onClick={() => void act({ type: 'CEO_REST' }, null)}>
-        🌿 Auszeit nehmen (+Energie)
+        <Icon name="leaf" size={14} /> Auszeit nehmen (+Energie)
       </button>
       <p className="mt-2 text-[10px] leading-relaxed text-dim">
         Krisen, Bewährung und ein stark zugespitzter Fokus zehren an der Energie; Erholung und Coaching bauen sie auf. Niedrige Energie schwächt die Wirkung deines Fokus — Selbstführung ist Teil der Chefaufgabe.
@@ -191,10 +192,10 @@ function PublicPanel() {
   if (!state) return null;
   const active = state.meta.status === 'active';
   const rep = state.reputation;
-  const appearances: { kind: 'interview' | 'keynote' | 'thought-leadership'; label: string; cost: string }[] = [
-    { kind: 'interview', label: '🎙️ Medien-Interview', cost: '3 k€ · −8 Energie' },
-    { kind: 'keynote', label: '🎤 Konferenz-Keynote', cost: '9 k€ · −14 Energie' },
-    { kind: 'thought-leadership', label: '✍️ Fachbeitrag', cost: '1,5 k€ · −6 Energie' },
+  const appearances: { kind: 'interview' | 'keynote' | 'thought-leadership'; icon: IconName; label: string; cost: string }[] = [
+    { kind: 'interview', icon: 'mic', label: 'Medien-Interview', cost: '3 k€ · −8 Energie' },
+    { kind: 'keynote', icon: 'megaphone', label: 'Konferenz-Keynote', cost: '9 k€ · −14 Energie' },
+    { kind: 'thought-leadership', icon: 'pen', label: 'Fachbeitrag', cost: '1,5 k€ · −6 Energie' },
   ];
   return (
     <Panel title="Öffentliche Rolle · die CEO-Marke">
@@ -209,7 +210,7 @@ function PublicPanel() {
           <div className="mt-3 flex flex-wrap gap-2">
             {appearances.map((a) => (
               <button key={a.kind} className="btn text-left" disabled={busy || !active || state.ceo.energy < 12} onClick={() => void act({ type: 'CEO_PUBLIC_APPEARANCE', kind: a.kind }, null)}>
-                <span className="block">{a.label}</span>
+                <span className="flex items-center gap-1.5"><Icon name={a.icon} size={13} /> {a.label}</span>
                 <span className="block text-[9px] text-dim">{a.cost}</span>
               </button>
             ))}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { DEPARTMENTS, deptDe, EMPLOYER_COST_FACTOR, esopUnallocated, laborSummaryDe, vestedFraction, vestedPercent, type Employee, type TarifStatus } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, Drill, GradeBadge, Modal, Panel, scoreColor } from '../components/ui.js';
+import { Icon } from '../components/Icon.js';
 import { eur, num, pct } from '../format.js';
 
 /**
@@ -83,7 +84,7 @@ export function TeamView() {
         <Panel title="Schlüsselpersonen">
           {employees.filter((e) => e.keyPerson).map((e) => (
             <button key={e.id} className="mb-1.5 flex w-full items-center justify-between text-left text-xs hover:text-accent" onClick={() => setOpenEmp(e)}>
-              <span>⭐ {e.firstName} {e.lastName} <span className="text-dim">({e.roleTitleDe})</span></span>
+              <span className="inline-flex items-center gap-1"><Icon name="star" size={12} className="text-warn" /> {e.firstName} {e.lastName} <span className="text-dim">({e.roleTitleDe})</span></span>
               <span className={`num ${e.satisfaction < 45 ? 'text-bad' : e.satisfaction < 60 ? 'text-warn' : 'text-good'}`}>{Math.round(e.satisfaction)}</span>
             </button>
           ))}
@@ -110,7 +111,7 @@ export function TeamView() {
                 .sort((a, b) => a.dept.localeCompare(b.dept) || b.salaryMonthly - a.salaryMonthly)
                 .map((e) => (
                   <tr key={e.id} className="cursor-pointer border-b border-line/40 last:border-0 hover:bg-panel2" onClick={() => setOpenEmp(e)}>
-                    <td className="py-1.5 pr-2">{e.keyPerson && '⭐ '}{e.firstName} {e.lastName}</td>
+                    <td className="py-1.5 pr-2">{e.keyPerson && <Icon name="star" size={11} className="mr-1 inline text-warn" />}{e.firstName} {e.lastName}</td>
                     <td className="py-1.5 pr-2 text-dim">{e.roleTitleDe}</td>
                     <td className="py-1.5 pr-2 text-dim">{deptDe(e.dept)}</td>
                     <td className="num py-1.5 pr-2 text-right text-dim">{e.age ?? '—'}</td>
@@ -142,7 +143,7 @@ function CeoPanel() {
   const skills = Object.entries(ceo.skills) as [string, number][];
 
   return (
-    <Panel title={`🎩 Du als CEO · ${state.playerProfile.ceoName}`}>
+    <Panel icon="crown" title={`Du als CEO · ${state.playerProfile.ceoName}`}>
       <div className="grid gap-6 md:grid-cols-3">
         <div>
           <div className="kicker text-[9.5px]">Deine Vergütung (Beschluss des Aufsichtsrats)</div>
@@ -221,7 +222,8 @@ function LaborPanel() {
 
   return (
     <Panel
-      title="🤝 Arbeitsbeziehungen"
+      icon="handshake"
+      title="Arbeitsbeziehungen"
       right={<span className="num text-[10.5px] text-dim">{laborSummaryDe(l)}</span>}
     >
       {/* Kennzahlen-Zeile — immer sichtbar */}
@@ -290,7 +292,7 @@ function LaborPanel() {
                 <tr key={i} className="border-b border-line/40 last:border-0">
                   <td className="num py-1 pr-2">W{r.week}</td>
                   <td className="num py-1 pr-2">+{(r.agreedPct * 100).toFixed(1)} %</td>
-                  <td className={`py-1 ${r.viaStrike ? 'text-bad' : 'text-good'}`}>{r.viaStrike ? '✊ nach Streik' : '🤝 verhandelt'}</td>
+                  <td className={`py-1 ${r.viaStrike ? 'text-bad' : 'text-good'}`}>{r.viaStrike ? <span className="inline-flex items-center gap-1"><Icon name="alert" size={11} /> nach Streik</span> : <span className="inline-flex items-center gap-1"><Icon name="handshake" size={11} /> verhandelt</span>}</td>
                 </tr>
               ))}
             </tbody>
@@ -355,7 +357,7 @@ function EmployeeModal({ emp, onClose }: { emp: Employee; onClose: () => void })
   return (
     <Modal title={`Steckbrief · ${deptDe(emp.dept)}`} onClose={onClose} wide>
       <div className="flex items-baseline justify-between gap-4">
-        <h3 className="serif text-[26px] leading-tight">{emp.keyPerson && '⭐ '}{emp.firstName} {emp.lastName}</h3>
+        <h3 className="serif inline-flex items-center gap-1.5 text-[26px] leading-tight">{emp.keyPerson && <Icon name="star" size={18} className="text-warn" />}{emp.firstName} {emp.lastName}</h3>
         <GradeBadge grade={emp.performance >= 80 ? 1 : emp.performance >= 68 ? 2 : emp.performance >= 55 ? 3 : 4} />
       </div>
       <div className="kicker mt-1">{emp.roleTitleDe} · {emp.age ?? '—'} Jahre · seit ~{tenureYears.toFixed(1)} Jahren dabei · {emp.seniority}</div>
@@ -396,7 +398,7 @@ function EmployeeModal({ emp, onClose }: { emp: Employee; onClose: () => void })
         <div className="kicker mb-2 text-[10px]">Aktionen</div>
         <div className="flex flex-wrap items-center gap-3">
           <button className="btn" onClick={() => { onClose(); openChatWith('dm:' + (exec ? exec.id : emp.id)); }}>
-            💬 Chat öffnen
+            <Icon name="chat" size={13} /> Chat öffnen
           </button>
           <div className="flex items-center gap-2">
             <span className="text-xs text-dim">Gehalt +</span>

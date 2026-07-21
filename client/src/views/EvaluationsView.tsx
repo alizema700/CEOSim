@@ -1,6 +1,7 @@
 import { KPI_DEFINITIONS } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, GradeBadge, Panel, scoreColor } from '../components/ui.js';
+import { Icon } from '../components/Icon.js';
 import { formatByUnit } from '../format.js';
 
 /**
@@ -138,7 +139,7 @@ export function EvaluationsView() {
                   </div>
                 )}
                 <div className="rounded border border-warn/40 bg-warn/5 p-2 text-xs">
-                  <span className="font-bold text-warn">📌 Lektion: </span>
+                  <span className="inline-flex items-center gap-1 font-bold text-warn"><Icon name="pin" size={12} /> Lektion: </span>
                   {ev.lessonDe}
                 </div>
               </div>

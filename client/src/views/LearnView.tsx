@@ -4,6 +4,7 @@ import { GLOSSARY, KPI_DEFINITIONS, PRECEDENT_CASES } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { api } from '../api.js';
 import { Bar, GradeBadge, Panel } from '../components/ui.js';
+import { Icon, Glyph } from '../components/Icon.js';
 
 /** Lernen: Journal · Skill-Tree & Badges · Was-wäre-wenn-Labor · Glossar · Fallbibliothek. */
 export function LearnView() {
@@ -13,15 +14,15 @@ export function LearnView() {
       <div className="flex flex-wrap gap-1.5">
         {(
           [
-            ['journal', '📓 Lern-Journal'],
-            ['skills', '🎓 Skill-Tree & Badges'],
-            ['lab', '🔬 Was-wäre-wenn-Labor'],
-            ['glossar', '📖 Glossar'],
-            ['faelle', '🏛 Fall-Bibliothek'],
+            ['journal', 'book', 'Lern-Journal'],
+            ['skills', 'graduation', 'Skill-Tree & Badges'],
+            ['lab', 'flask', 'Was-wäre-wenn-Labor'],
+            ['glossar', 'book', 'Glossar'],
+            ['faelle', 'institution', 'Fall-Bibliothek'],
           ] as const
-        ).map(([id, label]) => (
-          <button key={id} className={`chip ${tab === id ? 'chip-on' : ''}`} onClick={() => setTab(id)}>
-            {label}
+        ).map(([id, icon, label]) => (
+          <button key={id} className={`chip inline-flex items-center gap-1.5 ${tab === id ? 'chip-on' : ''}`} onClick={() => setTab(id)}>
+            <Icon name={icon} size={12} /> {label}
           </button>
         ))}
       </div>
@@ -59,11 +60,11 @@ function JournalTab() {
                   <span><span className="text-dim">W{d?.week} → W{ev.week} · </span>{d?.summaryDe}</span>
                   <GradeBadge grade={ev.grade.overall} />
                 </div>
-                <p className="mt-1 text-xs text-warn">📌 {ev.lessonDe}</p>
+                <p className="mt-1 inline-flex items-center gap-1 text-xs text-warn"><Icon name="pin" size={12} /> {ev.lessonDe}</p>
                 {ev.precedents.length > 0 && (
                   <div className="mt-1 space-y-0.5">
                     {ev.precedents.map((p) => (
-                      <p key={p.caseId} className="text-[11px] text-dim">🏛 <span className="text-ink">{p.titleDe}</span> — {p.relevanceDe}</p>
+                      <p key={p.caseId} className="text-[11px] text-dim"><Icon name="institution" size={11} className="mr-1 inline" /><span className="text-ink">{p.titleDe}</span> — {p.relevanceDe}</p>
                     ))}
                   </div>
                 )}
@@ -126,7 +127,7 @@ function SkillsTab() {
         <div className="grid grid-cols-3 gap-2">
           {badges.map((b) => (
             <div key={b.id} className={`rounded border p-2 text-center ${b.earned ? 'border-accent/50 bg-accent/5' : 'border-line opacity-40'}`} title={b.descDe}>
-              <div className="text-xl">{b.icon}</div>
+              <div className="text-xl"><Glyph e={b.icon} size={22} /></div>
               <div className="mt-0.5 text-[10px] font-bold">{b.nameDe}</div>
               <div className="text-[9px] text-dim">{b.descDe}</div>
             </div>
@@ -191,7 +192,7 @@ function LabTab() {
               }
             }}
           >
-            {forking ? 'Forke …' : '🔬 Fork erzeugen & öffnen'}
+            {forking ? 'Forke …' : <><Icon name="flask" size={13} /> Fork erzeugen & öffnen</>}
           </button>
         </div>
       </Panel>
@@ -246,7 +247,7 @@ function GlossaryTab() {
             <div className="text-xs font-bold text-accent">{e.termDe}</div>
             <p className="mt-1 text-[11px] leading-relaxed">{e.definitionDe}</p>
             {e.formulaDe && <p className="mt-1 rounded bg-bg px-2 py-1 text-[11px] text-warn">{e.formulaDe}</p>}
-            {e.exampleDe && <p className="mt-1 text-[11px] text-dim">💡 {e.exampleDe}</p>}
+            {e.exampleDe && <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-dim"><Icon name="bulb" size={11} /> {e.exampleDe}</p>}
             {e.mathDe && (
               <details className="mt-1">
                 <summary className="cursor-pointer text-[10px] text-dim hover:text-ink">Für Mathematiker</summary>
@@ -281,7 +282,7 @@ function CasesTab() {
               <p><span className="text-dim">Kontext: </span>{c.contextDe}</p>
               <p><span className="text-dim">Entscheidung: </span>{c.decisionDe}</p>
               <p><span className="text-dim">Ausgang: </span>{c.outcomeDe}</p>
-              <p className="text-warn">📌 {c.lessonDe}</p>
+              <p className="inline-flex items-center gap-1 text-warn"><Icon name="pin" size={12} /> {c.lessonDe}</p>
               <p className="text-[10px] text-dim">Tags: {c.tags.join(' · ')} — Quellenlage: {c.sourceDe}</p>
             </div>
           </details>

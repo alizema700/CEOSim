@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { Line, LineChart, ResponsiveContainer, Tooltip as ChartTooltip, XAxis, YAxis } from 'recharts';
 import { KPI_DEFINITIONS, type KpiId, type KpiSnapshot } from '@boardroom/shared';
 import { formatByUnit, healthColor } from '../format.js';
-import { Icon } from './Icon.js';
+import { Icon, type IconName } from './Icon.js';
 
 /** Redaktionelle UI-Bausteine: Modal, Rubrik-Karte, KPI-Karte mit Formel. */
 
@@ -26,11 +26,11 @@ export function Modal({ title, onClose, children, wide = false }: { title: strin
   );
 }
 
-export function Panel({ title, children, right }: { title: string; children: ReactNode; right?: ReactNode }) {
+export function Panel({ title, children, right, icon }: { title: string; children: ReactNode; right?: ReactNode; icon?: IconName }) {
   return (
     <div className="panel">
       <div className="panel-title flex items-center justify-between">
-        <span>{title}</span>
+        <span className="inline-flex items-center gap-1.5">{icon && <Icon name={icon} size={12} />}{title}</span>
         {right}
       </div>
       <div className="p-3.5">{children}</div>

@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import type { GameEvent } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { api } from '../api.js';
+import { Icon } from '../components/Icon.js';
 import { t } from '../i18n.js';
 import { eur, dateDe, num } from '../format.js';
 
@@ -36,7 +37,7 @@ export function SavesView() {
         {error && (
           <div className="mb-4 flex items-center justify-between border-l-2 border-bad bg-bad/5 px-3 py-2 text-xs text-bad">
             <span>{error}</span>
-            <button onClick={() => setError(null)}>✕</button>
+            <button onClick={() => setError(null)} aria-label="Schließen"><Icon name="x" size={12} /></button>
           </div>
         )}
 
@@ -91,8 +92,9 @@ export function SavesView() {
                   <button
                     className="btn-danger shrink-0"
                     onClick={() => { if (confirm(`„${g.companyName}" löschen?`)) void deleteGame(g.gameId); }}
+                    aria-label="Löschen"
                   >
-                    🗑
+                    <Icon name="trash" size={14} />
                   </button>
                 </div>
                 <button className="mt-3 grid grid-cols-3 gap-2 border-t border-line pt-3 text-left" onClick={() => void openGame(g.gameId)} disabled={busy}>

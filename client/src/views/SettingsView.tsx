@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store.js';
 import { api } from '../api.js';
 import { Panel, StatRow } from '../components/ui.js';
+import { Icon } from '../components/Icon.js';
 import { num } from '../format.js';
 import { t } from '../i18n.js';
 
@@ -70,7 +71,7 @@ export function SettingsView() {
           </label>
         </Panel>
 
-        <Panel title={`🌐 ${t('language')} (Phase 6: Chrome-Labels)`}>
+        <Panel icon="globe" title={`${t('language')} (Phase 6: Chrome-Labels)`}>
           <div className="flex gap-1.5">
             <button className={`chip ${lang === 'de' ? 'chip-on' : ''}`} onClick={() => setLang('de')}>Deutsch</button>
             <button className={`chip ${lang === 'en' ? 'chip-on' : ''}`} onClick={() => setLang('en')}>English</button>
@@ -81,7 +82,7 @@ export function SettingsView() {
           </p>
         </Panel>
 
-        <Panel title="🖼 Firmenlogo">
+        <Panel icon="image" title="Firmenlogo">
           <div className="flex items-center gap-3">
             {logoDataUrl ? (
               <img src={logoDataUrl} alt="Logo" className="h-12 w-12 rounded border border-line object-cover" />
@@ -104,7 +105,7 @@ export function SettingsView() {
               ⬇ Als JSON exportieren (Event-Log + Snapshot)
             </a>
             <a className="btn" href={`/api/games/${state.meta.gameId}/report.pdf`} download>
-              📄 {t('quarterly_pdf')}
+              <Icon name="file" size={13} /> {t('quarterly_pdf')}
             </a>
           </div>
           <p className="mt-2 text-[10px] text-dim">
@@ -123,7 +124,7 @@ export function SettingsView() {
               }
             }}
           >
-            🗑 Diesen Spielstand löschen
+            <Icon name="trash" size={13} /> Diesen Spielstand löschen
           </button>
         </Panel>
       </div>

@@ -1,6 +1,7 @@
 import { EVENT_CARDS } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Panel } from '../components/ui.js';
+import { Icon } from '../components/Icon.js';
 import { ThreadPane } from './ChatView.js';
 
 /**
@@ -18,7 +19,7 @@ export function LegalView() {
   return (
     <div className="flex h-full min-h-0 flex-col gap-3">
       <div className="rounded border border-warn/60 bg-warn/10 px-3 py-2 text-[11px] leading-relaxed text-warn">
-        ⚖️ <b>Dauerhafter Hinweis:</b> Alle Inhalte der simulierten Kanzlei „Brandt &amp; Kollegen“ sind fiktive
+        <Icon name="scale" size={13} className="mr-1 inline" /><b>Dauerhafter Hinweis:</b> Alle Inhalte der simulierten Kanzlei „Brandt &amp; Kollegen“ sind fiktive
         Ausbildungs-Inhalte dieses Simulators und <b>keine echte Rechtsberatung</b>. Für reale Fälle: echte Kanzlei.
         <span className="ml-2 text-dim">Honorar: 450 € pro Chat-Runde (simuliert) — Anwaltszeit gezielt einsetzen!</span>
       </div>
@@ -39,7 +40,7 @@ export function LegalView() {
                   <div key={c.instanceId} className="mb-2 border-b border-line/40 pb-2 text-xs last:border-0">
                     <div className="font-bold">{card?.titleDe ?? c.cardId}</div>
                     <div className="text-[10px] text-dim">
-                      Woche {c.triggeredWeek} · {c.status === 'open' ? '🔴 offen — Reaktion nötig (Inbox)' : `abgeschlossen: ${card?.options.find((o) => o.id === c.chosenOptionId)?.labelDe ?? c.chosenOptionId}`}
+                      Woche {c.triggeredWeek} · {c.status === 'open' ? <><Icon name="dot" size={11} className="text-bad" /> offen — Reaktion nötig (Inbox)</> : `abgeschlossen: ${card?.options.find((o) => o.id === c.chosenOptionId)?.labelDe ?? c.chosenOptionId}`}
                     </div>
                   </div>
                 );

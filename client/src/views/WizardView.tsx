@@ -4,6 +4,7 @@ import { CITY_PRESETS, DIFFICULTIES, LOCATIONS, profileForCity, type LocationPro
 import { useStore } from '../store.js';
 import { eur, pct } from '../format.js';
 import { LocationMap } from '../components/LocationMap.js';
+import { Icon } from '../components/Icon.js';
 
 /**
  * „Neues Unternehmen"-Wizard — individualisiert das Spiel auf den Spieler:
@@ -117,7 +118,7 @@ export function WizardView() {
             >
               <div className="flex items-center justify-between">
                 <span className="text-sm font-bold">{s.title}</span>
-                {!s.available && <span className="shrink-0 border border-warn/50 px-1.5 py-0.5 text-[9px] text-warn" style={{ borderRadius: 2 }}>🔒 Bald verfügbar</span>}
+                {!s.available && <span className="shrink-0 border border-warn/50 px-1.5 py-0.5 text-[9px] text-warn" style={{ borderRadius: 2 }}><Icon name="lock" size={10} className="mr-1 inline" />Bald verfügbar</span>}
               </div>
               <p className="mt-1 text-xs leading-relaxed text-dim">{s.desc}</p>
             </button>
@@ -257,7 +258,7 @@ export function WizardView() {
             <div className="flex flex-wrap gap-1.5">
               {SKILLS.map((s) => (
                 <button key={s.id} className={`chip ${strengths.includes(s.id) ? 'chip-on' : ''}`} onClick={() => toggle(strengths, setStrengths, s.id, 3)}>
-                  💪 {s.label}
+                  <Icon name="dumbbell" size={13} /> {s.label}
                 </button>
               ))}
             </div>
@@ -267,7 +268,7 @@ export function WizardView() {
             <div className="flex flex-wrap gap-1.5">
               {SKILLS.map((s) => (
                 <button key={s.id} className={`chip ${weaknesses.includes(s.id) ? 'chip-on' : ''}`} onClick={() => toggle(weaknesses, setWeaknesses, s.id, 3)}>
-                  🎯 {s.label}
+                  <Icon name="target" size={13} /> {s.label}
                 </button>
               ))}
             </div>
@@ -307,7 +308,7 @@ export function WizardView() {
           </button>
         ) : (
           <button className="btn-primary" onClick={() => void start()} disabled={busy || !canNext}>
-            {busy ? 'Erstelle …' : '🏁 Unternehmen übernehmen'}
+            {busy ? 'Erstelle …' : <><Icon name="flag" size={14} /> Unternehmen übernehmen</>}
           </button>
         )}
       </div>
@@ -331,7 +332,7 @@ function FreeCityInput({ onSelect }: { onSelect: (p: LocationProfile) => void })
         }}
       />
       <button className="btn" disabled={city.trim().length < 2} onClick={() => onSelect(profileForCity(city))}>
-        🧭 Standort-Analyst schätzen lassen
+        <Icon name="compass" size={13} /> Standort-Analyst schätzen lassen
       </button>
     </div>
   );

@@ -4,6 +4,7 @@ import { IPO_PREP_COST, PRE_IPO_SHARES, type IpoBank } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { api } from '../api.js';
 import { Panel } from '../components/ui.js';
+import { Icon } from '../components/Icon.js';
 import { eur, pct } from '../format.js';
 import { ThreadPane } from './ChatView.js';
 
@@ -47,7 +48,7 @@ function EligibilityPanel() {
   if (!state) return null;
   const locked = state.ipo.status === 'locked';
   return (
-    <Panel title={locked ? '🔒 IPO — Freischaltung ab Kennzahlen' : 'IPO-Kriterien (laufend geprüft)'}>
+    <Panel icon={locked ? 'lock' : undefined} title={locked ? 'IPO — Freischaltung ab Kennzahlen' : 'IPO-Kriterien (laufend geprüft)'}>
       {locked && (
         <p className="mb-2 text-[11px] leading-relaxed text-dim">
           Ein Börsengang ist kein Knopf, sondern ein Reifegrad. Sobald alle Kriterien stehen, melden sich die Banken von selbst
@@ -75,7 +76,7 @@ function BankSelection() {
   }, [state?.meta.gameId]);
   if (!state) return null;
   return (
-    <Panel title={`🏛️ Banken-Auswahl — Mandat startet die Vorbereitung (~8 Wochen, ${eur(IPO_PREP_COST)})`}>
+    <Panel icon="institution" title={`Banken-Auswahl — Mandat startet die Vorbereitung (~8 Wochen, ${eur(IPO_PREP_COST)})`}>
       <div className="grid gap-3 md:grid-cols-3">
         {banks.map((b) => (
           <div key={b.id} className="flex flex-col rounded border border-line bg-panel2 p-3">
@@ -117,7 +118,7 @@ function PreparingPanel() {
   const started = state.ipo.preparationStartWeek ?? state.meta.week;
   const done = state.meta.week - started;
   return (
-    <Panel title="📋 IPO-Vorbereitung läuft">
+    <Panel icon="clipboard" title="IPO-Vorbereitung läuft">
       <p className="text-xs leading-relaxed text-dim">
         Prospekt, Audit, Legal — Woche {done}/8. Die Roadshow startet automatisch; danach hast du 3 Wochen für das Pricing.
         Nutze die Zeit: Jede KPI-Verbesserung fließt in die Bookbuilding-Spanne ein.
@@ -148,7 +149,7 @@ function RoadshowPanel() {
   const grossNew = Math.round((PRE_IPO_SHARES * 0.18) / 0.82) * effPrice;
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Panel title={`✈️ Roadshow — Pricing bis Woche ${ipo.roadshowEndsWeek}`}>
+      <Panel icon="send" title={`Roadshow — Pricing bis Woche ${ipo.roadshowEndsWeek}`}>
         <div className="mb-2 text-xs">
           Bookbuilding-Spanne: <span className="num font-bold">{lo.toFixed(2)} – {hi.toFixed(2)} €</span> je Aktie
         </div>
@@ -193,7 +194,7 @@ function RoadshowPanel() {
           Das Listing läuft mit dem nächsten Wochenabschluss. Unter 0,9× Zeichnungsquote zieht die Bank den Deal — öffentlich.
         </p>
       </Panel>
-      <Panel title="🎤 Roadshow-Q&A — institutionelle Investoren">
+      <Panel icon="mic" title="Roadshow-Q&A — institutionelle Investoren">
         <ThreadPane threadKey="roadshow" />
       </Panel>
     </div>
@@ -212,7 +213,7 @@ function PublicPanel() {
   return (
     <div className="grid gap-4 lg:grid-cols-2">
       <div className="space-y-4">
-        <Panel title="📈 Aktienkurs">
+        <Panel icon="trending-up" title="Aktienkurs">
           <div className="mb-2 flex items-baseline gap-4">
             <span className="num text-2xl font-bold">{cur.toFixed(2)} €</span>
             <span className={`num text-sm ${perf >= 0 ? 'text-good' : 'text-bad'}`}>
@@ -277,7 +278,7 @@ function PublicPanel() {
             ))
           )}
         </Panel>
-        <Panel title="🎤 Investor-Relations-Q&A">
+        <Panel icon="mic" title="Investor-Relations-Q&A">
           <ThreadPane threadKey="roadshow" />
         </Panel>
       </div>

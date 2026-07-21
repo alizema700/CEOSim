@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useStore } from '../store.js';
 import { api } from '../api.js';
 import { Panel } from '../components/ui.js';
+import { Icon } from '../components/Icon.js';
 
 /**
  * Presse: PM-Editor + Medienspiegel. Jede Veröffentlichung wird vom
@@ -56,7 +57,7 @@ export function PressView() {
             maxLength={4000}
           />
           <button className="btn-primary w-full" disabled={publishing || gameOver || title.trim().length < 3 || body.trim().length < 20} onClick={() => void publish()}>
-            {publishing ? 'Die Redaktionen lesen …' : '📤 Veröffentlichen'}
+            {publishing ? 'Die Redaktionen lesen …' : <><Icon name="send" size={13} /> Veröffentlichen</>}
           </button>
         </Panel>
 
@@ -79,7 +80,7 @@ export function PressView() {
             <div className="max-h-64 space-y-1.5 overflow-y-auto">
               {[...state.pressLog].reverse().map((p, i) => (
                 <div key={i} className="flex items-baseline gap-2 text-xs">
-                  <span className="shrink-0">{p.tone === 'positive' ? '🟢' : p.tone === 'negative' ? '🔴' : '⚪'}</span>
+                  <Icon name="dot" size={11} className={`shrink-0 ${p.tone === 'positive' ? 'text-good' : p.tone === 'negative' ? 'text-bad' : 'text-faint'}`} />
                   <span className="text-ink">{p.topicDe}</span>
                   <span className="ml-auto shrink-0 text-[9px] text-dim">W{p.week}</span>
                 </div>

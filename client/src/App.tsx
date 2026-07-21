@@ -25,6 +25,7 @@ import { LearnView } from './views/LearnView.js';
 import { LegacyModal } from './views/LegacyModal.js';
 import { TakeoverModal } from './views/TakeoverModal.js';
 import { Modal } from './components/ui.js';
+import { Icon } from './components/Icon.js';
 
 export function App() {
   const { view, state, error, setError } = useStore();
@@ -38,7 +39,7 @@ export function App() {
       {error && (
         <div className="panel mb-4 flex items-center justify-between border-bad/60 px-3 py-2 text-xs text-bad">
           <span>{error}</span>
-          <button onClick={() => setError(null)}>✕</button>
+          <button onClick={() => setError(null)} aria-label="Schließen"><Icon name="x" size={13} /></button>
         </div>
       )}
       {view === 'dashboard' && <DashboardView />}
@@ -90,7 +91,7 @@ function BriefingModal() {
             setView('inbox');
           }}
         >
-          ✉ Zur Inbox
+          <Icon name="mail" size={13} /> Zur Inbox
         </button>
         <button className="btn-primary" onClick={close}>
           Danke, los geht’s

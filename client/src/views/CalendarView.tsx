@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { Appointment } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Modal } from '../components/ui.js';
+import { Icon, type IconName } from '../components/Icon.js';
 import { ThreadPane } from './ChatView.js';
 
 /**
@@ -21,7 +22,7 @@ export function CalendarView() {
   const week = state.meta.week;
   const weeks = [week, week + 1, week + 2, week + 3];
   const days = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
-  const kindIcon: Record<Appointment['kind'], string> = { leadershipSync: '👔', boardCall: '🏛️', customerCall: '🤝', legal: '§', earningsCall: '📊', custom: '📌' };
+  const kindIcon: Record<Appointment['kind'], IconName> = { leadershipSync: 'briefcase', boardCall: 'institution', customerCall: 'handshake', legal: 'scale', earningsCall: 'bar-chart', custom: 'pin' };
 
   return (
     <div className="space-y-4">
@@ -52,7 +53,7 @@ export function CalendarView() {
                           a.kind === 'boardCall' ? 'border-warn/50 bg-warn/5' : 'border-line bg-panel2'
                         }`}
                       >
-                        {kindIcon[a.kind]} {a.titleDe}
+                        <Icon name={kindIcon[a.kind]} size={12} className="mr-1" />{a.titleDe}
                       </button>
                     ))}
                 </div>
@@ -136,7 +137,7 @@ export function CalendarView() {
               <div className="mb-1 text-[10px] uppercase tracking-wider text-dim">Teilnehmer</div>
               <ul className="space-y-0.5 text-xs">
                 {openApt.participants.map((p, i) => (
-                  <li key={i}>👤 {p}</li>
+                  <li key={i} className="flex items-center gap-1.5"><Icon name="user" size={12} className="text-dim" /> {p}</li>
                 ))}
               </ul>
             </div>

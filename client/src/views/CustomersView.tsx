@@ -1,6 +1,7 @@
 import { cohortMrr, keyAccountMrr, totalMrr } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, KpiTrendDrill, Panel, StatRow, scoreColor } from '../components/ui.js';
+import { Icon } from '../components/Icon.js';
 import { eur, num, pct } from '../format.js';
 
 /** Kunden: Segmente, Kohorten (Alter/Churn), Key-Accounts (rote Accounts!), Pipeline. */
@@ -28,8 +29,8 @@ export function CustomersView() {
           {c.keyAccounts.map((ka) => (
             <div key={ka.id} className="mb-2.5">
               <div className="flex items-baseline justify-between text-xs">
-                <span>
-                  {ka.status === 'churned' ? '💀 ' : ka.status === 'atRisk' ? '🔴 ' : ''}
+                <span className="inline-flex items-center gap-1">
+                  {ka.status === 'churned' ? <Icon name="skull" size={12} className="text-bad" /> : ka.status === 'atRisk' ? <Icon name="dot" size={11} className="text-bad" /> : null}
                   {ka.name}
                 </span>
                 <span className="num text-dim">
