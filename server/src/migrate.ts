@@ -66,5 +66,6 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   if (!s.takeover) s.takeover = initialTakeoverState();
   if (!s.crisis) s.crisis = initialCrisisState();
   if (!s.macro) s.macro = initialMacroState();
+  if (s.board && s.board.lastMeetingWeek === undefined) { s.board.lastMeetingWeek = -99; s.board.lastMeeting = null; }
   return state;
 }

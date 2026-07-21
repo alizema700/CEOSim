@@ -6,6 +6,7 @@ import { totalMrr, runwayWeeks } from './derive.js';
 import { computeKpis, computeValuation } from './kpis.js';
 import { acceptanceShare, defendedTakeover, succeedTakeover } from './takeover.js';
 import { respondCrisis } from './crisis.js';
+import { BOARD_MEETING_COOLDOWN, BOARD_MEETING_ENERGY, holdBoardMeeting } from './governance.js';
 import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
@@ -346,6 +347,13 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       if (action.mode === 'investigate' && f.cash < 80_000) errors.push('Zu wenig Liquidität für eine externe Aufklärung (~80 k€).');
       if (action.mode === 'silent') warnings.push('Schweigen ist ein Vabanquespiel: Der Sturm kann verebben — oder sich ohne Gegenstimme hochschaukeln.');
       if (action.mode === 'defend') warnings.push('Gegenrede trägt nur, wenn die Faktenlage hält. Bei starker Empörung befeuert sie den Sturm.');
+      break;
+    }
+
+    case 'HOLD_BOARD_MEETING': {
+      const since = state.meta.week - state.board.lastMeetingWeek;
+      if (since < BOARD_MEETING_COOLDOWN) errors.push(`Zu früh für die nächste Sitzung — noch ${BOARD_MEETING_COOLDOWN - since} Woche(n) Sperre.`);
+      if (state.ceo.energy < BOARD_MEETING_ENERGY) errors.push(`Zu wenig Energie (${Math.round(state.ceo.energy)}/100) für eine überzeugende Sitzung.`);
       break;
     }
   }
@@ -821,6 +829,17 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       for (const o of crisisOcc) analysis.push(`${o.icon} ${o.textDe}`);
       break;
     }
+    case 'HOLD_BOARD_MEETING': {
+      const rec = holdBoardMeeting(state, action.approach);
+      state.board.lastMeeting = rec;
+      state.board.lastMeetingWeek = week;
+      state.ceo.boardTrust = clamp(state.ceo.boardTrust + rec.trustDelta, 0, 100);
+      state.ceo.energy = Math.max(0, state.ceo.energy - BOARD_MEETING_ENERGY);
+      summary = `Vorstandssitzung (${rec.approachDe}): Board-Vertrauen ${rec.trustDelta >= 0 ? '+' : ''}${rec.trustDelta}`;
+      analysis.push(`Ansprache-Stil „${rec.approachDe}" — die Sitze reagieren nach Passung zu ihrem Mandat. Board-Vertrauen ${rec.trustDelta >= 0 ? '+' : ''}${rec.trustDelta}, Energie −${BOARD_MEETING_ENERGY}.`);
+      for (const r of rec.reactions) analysis.push(`${r.name} (${r.affiliationDe}): ${r.moodDe} (${r.delta >= 0 ? '+' : ''}${r.delta}).`);
+      break;
+    }
     case 'DISTRIBUTE_DIVIDEND': {
       recordResolution(state, 'dividende', `Gewinnausschüttung ${fmt(action.amount)}`);
       schedule(state, 0, `Dividende W${week}`, decisionId, { kind: 'DIVIDEND_PAYOUT', amount: action.amount });
@@ -881,7 +900,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

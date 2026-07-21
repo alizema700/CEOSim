@@ -11,11 +11,16 @@ import {
   memberSupport,
   organNames,
   taxBreakdown,
+  BOARD_MEETING_COOLDOWN,
+  BOARD_MEETING_ENERGY,
+  MEETING_APPROACHES,
+  type BoardMeetingApproach,
   type BoardMember,
   type CapTableEntry,
 } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, Drill, Panel, scoreColor } from '../components/ui.js';
+import { Icon, type IconName } from '../components/Icon.js';
 import { eur, num, pct } from '../format.js';
 
 /**
@@ -97,6 +102,9 @@ export function StructureView() {
 
       {/* ── Aufsichtsrat / Board ────────────────────────────────────── */}
       <BoardPanel />
+
+      {/* ── Vorstandssitzung (interaktiv) ───────────────────────────── */}
+      <BoardMeetingPanel />
 
       {/* ── Steuern (echte dt. Sätze) ───────────────────────────────── */}
       <Panel title="Ertragsteuer">
@@ -268,6 +276,69 @@ const SEAT_LABEL: Record<BoardMember['seatType'], string> = {
   ceo: 'CEO',
 };
 const VOTE_STYLE: Record<string, string> = { ja: 'text-good', nein: 'text-bad', enthaltung: 'text-dim' };
+
+const APPROACH_ICON: Record<BoardMeetingApproach, IconName> = { data: 'bar-chart', vision: 'rocket', listen: 'chat' };
+
+/**
+ * Vorstandssitzung (Phase 22): der CEO tritt vor den Aufsichtsrat und wählt
+ * einen Ansprache-Stil. Die Sitze reagieren nach Passung — das Ergebnis (Stimmung
+ * je Sitz + Vertrauensänderung) erscheint direkt darunter.
+ */
+function BoardMeetingPanel() {
+  const { state, act, busy } = useStore();
+  if (!state) return null;
+  const active = state.meta.status === 'active';
+  const since = state.meta.week - state.board.lastMeetingWeek;
+  const onCooldown = since < BOARD_MEETING_COOLDOWN;
+  const lowEnergy = state.ceo.energy < BOARD_MEETING_ENERGY;
+  const last = state.board.lastMeeting;
+  const moodCls = (d: number) => (d >= 3 ? 'text-good' : d >= 1 ? 'text-good/80' : d === 0 ? 'text-dim' : 'text-bad');
+
+  return (
+    <Panel icon="users" title="Vorstandssitzung einberufen">
+      <p className="mb-3 max-w-[74ch] text-[11.5px] leading-relaxed text-dim">
+        Tritt vor den Aufsichtsrat und wähle deinen Ansprache-Stil. Jeder Sitz reagiert nach Passung zu seinem Mandat —
+        das bewegt das Board-Vertrauen. Kostet {BOARD_MEETING_ENERGY} Energie, danach {BOARD_MEETING_COOLDOWN} Wochen Sperre.
+        {onCooldown && <span className="text-warn"> · Noch {BOARD_MEETING_COOLDOWN - since} Woche(n) gesperrt.</span>}
+        {lowEnergy && <span className="text-bad"> · Zu wenig Energie ({Math.round(state.ceo.energy)}/100).</span>}
+      </p>
+      <div className="grid gap-2 sm:grid-cols-3">
+        {(Object.keys(MEETING_APPROACHES) as BoardMeetingApproach[]).map((ap) => {
+          const cfg = MEETING_APPROACHES[ap];
+          return (
+            <button
+              key={ap}
+              className="flex flex-col items-start border border-line p-2.5 text-left transition-colors hover:border-accent disabled:opacity-45"
+              style={{ borderRadius: 2 }}
+              disabled={busy || !active || onCooldown || lowEnergy}
+              onClick={() => void act({ type: 'HOLD_BOARD_MEETING', approach: ap }, null)}
+            >
+              <span className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><Icon name={APPROACH_ICON[ap]} size={15} /> {cfg.labelDe}</span>
+              <span className="mt-0.5 text-[10.5px] leading-tight text-dim">{cfg.descDe}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      {last && (
+        <div className="mt-3 border-t border-line pt-2.5">
+          <div className="flex items-baseline justify-between">
+            <span className="kicker text-[9px]">Letzte Sitzung · W{last.week} · {last.approachDe}</span>
+            <span className={`num text-[13px] ${last.trustDelta >= 0 ? 'text-good' : 'text-bad'}`}>Board-Vertrauen {last.trustDelta >= 0 ? '+' : ''}{last.trustDelta}</span>
+          </div>
+          <div className="mt-2 grid gap-x-6 gap-y-1 sm:grid-cols-2">
+            {last.reactions.map((r) => (
+              <div key={r.memberId} className="flex items-baseline justify-between gap-2 text-[11.5px]">
+                <span className="truncate text-ink2">{r.name} <span className="text-dim">· {r.affiliationDe.split(' · ')[0]}</span></span>
+                <span className={`shrink-0 ${moodCls(r.delta)}`}>{r.moodDe} ({r.delta >= 0 ? '+' : ''}{r.delta})</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </Panel>
+  );
+}
 
 /** Aufsichtsrat/Board: benannte Sitze mit Rückhalt + letzte Beschlüsse. */
 function BoardPanel() {

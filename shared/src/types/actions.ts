@@ -46,6 +46,7 @@ export type PlayerAction =
   | HireCoachAction
   | TakeoverRespondAction
   | CrisisRespondAction
+  | HoldBoardMeetingAction
   | StepDownAction;
 
 /**
@@ -359,6 +360,16 @@ export interface TakeoverRespondAction {
 export interface CrisisRespondAction {
   type: 'CRISIS_RESPOND';
   mode: 'apologize' | 'defend' | 'silent' | 'investigate';
+}
+
+/**
+ * Vorstandssitzung einberufen (Phase 22): der CEO tritt vor den Aufsichtsrat
+ * und wählt einen Ansprache-Stil (Zahlen / Vision / Zuhören). Die Sitze
+ * reagieren je nach Passung — das Board-Vertrauen bewegt sich.
+ */
+export interface HoldBoardMeetingAction {
+  type: 'HOLD_BOARD_MEETING';
+  approach: 'data' | 'vision' | 'listen';
 }
 
 /**

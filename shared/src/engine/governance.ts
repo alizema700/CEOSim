@@ -1,6 +1,6 @@
 import { clamp } from '../types/common.js';
 import type { CompanyState } from '../types/company.js';
-import type { BoardMember, BoardState, MemberVote, ResolutionKind, ResolutionRecord } from '../types/board.js';
+import type { BoardMeetingApproach, BoardMeetingRecord, BoardMember, BoardState, MemberVote, ResolutionKind, ResolutionRecord } from '../types/board.js';
 import { personName } from './names.js';
 import { stream } from './rng.js';
 
@@ -23,7 +23,56 @@ export function buildInitialBoard(seed: number, ceoName: string): BoardState {
     { id: 'seat_ceo', name: ceoName, seatType: 'ceo', affiliationDe: 'CEO (Sie) — bei eigenen Belangen befangen', bias: 14, appointedWeek: 0, capitalShare: 0.05 },
     { id: 'seat_independent', name: `${c.firstName} ${c.lastName}`, seatType: 'independent', affiliationDe: 'Unabhängiges Mitglied', bias: 2, appointedWeek: 0, capitalShare: 0.1 },
   ];
-  return { members, resolutions: [] };
+  return { members, resolutions: [], lastMeetingWeek: -99, lastMeeting: null };
+}
+
+// ── Vorstandssitzung (Phase 22): interaktive Szene ──────────────────────
+export const BOARD_MEETING_COOLDOWN = 4; // Wochen zwischen Sitzungen
+export const BOARD_MEETING_ENERGY = 12; // Energiekosten
+
+export const MEETING_APPROACHES: Record<BoardMeetingApproach, { labelDe: string; descDe: string; fit: Partial<Record<BoardMember['seatType'], number>> }> = {
+  data: {
+    labelDe: 'Zahlen & Fakten',
+    descDe: 'Nüchtern mit KPIs, Kohorten und Runway argumentieren. Investoren & Vorsitz lieben Belege; Belegschaft bleibt kühl.',
+    fit: { investor: 4, chair: 3, independent: 2, founder: 1, employee: 0 },
+  },
+  vision: {
+    labelDe: 'Vision & Wachstum',
+    descDe: 'Das große Bild und die Ambition verkaufen. Gründung & Unabhängige zünden; Investoren wollen erst Zahlen sehen.',
+    fit: { founder: 4, independent: 2, chair: 2, ceo: 1, investor: 0, employee: 1 },
+  },
+  listen: {
+    labelDe: 'Zuhören & Zugeständnisse',
+    descDe: 'Bedenken aufnehmen, Brücken bauen. Belegschaft & Unabhängige danken es; wirkt aber weniger entschlossen.',
+    fit: { employee: 4, independent: 2, chair: 1, founder: 1, investor: 0, ceo: 0 },
+  },
+};
+
+/**
+ * Hält eine Vorstandssitzung mit gewähltem Ansprache-Stil. Jedes Mitglied
+ * reagiert nach Passung (Sitztyp ↔ Stil), moduliert durch CEO-Kommunikation und
+ * -Energie. Aggregiert zu einer Board-Vertrauens-Änderung; deterministisch.
+ */
+export function holdBoardMeeting(state: CompanyState, approach: BoardMeetingApproach): BoardMeetingRecord {
+  const cfg = MEETING_APPROACHES[approach];
+  const komm = state.ceo.skills.kommunikation ?? 50;
+  const energy = state.ceo.energy ?? 100;
+  const commFactor = 0.6 + komm / 125; // 0,6 … 1,4
+  const energyFactor = energy < 25 ? 0.5 : energy < 50 ? 0.8 : 1; // erschöpft = weniger überzeugend
+  const reactions = state.board.members
+    .filter((m) => m.seatType !== 'ceo')
+    .map((m) => {
+      const base = cfg.fit[m.seatType] ?? 0;
+      // Sehr zufriedene Sitze haben weniger Luft nach oben; skeptische reagieren stärker.
+      const support = memberSupport(state, m);
+      const headroom = base > 0 ? (100 - support) / 100 : 1;
+      const delta = Math.round((base - 1.2) * commFactor * energyFactor * (0.7 + headroom * 0.6));
+      const moodDe = delta >= 3 ? 'überzeugt' : delta >= 1 ? 'zustimmend' : delta === 0 ? 'neutral' : 'skeptisch';
+      return { memberId: m.id, name: m.name, affiliationDe: m.affiliationDe, delta, moodDe };
+    });
+  const avg = reactions.length ? reactions.reduce((a, r) => a + r.delta, 0) / reactions.length : 0;
+  const trustDelta = clamp(Math.round(avg * 1.6), -4, 6);
+  return { week: state.meta.week, approach, approachDe: cfg.labelDe, trustDelta, reactions };
 }
 
 /** Aktueller Kapitalanteil, den ein Sitz vertritt (aus der LIVE-Cap-Table). */

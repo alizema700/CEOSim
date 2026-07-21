@@ -47,7 +47,32 @@ export interface ResolutionRecord {
   votes: MemberVote[];
 }
 
+/** Ansprache-Stil einer Vorstandssitzung (Phase 22). */
+export type BoardMeetingApproach = 'data' | 'vision' | 'listen';
+
+export interface BoardMeetingReaction {
+  memberId: Id;
+  name: string;
+  affiliationDe: string;
+  /** Reaktion auf die Ansprache (−… skeptisch … +… überzeugt). */
+  delta: number;
+  moodDe: string;
+}
+
+export interface BoardMeetingRecord {
+  week: WeekIndex;
+  approach: BoardMeetingApproach;
+  approachDe: string;
+  /** Resultierende Änderung des Board-Vertrauens. */
+  trustDelta: number;
+  reactions: BoardMeetingReaction[];
+}
+
 export interface BoardState {
   members: BoardMember[];
   resolutions: ResolutionRecord[];
+  /** Woche der letzten einberufenen Vorstandssitzung (Cooldown). */
+  lastMeetingWeek: WeekIndex;
+  /** Ergebnis der letzten Sitzung (fürs UI). */
+  lastMeeting: BoardMeetingRecord | null;
 }
