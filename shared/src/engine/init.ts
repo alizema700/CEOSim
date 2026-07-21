@@ -20,6 +20,7 @@ import { initialIpoState } from '../types/ipo.js';
 import { initialLaborState } from '../types/labor.js';
 import { balancedFocus } from '../types/ceo.js';
 import { initialTakeoverState } from '../types/takeover.js';
+import { initialCrisisState } from '../types/crisis.js';
 import { initialLegalState } from './legal.js';
 import { buildInitialBoard } from './governance.js';
 import { ESOP_CLIFF_WEEKS, ESOP_VEST_WEEKS, defaultGrantPercent } from './equity.js';
@@ -395,6 +396,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
     legal: initialLegalState(seed, loc),
     board: buildInitialBoard(seed, setup.playerProfile.ceoName),
     takeover: initialTakeoverState(),
+    crisis: initialCrisisState(),
     history: [],
     decisionLog: [],
     evaluations: [],

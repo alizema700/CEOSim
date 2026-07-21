@@ -124,6 +124,7 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('HIRE_COACH'), skill: z.enum(['finanzen', 'strategie', 'leadership', 'kommunikation', 'krisenmanagement', 'governance']) }),
   z.object({ type: z.literal('STEP_DOWN') }),
   z.object({ type: z.literal('TAKEOVER_RESPOND'), mode: z.enum(['accept', 'negotiate', 'poison_pill', 'rally']) }),
+  z.object({ type: z.literal('CRISIS_RESPOND'), mode: z.enum(['apologize', 'defend', 'silent', 'investigate']) }),
 ]);
 
 const zHypothesis = z

@@ -45,6 +45,7 @@ export type PlayerAction =
   | CeoPublicAppearanceAction
   | HireCoachAction
   | TakeoverRespondAction
+  | CrisisRespondAction
   | StepDownAction;
 
 /**
@@ -349,6 +350,15 @@ export interface HireCoachAction {
 export interface TakeoverRespondAction {
   type: 'TAKEOVER_RESPOND';
   mode: 'accept' | 'negotiate' | 'poison_pill' | 'rally';
+}
+
+/**
+ * Reaktion auf eine öffentliche Krise / einen Shitstorm (Phase 15):
+ * entschuldigen, mit Fakten gegenhalten, schweigen oder transparent aufklären.
+ */
+export interface CrisisRespondAction {
+  type: 'CRISIS_RESPOND';
+  mode: 'apologize' | 'defend' | 'silent' | 'investigate';
 }
 
 /**

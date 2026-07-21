@@ -146,6 +146,19 @@ export function DashboardView() {
         </section>
       )}
 
+      {/* ── Krisen-Alarm ──────────────────────────────────────────────── */}
+      {state.crisis.status === 'active' && (
+        <section className="border-2 border-bad bg-bad/5 px-4 py-3" style={{ borderRadius: 3 }}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="kicker inline-flex items-center gap-1.5 text-bad"><Icon name="flame" size={13} /> Öffentliche Krise · Stufe {state.crisis.stage}</span>
+            <button className="btn border-bad text-bad" onClick={() => useStore.getState().setCrisisOpen(true)}>Reaktion öffnen →</button>
+          </div>
+          <p className="mt-1 max-w-[70ch] text-[13px] leading-relaxed text-ink2">
+            {state.crisis.headlineDe} — Schwere {Math.round(state.crisis.severity)}/100. Entschuldigen, gegenhalten, schweigen oder transparent aufklären. Ohne Reaktion eskaliert der Sturm.
+          </p>
+        </section>
+      )}
+
       {/* ── Nächste Züge (kontextuelle Empfehlungen) ──────────────────── */}
       <NextMovesPanel />
 
@@ -450,6 +463,7 @@ function NextMovesPanel() {
   if (state.product.techDebt > 62) push({ prio: 50, icon: '🧱', tone: 'warn', textDe: `Tech-Debt bei ${Math.round(state.product.techDebt)}/100 — Ausfallrisiko steigt. R&D-Allokation nachjustieren.`, cta: 'Produkt', go: () => setView('product') });
   if (state.ceo.energy < 30) push({ prio: 63, icon: '🪫', tone: 'warn', textDe: `Deine Energie ist bei ${Math.round(state.ceo.energy)}/100 — Dauerlast kostet Urteilskraft. Auszeit oder mehr Delegation wäre klug.`, cta: 'CEO', go: () => setView('ceo') });
   if (state.takeover.status !== 'none') push({ prio: 99, icon: '🦈', tone: 'bad', textDe: `Feindliche Übernahme durch ${state.takeover.bidderName}: ${state.takeover.status === 'tender' ? 'ein Angebot liegt vor' : 'ein Bieter sammelt Anteile'}. Verteidigen oder zum Höchstpreis aussteigen.`, cta: 'Verteidigung', go: () => useStore.getState().setTakeoverOpen(true) });
+  if (state.crisis.status === 'active') push({ prio: 98, icon: '🔥', tone: 'bad', textDe: `Öffentliche Krise (Stufe ${state.crisis.stage}): „${state.crisis.headlineDe}" — Schwere ${Math.round(state.crisis.severity)}/100. Jetzt reagieren, bevor der Sturm eskaliert.`, cta: 'Reaktion', go: () => useStore.getState().setCrisisOpen(true) });
 
   moves.sort((a, b) => b.prio - a.prio);
   const top = moves.slice(0, 3);

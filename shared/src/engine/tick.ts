@@ -44,6 +44,7 @@ import { effectiveCorporateTaxRate } from '../types/legal.js';
 import { tickGovernance } from './governance.js';
 import { tickCeo } from './ceo.js';
 import { tickTakeover } from './takeover.js';
+import { tickCrisis } from './crisis.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -123,6 +124,7 @@ export function closeWeek(state: CompanyState): WeekReport {
   tickLegal(state, occurrences);
   tickGovernance(state, occurrences);
   tickTakeover(state, occurrences);
+  tickCrisis(state, occurrences);
 
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);

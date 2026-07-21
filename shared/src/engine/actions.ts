@@ -5,6 +5,7 @@ import type { EffectPayload } from '../types/effects.js';
 import { totalMrr, runwayWeeks } from './derive.js';
 import { computeKpis, computeValuation } from './kpis.js';
 import { acceptanceShare, defendedTakeover, succeedTakeover } from './takeover.js';
+import { respondCrisis } from './crisis.js';
 import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
@@ -337,6 +338,14 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
         warnings.push('Giftpillen sichern die Unabhängigkeit, gelten Investoren aber als Entrenchment — die entgangene Prämie wird dir angekreidet.');
       }
       if (action.mode === 'accept') warnings.push('Endgültig: Die Annahme verkauft die Firma und beendet deine Amtszeit — dafür der Höchstpreis auf dein Konto.');
+      break;
+    }
+
+    case 'CRISIS_RESPOND': {
+      if (state.crisis.status !== 'active') errors.push('Aktuell gibt es keine akute Krise.');
+      if (action.mode === 'investigate' && f.cash < 80_000) errors.push('Zu wenig Liquidität für eine externe Aufklärung (~80 k€).');
+      if (action.mode === 'silent') warnings.push('Schweigen ist ein Vabanquespiel: Der Sturm kann verebben — oder sich ohne Gegenstimme hochschaukeln.');
+      if (action.mode === 'defend') warnings.push('Gegenrede trägt nur, wenn die Faktenlage hält. Bei starker Empörung befeuert sie den Sturm.');
       break;
     }
   }
@@ -800,6 +809,18 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       for (const o of takeoverOcc) analysis.push(`${o.icon} ${o.textDe}`);
       break;
     }
+    case 'CRISIS_RESPOND': {
+      const crisisOcc: Occurrence[] = [];
+      const headline = state.crisis.headlineDe;
+      respondCrisis(state, action.mode, crisisOcc);
+      const modeLabel = action.mode === 'apologize' ? 'Entschuldigung' : action.mode === 'defend' ? 'Gegenrede' : action.mode === 'silent' ? 'Kein Kommentar' : 'Transparente Aufklärung';
+      summary = `Krise „${headline}": ${modeLabel}`;
+      analysis.push('Krisenreaktionen wirken über deine CEO-Marke, Kommunikation und den Board-Rückhalt — je glaubwürdiger die Führung, desto stärker die Deeskalation.');
+      if (state.crisis.status === 'none') analysis.push('Der Sturm ist abgeklungen — die öffentliche Aufmerksamkeit wandert weiter.');
+      else analysis.push(`Der Sturm läuft weiter (Schwere ${Math.round(state.crisis.severity)}/100, Stufe ${state.crisis.stage}). Dranbleiben — eine einzelne Reaktion beendet ihn selten.`);
+      for (const o of crisisOcc) analysis.push(`${o.icon} ${o.textDe}`);
+      break;
+    }
     case 'DISTRIBUTE_DIVIDEND': {
       recordResolution(state, 'dividende', `Gewinnausschüttung ${fmt(action.amount)}`);
       schedule(state, 0, `Dividende W${week}`, decisionId, { kind: 'DIVIDEND_PAYOUT', amount: action.amount });
@@ -860,7 +881,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,
