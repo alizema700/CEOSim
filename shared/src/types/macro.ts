@@ -14,6 +14,10 @@ export interface MacroState {
   regime: MacroRegime;
   /** Leitzins-artiger Referenzsatz in Prozent (Finanzierungsklima/Bewertung). */
   interestRatePct: number;
+  /** Inflationsrate in Prozent (Kostendruck, treibt den Leitzins). */
+  inflationPct: number;
+  /** Kapitalmarkt-/Tech-Sektor-Index (Basis 100) — bewegt Bewertungen & IPO-Fenster. */
+  capitalIndex: number;
   /** Wochen im aktuellen Regime (fürs UI/Narrativ). */
   weeksInRegime: number;
   /** Letzte Schockwoche (verhindert Schock-Ketten). */
@@ -23,7 +27,13 @@ export interface MacroState {
 }
 
 export function initialMacroState(): MacroState {
-  return { sentiment: 0, regime: 'neutral', interestRatePct: 4.0, weeksInRegime: 0, lastShockWeek: -99, lastHeadlineDe: '' };
+  return { sentiment: 0, regime: 'neutral', interestRatePct: 4.0, inflationPct: 2.0, capitalIndex: 100, weeksInRegime: 0, lastShockWeek: -99, lastHeadlineDe: '' };
+}
+
+/** Bewertungs-Multiplikator aus dem Kapitalmarkt (Basis 100 = neutral 1,0). */
+export function macroValuationMultiplier(m: { capitalIndex: number }): number {
+  const x = (m?.capitalIndex ?? 100) / 100;
+  return Math.max(0.78, Math.min(1.32, x));
 }
 
 export function regimeForSentiment(s: number): MacroRegime {

@@ -67,8 +67,16 @@ export function tickMacro(state: CompanyState, occ: Occurrence[]): void {
     m.weeksInRegime += 1;
   }
 
-  // Leitzins bewegt sich mit der Überhitzung (Boom → teurer, Rezession → billiger).
-  m.interestRatePct = Math.round(clamp(4 + m.sentiment / 45, 1.5, 7.5) * 10) / 10;
+  // Inflation: mean-revert Richtung ~2,2 %, plus Überhitzungs-Aufschlag (Boom heizt).
+  const inflTarget = clamp(2.2 + m.sentiment / 55, 0.4, 7);
+  m.inflationPct = Math.round(clamp(m.inflationPct + (inflTarget - m.inflationPct) * 0.12 + (rng() - 0.5) * 0.25, 0.2, 8) * 10) / 10;
+
+  // Kapitalmarkt-Index folgt geglättet der Stimmung (Basis 100).
+  const capTarget = clamp(100 + m.sentiment * 0.62, 40, 200);
+  m.capitalIndex = Math.round(clamp(m.capitalIndex + (capTarget - m.capitalIndex) * 0.12 + (rng() - 0.5) * 2.5, 35, 220) * 10) / 10;
+
+  // Leitzins: Notenbank bekämpft Inflation; Konjunktur wirkt zusätzlich.
+  m.interestRatePct = Math.round(clamp(0.6 + m.inflationPct * 0.9 + m.sentiment / 90, 1, 9) * 10) / 10;
 
   // Schock separat vermelden (auch ohne Regimewechsel).
   if (shocked && newRegime === m.regime) {
@@ -92,5 +100,5 @@ export function tickMacro(state: CompanyState, occ: Occurrence[]): void {
 /** Kurzstatus fürs UI/Personas. */
 export function macroSummaryDe(state: CompanyState): string {
   const m = state.macro;
-  return `${REGIME_LABELS[m.regime]} (Stimmung ${Math.round(m.sentiment)}, Zins ${m.interestRatePct.toFixed(1)} %)`;
+  return `${REGIME_LABELS[m.regime]} (Stimmung ${Math.round(m.sentiment)}, Inflation ${m.inflationPct.toFixed(1)} %, Zins ${m.interestRatePct.toFixed(1)} %, Kapitalmarkt-Index ${Math.round(m.capitalIndex)})`;
 }

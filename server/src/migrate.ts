@@ -67,6 +67,7 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   if (!s.crisis) s.crisis = initialCrisisState();
   if (!s.macro) s.macro = initialMacroState();
   if (!s.rivalry) s.rivalry = initialCompetitorStrikeState();
+  if (s.macro && (s.macro as { inflationPct?: number }).inflationPct === undefined) { (s.macro as { inflationPct: number }).inflationPct = 2.0; (s.macro as { capitalIndex: number }).capitalIndex = 100; }
   if (s.board && s.board.lastMeetingWeek === undefined) { s.board.lastMeetingWeek = -99; s.board.lastMeeting = null; }
   if (s.ceo && !s.ceo.personal) s.ceo.personal = initialCeoPersonal();
   return state;

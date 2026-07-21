@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { newGame } from './helpers.js';
 import { closeWeek } from '../src/engine/tick.js';
 import { macroLeadFactor, macroWinFactor } from '../src/engine/macro.js';
-import { regimeForSentiment } from '../src/types/macro.js';
+import { macroValuationMultiplier, regimeForSentiment } from '../src/types/macro.js';
+import { computeValuation } from '../src/engine/kpis.js';
 
 /**
  * Phase 16: Makroökonomie — deterministischer Konjunktur-Walk, beschränkte
@@ -52,5 +53,39 @@ describe('Konjunktur-Dynamik', () => {
     for (let i = 0; i < 20; i++) { closeWeek(a); closeWeek(b); }
     expect(a.macro.sentiment).toBe(b.macro.sentiment);
     expect(a.macro.regime).toBe(b.macro.regime);
+  });
+});
+
+describe('Makro-Ausbau (Inflation, Kapitalmarkt, Zins)', () => {
+  it('Inflation & Kapitalmarkt-Index bleiben beschränkt', () => {
+    const s = newGame(16010);
+    for (let i = 0; i < 40 && s.meta.status === 'active'; i++) {
+      closeWeek(s);
+      expect(s.macro.inflationPct).toBeGreaterThanOrEqual(0.2);
+      expect(s.macro.inflationPct).toBeLessThanOrEqual(8);
+      expect(s.macro.capitalIndex).toBeGreaterThanOrEqual(35);
+      expect(s.macro.capitalIndex).toBeLessThanOrEqual(220);
+    }
+  });
+
+  it('Kapitalmarkt-Multiplikator ist neutral bei 100 und beschränkt', () => {
+    expect(macroValuationMultiplier({ capitalIndex: 100 })).toBeCloseTo(1, 5);
+    expect(macroValuationMultiplier({ capitalIndex: 200 })).toBeLessThanOrEqual(1.32);
+    expect(macroValuationMultiplier({ capitalIndex: 40 })).toBeGreaterThanOrEqual(0.78);
+  });
+
+  it('Bullenmarkt hebt die Bewertung, Bärenmarkt senkt sie', () => {
+    const bull = newGame(16011); bull.macro.capitalIndex = 130;
+    const base = newGame(16011); base.macro.capitalIndex = 100;
+    const bear = newGame(16011); bear.macro.capitalIndex = 70;
+    expect(computeValuation(bull).value).toBeGreaterThan(computeValuation(base).value);
+    expect(computeValuation(bear).value).toBeLessThan(computeValuation(base).value);
+  });
+
+  it('höhere Inflation ⇒ höherer Leitzins', () => {
+    const hot = newGame(16012); hot.macro.inflationPct = 6; hot.macro.sentiment = 0;
+    const calm = newGame(16012); calm.macro.inflationPct = 1.5; calm.macro.sentiment = 0;
+    closeWeek(hot); closeWeek(calm);
+    expect(hot.macro.interestRatePct).toBeGreaterThan(calm.macro.interestRatePct);
   });
 });

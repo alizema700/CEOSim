@@ -27,8 +27,10 @@ function MacroPanel() {
       </div>
       <div className="mt-2"><Bar value={gauge} color={barCls} /></div>
       <div className="mt-1 flex justify-between text-[9px] uppercase tracking-wider text-faint"><span>Rezession</span><span>Neutral</span><span>Boom</span></div>
-      <div className="mt-3 grid grid-cols-3 gap-3">
+      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-5">
         <div><div className="kicker text-[8.5px]">Leitzins</div><div className="num text-[16px]">{m.interestRatePct.toFixed(1)} %</div></div>
+        <div><div className="kicker text-[8.5px]">Inflation</div><div className={`num text-[16px] ${m.inflationPct > 4 ? 'text-bad' : m.inflationPct > 3 ? 'text-warn' : 'text-ink'}`}>{m.inflationPct.toFixed(1)} %</div></div>
+        <div><div className="kicker text-[8.5px]">Kapitalmarkt</div><div className={`num text-[16px] ${m.capitalIndex >= 108 ? 'text-good' : m.capitalIndex <= 92 ? 'text-bad' : 'text-ink'}`}>{Math.round(m.capitalIndex)}</div><div className="text-[9px] text-dim">Bewertung ×{(Math.max(0.78, Math.min(1.32, m.capitalIndex / 100))).toFixed(2)}</div></div>
         <div><div className="kicker text-[8.5px]">Lead-Zufluss</div><div className={`num text-[16px] ${lead >= 1 ? 'text-good' : 'text-bad'}`}>{fmtPct(lead)}</div></div>
         <div><div className="kicker text-[8.5px]">Abschlussquote</div><div className={`num text-[16px] ${win >= 1 ? 'text-good' : 'text-bad'}`}>{fmtPct(win)}</div></div>
       </div>

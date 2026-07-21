@@ -231,7 +231,10 @@ export function computeValuation(state: CompanyState): ValuationBreakdown {
     drivers.push('Profitabel ⇒ +0,8×');
   }
   multiple = Math.max(0.8, Math.min(15, multiple));
-  return { arr, multiple, driversDe: drivers, value: arr * multiple };
+  // Kapitalmarkt-Umfeld (Phase 22): Bull-/Bärenmarkt hebt/senkt die Bewertung.
+  const capMult = Math.max(0.78, Math.min(1.32, (state.macro?.capitalIndex ?? 100) / 100));
+  if (Math.abs(capMult - 1) > 0.02) drivers.push(`Kapitalmarkt (Index ${Math.round(state.macro?.capitalIndex ?? 100)}) ⇒ ×${capMult.toFixed(2)}`);
+  return { arr, multiple, driversDe: drivers, value: arr * multiple * capMult };
 }
 
 export function mrrGrowthMonthly(state: CompanyState): number {
