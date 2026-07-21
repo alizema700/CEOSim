@@ -1,6 +1,6 @@
 import { totalMrr } from '@boardroom/shared';
 import { useStore } from '../store.js';
-import { Panel, StatRow } from '../components/ui.js';
+import { KpiTrendDrill, Panel, StatRow } from '../components/ui.js';
 import { eur, pct } from '../format.js';
 
 /** Finanzen: GuV, Cash-Flow, Bilanz (letzte Woche), Cap Table, Covenants. */
@@ -11,7 +11,9 @@ export function FinanceView() {
   const f = state.finance;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="space-y-4">
+      <KpiTrendDrill id="finance-trend" title="Finanz-Dynamik · Verlauf" history={state.history} series={[{ kpi: 'mrr', label: 'MRR', color: '#2f7f79' }, { kpi: 'valuation', label: 'Bewertung', color: '#b8791f' }, { kpi: 'runwayWeeks', label: 'Runway', color: '#5a7d8c' }]} />
+      <div className="grid gap-4 lg:grid-cols-3">
       <Panel title={r ? `GuV · Woche ${r.week}` : 'GuV (noch keine Woche abgeschlossen)'}>
         {r ? (
           <>
@@ -90,6 +92,7 @@ export function FinanceView() {
         <StatRow label="G&A-Sachkosten" value={`${eur(f.budgetsMonthly.gaOther)}/M`} />
         <StatRow label="COGS-Quote" value={pct(f.cogsRate)} />
       </Panel>
+      </div>
     </div>
   );
 }

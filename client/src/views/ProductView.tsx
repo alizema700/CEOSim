@@ -1,5 +1,5 @@
 import { useStore } from '../store.js';
-import { Bar, Panel, StatRow } from '../components/ui.js';
+import { Bar, KpiTrendDrill, Panel, StatRow } from '../components/ui.js';
 import { num, pct } from '../format.js';
 
 /** Produkt: Tech-Debt, Velocity, Bugs, NPS, aktuelle R&D-Allokation. */
@@ -9,7 +9,9 @@ export function ProductView() {
   const p = state.product;
 
   return (
-    <div className="grid gap-4 lg:grid-cols-3">
+    <div className="space-y-4">
+      <KpiTrendDrill id="product-trend" title="Produktwirkung auf Bindung & Churn · Verlauf" history={state.history} series={[{ kpi: 'nrr', label: 'NRR', color: '#2e8558' }, { kpi: 'logoChurnMonthly', label: 'Logo-Churn', color: '#c2453d' }]} />
+      <div className="grid gap-4 lg:grid-cols-3">
       <Panel title="Technischer Zustand">
         <div className="mb-2">
           <div className="mb-0.5 flex justify-between text-[11px]">
@@ -54,6 +56,7 @@ export function ProductView() {
         </button>
         <p className="mt-2 text-[10px] text-dim">Roadmap mit RICE-Priorisierung und Launches folgt in einer späteren Phase.</p>
       </Panel>
+      </div>
     </div>
   );
 }

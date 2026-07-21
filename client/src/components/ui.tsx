@@ -217,3 +217,43 @@ export function MultiLineChart({ data, series, height = 224, labelFormatter }: {
     </div>
   );
 }
+
+/**
+ * Trend-Drill (Phase 11): aufklappbarer Mehrserien-Verlauf mehrerer Kennzahlen
+ * INDEXIERT (Start = 100), damit unterschiedlich skalierte Größen (MRR vs.
+ * Runway) auf einer Achse vergleichbar werden. Zeigt die relative Dynamik.
+ */
+export function KpiTrendDrill({ id, title, history, series, defaultOpen = false }: {
+  id: string;
+  title: string;
+  history: KpiSnapshot[];
+  series: { kpi: KpiId; label: string; color: string }[];
+  defaultOpen?: boolean;
+}) {
+  if (history.length < 2) return null;
+  const base: Record<string, number> = {};
+  for (const s of series) {
+    const b = history[0]!.values[s.kpi];
+    base[s.kpi] = b && Math.abs(b) > 1e-6 ? b : 1;
+  }
+  const data = history.map((h) => {
+    const row: Record<string, number> = { week: h.week };
+    for (const s of series) row[s.kpi] = Math.round(((h.values[s.kpi] ?? 0) / base[s.kpi]!) * 1000) / 10;
+    return row;
+  });
+  const chartSeries = series.map((s) => ({ key: s.kpi, label: s.label, color: s.color, formatter: (v: number) => `${v.toFixed(0)} (Index)` }));
+  const latest = (kpi: KpiId) => history[history.length - 1]!.values[kpi] ?? 0;
+  return (
+    <Drill id={id} title={title} defaultOpen={defaultOpen} summary={`${history.length} Wochen · indexiert`}>
+      <MultiLineChart data={data} series={chartSeries} height={200} />
+      <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1">
+        {series.map((s) => (
+          <span key={s.kpi} className="text-[10.5px] text-dim">
+            <span className="num" style={{ color: s.color }}>●</span> {s.label}: <span className="num text-ink">{formatByUnit(latest(s.kpi), KPI_DEFINITIONS[s.kpi].unit)}</span>
+          </span>
+        ))}
+      </div>
+      <p className="mt-1 text-[10px] text-dim">Indexiert: Woche 0 = 100. Über 100 = gewachsen, darunter = gesunken — relative Dynamik auf einen Blick.</p>
+    </Drill>
+  );
+}

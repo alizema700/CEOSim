@@ -1,6 +1,6 @@
 import { totalMrr } from '@boardroom/shared';
 import { useStore } from '../store.js';
-import { Bar, Panel, StatRow } from '../components/ui.js';
+import { Bar, KpiTrendDrill, Panel, StatRow } from '../components/ui.js';
 import { eur, num, pct } from '../format.js';
 
 /** Markt: Konkurrenz-Dossiers, Marktanteile, Nachfrage. Volle Agenten in Phase 5. */
@@ -14,6 +14,7 @@ export function MarketView() {
 
   return (
     <div className="space-y-4">
+      <KpiTrendDrill id="market-trend" title="Bewertung, Wachstum & Konzentration · Verlauf" history={state.history} series={[{ kpi: 'valuation', label: 'Bewertung', color: '#2f7f79' }, { kpi: 'mrrGrowthMonthly', label: 'MRR-Wachstum', color: '#b8791f' }, { kpi: 'revenueConcentrationHhi', label: 'Konzentration (HHI)', color: '#5a7d8c' }]} />
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Markt">
           <StatRow label="Adressierbarer Markt (TAM)" value={eur(m.tamMrr) + ' MRR'} />

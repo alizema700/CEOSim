@@ -130,6 +130,9 @@ export function DashboardView() {
         </div>
       </section>
 
+      {/* ── Nächste Züge (kontextuelle Empfehlungen) ──────────────────── */}
+      <NextMovesPanel />
+
       {/* ── Offene Ereignisse (interaktiv) ────────────────────────────── */}
       {openEvents.length > 0 && (
         <section id="offene-ereignisse" className="rule-top pt-3.5">
@@ -232,7 +235,7 @@ export function DashboardView() {
           <div className="kicker mb-3">Die Kennzahlen · anklicken für Formel &amp; Definition</div>
           <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-8">
             {KPI_GRID.map((id) => (
-              <KpiCard key={id} id={id} value={kpis[id]} contextDe={contextFor(id)} />
+              <KpiCard key={id} id={id} value={kpis[id]} contextDe={contextFor(id)} history={state.history} />
             ))}
           </div>
         </section>
@@ -399,6 +402,66 @@ function sparkline(values: number[]): { points: string; lastX: number; lastY: nu
   const y = (v: number) => 172 - ((v - min) / range) * (172 - 24);
   const points = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(' ');
   return { points, lastX: x(n - 1), lastY: y(values[n - 1]!), min, max, deltaPct: values[0]! > 0 ? (values[n - 1]! / values[0]! - 1) * 100 : 0 };
+}
+
+interface Move { prio: number; icon: string; textDe: string; cta: string; go: () => void; tone: 'bad' | 'warn' | 'accent' | 'good' }
+
+/**
+ * „Nächste Züge": priorisierte Handlungsempfehlungen aus dem echten Zustand.
+ * Reduziert die „Was mache ich jetzt?"-Reibung, ohne dem Spieler die
+ * Entscheidung abzunehmen — jede Karte führt nur zur passenden Ansicht.
+ */
+function NextMovesPanel() {
+  const { state, setView } = useStore();
+  if (!state) return null;
+  const moves: Move[] = [];
+  const runway = runwayWeeks(state);
+  const churn = effectiveMonthlyChurn(state);
+  const push = (m: Move) => moves.push(m);
+
+  if (state.ceo.probation) push({ prio: 100, icon: '⚠️', tone: 'bad', textDe: `Bewährung bis Woche ${state.ceo.probation.endsWeek} — die Board-Ziele haben Vorrang vor allem anderen.`, cta: 'Ziele ansehen', go: () => setView('evaluations') });
+  if (state.finance.consecutiveMinCashBreachWeeks > 0) push({ prio: 95, icon: '🏦', tone: 'bad', textDe: `Covenant verletzt (${state.finance.consecutiveMinCashBreachWeeks}. Woche) — die Bank wird nervös. Liquidität sichern.`, cta: 'Finanzen', go: () => setView('finance') });
+  if (runway < 20) push({ prio: 90, icon: '⏳', tone: 'bad', textDe: `Runway nur ~${num(runway)} Wochen. Jetzt handeln: Fundraising, Kredit oder Kostenschnitt.`, cta: 'Entscheidungen', go: () => setView('decisions') });
+  else if (runway < 30) push({ prio: 60, icon: '⏳', tone: 'warn', textDe: `Runway unter 30 Wochen — aus der Stärke verhandeln, bevor es eng wird.`, cta: 'Fundraising', go: () => setView('strategy') });
+  if (churn > 0.035) push({ prio: 80, icon: '💧', tone: 'warn', textDe: `Logo-Churn bei ${pct(churn)}/Monat — das frisst am Neugeschäft. Der Hebel ist Kundenbindung (CS), nicht Marketing.`, cta: 'Entscheidungen', go: () => setView('decisions') });
+  if (state.labor.negotiation) push({ prio: 78, icon: '🤝', tone: 'warn', textDe: `Laufende Tarifrunde: Forderung +${(state.labor.negotiation.demandPct * 100).toFixed(1)} %. Ein Angebot ist fristgebunden.`, cta: 'Arbeitsbeziehungen', go: () => setView('team') });
+  if (state.ipo.status === 'eligible') push({ prio: 70, icon: '🔔', tone: 'good', textDe: 'Die Firma ist IPO-reif und börsenfähig — die Banken warten auf ein Mandat.', cta: 'Börse', go: () => setView('boerse') });
+  const needsAg = state.comms.messages.some((m) => m.templateId === 'ipo-needs-ag' && m.handledWeek === null) && state.legal.pendingConversion === null;
+  if (needsAg) push({ prio: 66, icon: '⚖️', tone: 'accent', textDe: 'IPO-reife Zahlen — aber die Rechtsform ist nicht börsenfähig. Der Formwechsel ist der nächste Schritt.', cta: 'Struktur', go: () => setView('structure') });
+  const unhappyKey = state.people.employees.find((e) => e.keyPerson && e.satisfaction < 50 && !e.equityGrant);
+  if (unhappyKey) push({ prio: 55, icon: '⭐', tone: 'warn', textDe: `${unhappyKey.firstName} ${unhappyKey.lastName} (Schlüsselperson) ist unzufrieden — Bindung über Optionen oder Gehalt lohnt sich, bevor sie geht.`, cta: 'Team', go: () => setView('team') });
+  if (state.product.techDebt > 62) push({ prio: 50, icon: '🧱', tone: 'warn', textDe: `Tech-Debt bei ${Math.round(state.product.techDebt)}/100 — Ausfallrisiko steigt. R&D-Allokation nachjustieren.`, cta: 'Produkt', go: () => setView('product') });
+
+  moves.sort((a, b) => b.prio - a.prio);
+  const top = moves.slice(0, 3);
+  const toneCls = { bad: 'border-bad text-bad', warn: 'border-warn text-warn', accent: 'border-accent text-accent', good: 'border-good text-good' };
+
+  if (top.length === 0) {
+    return (
+      <section className="rule-top pt-3.5">
+        <div className="kicker text-accent">Nächste Züge</div>
+        <p className="mt-2 max-w-[70ch] text-[14px] leading-[1.55] text-ink2">Ruhige Lage — keine Baustelle drängt. Die beste Zeit, offensiv zu werden: Wachstum forcieren, ein Projekt starten oder den nächsten strategischen Schritt vorbereiten, bevor das nächste Ereignis ihn erzwingt.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rule-top pt-3.5">
+      <div className="kicker text-ink">Nächste Züge · nach Dringlichkeit</div>
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+        {top.map((m, i) => (
+          <button key={i} onClick={m.go} className={`flex flex-col border-l-2 bg-panel p-3 text-left transition-colors hover:bg-panel2 ${toneCls[m.tone]}`} style={{ borderTopRightRadius: 2, borderBottomRightRadius: 2 }}>
+            <div className="flex items-baseline gap-2">
+              <span>{m.icon}</span>
+              <span className={`kicker text-[9px] ${toneCls[m.tone]}`}>{m.tone === 'bad' ? 'Dringend' : m.tone === 'warn' ? 'Bald' : 'Chance'}</span>
+            </div>
+            <p className="mt-1.5 flex-1 text-[13px] leading-[1.45] text-ink2">{m.textDe}</p>
+            <span className="edlink mt-2 self-start text-[12px]">{m.cta} →</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
 }
 
 /**

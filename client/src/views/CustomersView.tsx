@@ -1,6 +1,6 @@
 import { cohortMrr, keyAccountMrr, totalMrr } from '@boardroom/shared';
 import { useStore } from '../store.js';
-import { Bar, Panel, StatRow, scoreColor } from '../components/ui.js';
+import { Bar, KpiTrendDrill, Panel, StatRow, scoreColor } from '../components/ui.js';
 import { eur, num, pct } from '../format.js';
 
 /** Kunden: Segmente, Kohorten (Alter/Churn), Key-Accounts (rote Accounts!), Pipeline. */
@@ -13,6 +13,7 @@ export function CustomersView() {
 
   return (
     <div className="space-y-4">
+      <KpiTrendDrill id="customers-trend" title="Kunden, Bindung & Churn · Verlauf" history={state.history} series={[{ kpi: 'customers', label: 'Kunden', color: '#2f7f79' }, { kpi: 'nrr', label: 'NRR', color: '#2e8558' }, { kpi: 'logoChurnMonthly', label: 'Logo-Churn', color: '#c2453d' }]} />
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Übersicht">
           <StatRow label="MRR gesamt" value={eur(mrr) + '/M'} />
