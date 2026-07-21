@@ -177,6 +177,17 @@ export function DashboardView() {
         </section>
       )}
 
+      {/* ── Wettbewerber-Angriff-Alarm ────────────────────────────────── */}
+      {state.rivalry.status === 'active' && (
+        <section className="breaking border-2 border-bad bg-bad/5 px-4 py-3" style={{ borderRadius: 3 }}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="breaking-kicker kicker inline-flex items-center gap-1.5 px-1 text-bad"><Glyph e="⚔️" size={13} /> Wettbewerber-Angriff · {state.rivalry.attackerName}</span>
+            <button className="btn border-bad text-bad" onClick={() => useStore.getState().setRivalryOpen(true)}>Konter öffnen →</button>
+          </div>
+          <p className="mt-1 max-w-[70ch] text-[13px] leading-relaxed text-ink2">{state.rivalry.headlineDe} — Intensität {Math.round(state.rivalry.intensity)}/100. Mitgehen, differenzieren, aushalten oder zurückschlagen — sonst legt der Rivale nach.</p>
+        </section>
+      )}
+
       {/* ── Nächste Züge (kontextuelle Empfehlungen) ──────────────────── */}
       <NextMovesPanel />
 
@@ -485,6 +496,7 @@ function NextMovesPanel() {
   if (state.ceo.energy < 30) push({ prio: 63, icon: '🪫', tone: 'warn', textDe: `Deine Energie ist bei ${Math.round(state.ceo.energy)}/100 — Dauerlast kostet Urteilskraft. Auszeit oder mehr Delegation wäre klug.`, cta: 'CEO', go: () => setView('ceo') });
   if (state.takeover.status !== 'none') push({ prio: 99, icon: '🦈', tone: 'bad', textDe: `Feindliche Übernahme durch ${state.takeover.bidderName}: ${state.takeover.status === 'tender' ? 'ein Angebot liegt vor' : 'ein Bieter sammelt Anteile'}. Verteidigen oder zum Höchstpreis aussteigen.`, cta: 'Verteidigung', go: () => useStore.getState().setTakeoverOpen(true) });
   if (state.crisis.status === 'active') push({ prio: 98, icon: '🔥', tone: 'bad', textDe: `Öffentliche Krise (Stufe ${state.crisis.stage}): „${state.crisis.headlineDe}" — Schwere ${Math.round(state.crisis.severity)}/100. Jetzt reagieren, bevor der Sturm eskaliert.`, cta: 'Reaktion', go: () => useStore.getState().setCrisisOpen(true) });
+  if (state.rivalry.status === 'active') push({ prio: 97, icon: '⚔️', tone: 'bad', textDe: `Wettbewerber-Angriff von ${state.rivalry.attackerName}: ${state.rivalry.headlineDe} (Intensität ${Math.round(state.rivalry.intensity)}/100). Kontern, bevor der Rivale nachlegt.`, cta: 'Konter', go: () => useStore.getState().setRivalryOpen(true) });
 
   moves.sort((a, b) => b.prio - a.prio);
   const top = moves.slice(0, 3);

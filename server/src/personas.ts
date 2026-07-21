@@ -7,6 +7,7 @@ import {
   takeoverSummaryDe,
   crisisSummaryDe,
   macroSummaryDe,
+  rivalrySummaryDe,
   laborSummaryDe,
   legalSummaryDe,
   runwayWeeks,
@@ -61,6 +62,7 @@ export function stateBriefDe(state: CompanyState): string {
     ...(state.takeover.status !== 'none' ? [`⚠️ Übernahme: ${takeoverSummaryDe(state)}.`] : []),
     ...(state.crisis.status !== 'none' ? [`⚠️ Krise: ${crisisSummaryDe(state)}.`] : []),
     `Konjunktur: ${macroSummaryDe(state)}.`,
+    ...(state.rivalry.status !== 'none' ? [`⚔️ Wettbewerber-Angriff: ${rivalrySummaryDe(state)}.`] : []),
   ].join('\n');
 }
 

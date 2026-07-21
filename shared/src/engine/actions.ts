@@ -8,6 +8,7 @@ import { acceptanceShare, defendedTakeover, succeedTakeover } from './takeover.j
 import { respondCrisis } from './crisis.js';
 import { BOARD_MEETING_COOLDOWN, BOARD_MEETING_ENERGY, holdBoardMeeting } from './governance.js';
 import { restQuality } from './ceo.js';
+import { respondStrike } from './rivalry.js';
 import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
@@ -360,6 +361,14 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
 
     case 'CEO_PERSONAL_TIME': {
       if (action.kind === 'network' && f.cash < 4_000) errors.push('Zu wenig Liquidität fürs Netzwerken (~4 k€ für Events/Reisen).');
+      break;
+    }
+
+    case 'COUNTER_COMPETITOR': {
+      if (state.rivalry.status !== 'active') errors.push('Aktuell läuft kein Wettbewerber-Angriff.');
+      if (action.mode === 'match' && f.cash < 35_000) errors.push('Zu wenig Liquidität für eine Gegenkampagne (~35 k€).');
+      if (action.mode === 'counter' && f.cash < 25_000) errors.push('Zu wenig Liquidität für eine Gegenoffensive (~25 k€).');
+      if (action.mode === 'ignore') warnings.push('Aushalten spart Ressourcen — aber ohne Antwort kann der Angriff sich verschärfen.');
       break;
     }
   }
@@ -874,6 +883,18 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       }
       break;
     }
+    case 'COUNTER_COMPETITOR': {
+      const strikeOcc: Occurrence[] = [];
+      const attacker = state.rivalry.attackerName;
+      const modeLabel = action.mode === 'match' ? 'Mitgehen' : action.mode === 'differentiate' ? 'Differenzieren' : action.mode === 'ignore' ? 'Aushalten' : 'Gegenoffensive';
+      respondStrike(state, action.mode, strikeOcc);
+      summary = `Wettbewerber-Angriff (${attacker}): ${modeLabel}`;
+      analysis.push('Die Wirkung deines Konters hängt an Strategie & Vertrieb des CEO — und beim Differenzieren an der echten Produktstärke (NPS, wenig Tech-Debt).');
+      if (state.rivalry.status === 'none') analysis.push('Der Angriff ist abgewehrt — der Druck lässt nach.');
+      else analysis.push(`Der Angriff läuft weiter (Intensität ${Math.round(state.rivalry.intensity)}/100). Dranbleiben — ein einzelner Zug beendet ihn selten.`);
+      for (const o of strikeOcc) analysis.push(`${o.icon} ${o.textDe}`);
+      break;
+    }
     case 'DISTRIBUTE_DIVIDEND': {
       recordResolution(state, 'dividende', `Gewinnausschüttung ${fmt(action.amount)}`);
       schedule(state, 0, `Dividende W${week}`, decisionId, { kind: 'DIVIDEND_PAYOUT', amount: action.amount });
@@ -934,7 +955,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

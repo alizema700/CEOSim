@@ -25,6 +25,7 @@ import { LearnView } from './views/LearnView.js';
 import { LegacyModal } from './views/LegacyModal.js';
 import { TakeoverModal } from './views/TakeoverModal.js';
 import { CrisisModal } from './views/CrisisModal.js';
+import { RivalryModal } from './views/RivalryModal.js';
 import { Modal } from './components/ui.js';
 import { Icon } from './components/Icon.js';
 
@@ -64,6 +65,7 @@ export function App() {
       {view === 'settings' && <SettingsView />}
       <TakeoverModal />
       <CrisisModal />
+      <RivalryModal />
       <LegacyModal />
       <WeekReportModal />
       <BriefingModal />

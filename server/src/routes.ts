@@ -127,6 +127,7 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('CRISIS_RESPOND'), mode: z.enum(['apologize', 'defend', 'silent', 'investigate']) }),
   z.object({ type: z.literal('HOLD_BOARD_MEETING'), approach: z.enum(['data', 'vision', 'listen']) }),
   z.object({ type: z.literal('CEO_PERSONAL_TIME'), kind: z.enum(['sport', 'family', 'network']) }),
+  z.object({ type: z.literal('COUNTER_COMPETITOR'), mode: z.enum(['match', 'differentiate', 'ignore', 'counter']) }),
 ]);
 
 const zHypothesis = z

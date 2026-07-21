@@ -60,6 +60,9 @@ interface BoardroomStore {
   /** Krisen-Reaktions-Modal offen. */
   crisisOpen: boolean;
   setCrisisOpen: (open: boolean) => void;
+  /** Wettbewerber-Angriff-Modal offen. */
+  rivalryOpen: boolean;
+  setRivalryOpen: (open: boolean) => void;
   /** UI-Sprache (Chrome-Labels; Spielinhalte bleiben Deutsch). */
   lang: Locale;
   /** Hochgeladenes Logo (Data-URL) des offenen Spielstands. */
@@ -101,6 +104,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
   legacyOpen: false,
   takeoverOpen: false,
   crisisOpen: false,
+  rivalryOpen: false,
   lang: getLocale(),
   logoDataUrl: null,
   chatThread: null,
@@ -109,6 +113,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
   setLegacyOpen: (legacyOpen) => set({ legacyOpen }),
   setTakeoverOpen: (takeoverOpen) => set({ takeoverOpen }),
   setCrisisOpen: (crisisOpen) => set({ crisisOpen }),
+  setRivalryOpen: (rivalryOpen) => set({ rivalryOpen }),
   setLang: (lang) => {
     setLocale(lang);
     set({ lang });
@@ -146,7 +151,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
       ]);
       const latestBriefing = [...state.comms.messages].reverse().find((m) => m.kind === 'briefing');
       const briefingUnread = latestBriefing ? status[latestBriefing.id] === undefined : false;
-      set({ state, evaluations, reports, view: 'dashboard', lastDecision: null, messageStatus: status, showBriefing: briefingUnread, legacyOpen: false, takeoverOpen: false, crisisOpen: false });
+      set({ state, evaluations, reports, view: 'dashboard', lastDecision: null, messageStatus: status, showBriefing: briefingUnread, legacyOpen: false, takeoverOpen: false, crisisOpen: false, rivalryOpen: false });
     } catch (e) {
       set({ error: (e as Error).message });
     } finally {
@@ -204,6 +209,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
       if (state.meta.status !== 'active') set({ legacyOpen: true }); // Game Over ⇒ Bilanz (nach Wochenbericht)
       if (state.takeover.status === 'tender') set({ takeoverOpen: true }); // laufendes Angebot ⇒ Verteidigung
       if (state.crisis.status === 'active') set({ crisisOpen: true }); // akute Krise ⇒ Reaktion
+      if (state.rivalry.status === 'active') set({ rivalryOpen: true }); // Wettbewerber-Angriff ⇒ Konter
     } catch (e) {
       set({ error: (e as Error).message });
     } finally {
@@ -212,7 +218,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
   },
 
   leaveGame: () => {
-    set({ state: null, evaluations: [], reports: [], view: 'saves', weekReport: null, lastDecision: null, legacyOpen: false, takeoverOpen: false, crisisOpen: false });
+    set({ state: null, evaluations: [], reports: [], view: 'saves', weekReport: null, lastDecision: null, legacyOpen: false, takeoverOpen: false, crisisOpen: false, rivalryOpen: false });
     void get().loadGames();
   },
 }));

@@ -20,7 +20,7 @@ export type IconName =
   | 'leaf' | 'scissors' | 'handshake-break' | 'eye' | 'graduation'
   | 'droplet' | 'wall' | 'battery-low' | 'square' | 'check-square'
   | 'wrench' | 'diamond' | 'tag' | 'brain' | 'file' | 'image' | 'send' | 'dumbbell'
-  | 'magnet' | 'party';
+  | 'magnet' | 'party' | 'swords';
 
 /** Innerer SVG-Inhalt je Icon (24×24-Raster). `f` markiert gefüllte Formen. */
 const P: Record<IconName, { d?: string; extra?: string; f?: boolean }> = {
@@ -108,6 +108,7 @@ const P: Record<IconName, { d?: string; extra?: string; f?: boolean }> = {
   'dumbbell': { d: 'M6.5 8v8M9.5 6v12M14.5 6v12M17.5 8v8M9.5 12h5M3.5 10.5v3M20.5 10.5v3' },
   'magnet': { d: 'M6.5 4v8a5.5 5.5 0 0 0 11 0V4h-4v8a1.5 1.5 0 0 1-3 0V4zM6.5 8h4M13.5 8h4' },
   'party': { d: 'M3 21l5-13 9 9zM8 8l-.01.01M14 4c1 1 1 2.2 0 3.2M18 6c0 1.4 1 2 2.2 2M17.5 11c-1.2.4-1.8 1.4-1.4 2.6' },
+  'swords': { d: 'M5 19L17 5M19 19L7 5M3.2 17l3.8 3.8M20.8 17l-3.8 3.8M14.5 8l1.5-1.5M8 9.5L6.5 8' },
 };
 
 export function Icon({ name, size = 16, className, style, strokeWidth = 1.6 }: {
@@ -164,7 +165,7 @@ export const EMOJI_ICON: Record<string, IconName> = {
   '💪': 'dumbbell', '🧲': 'magnet', '🎉': 'party', '🎊': 'party', '🪦': 'skull', '💀': 'skull',
   '🌿': 'leaf', '🌊': 'droplet', '🎙️': 'mic', '👋': 'user', '🧯': 'shield', '🐣': 'leaf',
   '🦉': 'book', '🏔️': 'flag', '♟️': 'target', '♟': 'target', '📓': 'book',
-  '🟢': 'dot', '⚪': 'dot', '🟡': 'dot', '🧑‍⚖️': 'scale',
+  '🟢': 'dot', '⚪': 'dot', '🟡': 'dot', '🧑‍⚖️': 'scale', '⚔️': 'swords', '⚔': 'swords', '🗡️': 'swords',
 };
 
 /**

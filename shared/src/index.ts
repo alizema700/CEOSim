@@ -32,6 +32,7 @@ export * from './types/board.js';
 export * from './types/takeover.js';
 export * from './types/crisis.js';
 export * from './types/macro.js';
+export * from './types/rivalry.js';
 export * from './types/company.js';
 export * from './types/game.js';
 
@@ -66,6 +67,7 @@ export * from './engine/ceo.js';
 export * from './engine/takeover.js';
 export * from './engine/crisis.js';
 export * from './engine/macro.js';
+export * from './engine/rivalry.js';
 export * from './engine/legacy.js';
 
 // ── Kuratierte Daten (Phase 4) ───────────────────────────────────────

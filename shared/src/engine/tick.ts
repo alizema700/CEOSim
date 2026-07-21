@@ -45,6 +45,7 @@ import { tickGovernance } from './governance.js';
 import { tickCeo } from './ceo.js';
 import { tickTakeover } from './takeover.js';
 import { tickCrisis } from './crisis.js';
+import { tickRivalry } from './rivalry.js';
 import { tickMacro } from './macro.js';
 
 /**
@@ -127,6 +128,7 @@ export function closeWeek(state: CompanyState): WeekReport {
   tickGovernance(state, occurrences);
   tickTakeover(state, occurrences);
   tickCrisis(state, occurrences);
+  tickRivalry(state, occurrences);
 
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);

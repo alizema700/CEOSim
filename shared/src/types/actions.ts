@@ -48,6 +48,7 @@ export type PlayerAction =
   | CrisisRespondAction
   | HoldBoardMeetingAction
   | CeoPersonalTimeAction
+  | CounterCompetitorAction
   | StepDownAction;
 
 /**
@@ -381,6 +382,16 @@ export interface HoldBoardMeetingAction {
 export interface CeoPersonalTimeAction {
   type: 'CEO_PERSONAL_TIME';
   kind: 'sport' | 'family' | 'network';
+}
+
+/**
+ * Antwort auf einen Wettbewerber-Angriff (Phase 21): mitgehen (matchen),
+ * auf eigene Stärken setzen (differenzieren), aushalten (ignorieren) oder
+ * zurückschlagen (Gegenoffensive).
+ */
+export interface CounterCompetitorAction {
+  type: 'COUNTER_COMPETITOR';
+  mode: 'match' | 'differentiate' | 'ignore' | 'counter';
 }
 
 /**
