@@ -122,6 +122,7 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('CEO_REST') }),
   z.object({ type: z.literal('CEO_PUBLIC_APPEARANCE'), kind: z.enum(['interview', 'keynote', 'thought-leadership']) }),
   z.object({ type: z.literal('HIRE_COACH'), skill: z.enum(['finanzen', 'strategie', 'leadership', 'kommunikation', 'krisenmanagement', 'governance']) }),
+  z.object({ type: z.literal('STEP_DOWN') }),
 ]);
 
 const zHypothesis = z

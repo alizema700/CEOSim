@@ -70,7 +70,39 @@ export function CeoView() {
 
       {/* Kompetenzen & Coaching */}
       <CoachPanel />
+
+      {/* Amtszeit-Bilanz & Rücktritt */}
+      <TenurePanel />
     </div>
+  );
+}
+
+function TenurePanel() {
+  const { state, act, busy, setLegacyOpen } = useStore();
+  const [confirming, setConfirming] = useState(false);
+  if (!state) return null;
+  const active = state.meta.status === 'active';
+  return (
+    <section className="rule-top flex flex-wrap items-center justify-between gap-3 pt-3.5">
+      <div>
+        <div className="kicker text-ink">Amtszeit</div>
+        <p className="mt-0.5 max-w-[52ch] text-[11px] leading-relaxed text-dim">
+          Deine Amtszeit-Bilanz bewertet die ganze Zeit an der Spitze über sechs Dimensionen. Jederzeit als Vorschau — oder du schließt sie mit einem Rücktritt bewusst ab.
+        </p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button className="btn" onClick={() => setLegacyOpen(true)}>Amtszeit-Bilanz (Vorschau)</button>
+        {active && !confirming && <button className="btn border-bad text-bad" onClick={() => setConfirming(true)}>Zurücktreten …</button>}
+        {active && confirming && (
+          <>
+            <button className="btn" onClick={() => setConfirming(false)}>Abbrechen</button>
+            <button className="btn-primary" style={{ background: '#c2453d' }} disabled={busy} onClick={() => { setConfirming(false); void act({ type: 'STEP_DOWN' }, null); }}>
+              Rücktritt bestätigen (endgültig)
+            </button>
+          </>
+        )}
+      </div>
+    </section>
   );
 }
 

@@ -11,7 +11,7 @@ import { eur, num } from '../format.js';
  */
 
 export function Layout({ children }: { children: ReactNode }) {
-  const { state, view, setView, closeWeek, busy, leaveGame, messageStatus, logoDataUrl } = useStore();
+  const { state, view, setView, closeWeek, busy, leaveGame, messageStatus, logoDataUrl, setLegacyOpen } = useStore();
   useStore((s) => s.lang); // Re-Render bei Sprachwechsel
   if (!state) return <>{children}</>;
 
@@ -77,12 +77,13 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {/* ── Krisen-Aufmacher ─────────────────────────────────────────── */}
       {gameOver && (
-        <div className="flex items-baseline gap-4 border-b-2 border-bad bg-bad/5 px-5 py-2.5">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b-2 border-bad bg-bad/5 px-5 py-2.5">
           <span className="kicker text-bad">SPIELENDE</span>
           <span className="serif text-[19px] text-ink">{state.meta.endReasonDe}</span>
-          <button className="edlink ml-auto text-[13px]" style={{ color: '#c2453d', borderColor: '#c2453d' }} onClick={leaveGame}>
-            Zur Übersicht
-          </button>
+          <div className="ml-auto flex gap-4">
+            <button className="edlink text-[13px] text-accent" onClick={() => setLegacyOpen(true)}>Amtszeit-Bilanz</button>
+            <button className="edlink text-[13px]" style={{ color: '#c2453d', borderColor: '#c2453d' }} onClick={leaveGame}>Zur Übersicht</button>
+          </div>
         </div>
       )}
 

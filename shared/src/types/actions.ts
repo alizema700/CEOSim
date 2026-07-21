@@ -43,7 +43,8 @@ export type PlayerAction =
   | SetCeoFocusAction
   | CeoRestAction
   | CeoPublicAppearanceAction
-  | HireCoachAction;
+  | HireCoachAction
+  | StepDownAction;
 
 /**
  * Listenpreis ändern (± %). Sofort: Neugeschäfts-ARPA. Verzögert: Bestand wird
@@ -337,6 +338,14 @@ export interface CeoPublicAppearanceAction {
 export interface HireCoachAction {
   type: 'HIRE_COACH';
   skill: 'finanzen' | 'strategie' | 'leadership' | 'kommunikation' | 'krisenmanagement' | 'governance';
+}
+
+/**
+ * Rücktritt / Amtsende (Phase 13): Der CEO beendet die Amtszeit selbst und
+ * schließt sie mit der Legacy-Bilanz ab. Endgültig — das Spiel endet.
+ */
+export interface StepDownAction {
+  type: 'STEP_DOWN';
 }
 
 /** Ergebnis der Aktions-Validierung durch die Engine. */

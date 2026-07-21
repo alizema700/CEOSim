@@ -19,6 +19,7 @@ import { computeResolution, recordResolution } from './governance.js';
 import { ESOP_CLIFF_WEEKS, ESOP_VEST_WEEKS, esopUnallocated } from './equity.js';
 import { FOCUS_POINTS } from '../types/ceo.js';
 import { clamp } from '../types/common.js';
+import { computeLegacy } from './legacy.js';
 
 export { deptDe };
 
@@ -318,6 +319,11 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
     case 'HIRE_COACH': {
       if (state.ceo.coach && state.ceo.coach.skill === action.skill) errors.push('Genau dieses Coaching läuft bereits.');
       if (runwayWeeks(state) < 16) warnings.push('Coaching bei knappem Runway ist Luxus — der Aufsichtsrat könnte fragen.');
+      break;
+    }
+    case 'STEP_DOWN': {
+      if (state.meta.week < 4) warnings.push('So früh gibt es kaum eine Bilanz — ein Rücktritt jetzt bewertet vor allem den Startzustand.');
+      else warnings.push('Endgültig: Mit dem Rücktritt endet die Amtszeit und die Legacy-Bilanz wird festgeschrieben.');
       break;
     }
   }
@@ -725,6 +731,14 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       if (prev) analysis.push(`Wechsel vom bisherigen Schwerpunkt „${CEO_SKILL_LABELS[prev.skill]}".`);
       break;
     }
+    case 'STEP_DOWN': {
+      const legacy = computeLegacy(state);
+      state.meta.status = 'retired';
+      state.meta.endReasonDe = `Rücktritt nach ${week} Wochen — „${legacy.titleDe}" (Legacy-Score ${legacy.overall}/100, Note ${legacy.grade}). Die Amtszeit-Bilanz liegt vor.`;
+      summary = `Amtsende: Rücktritt als CEO nach ${week} Wochen`;
+      analysis.push('Du schließt deine Amtszeit selbst ab. Die vollständige Amtszeit-Bilanz bewertet Unternehmenswert, Kapitaleffizienz, Kunden, Menschen, Governance und dein persönliches Erbe.');
+      break;
+    }
     case 'DISTRIBUTE_DIVIDEND': {
       recordResolution(state, 'dividende', `Gewinnausschüttung ${fmt(action.amount)}`);
       schedule(state, 0, `Dividende W${week}`, decisionId, { kind: 'DIVIDEND_PAYOUT', amount: action.amount });
@@ -785,7 +799,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

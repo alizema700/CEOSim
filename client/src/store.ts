@@ -51,6 +51,9 @@ interface BoardroomStore {
   /** Lese-/Archiv-Status je Nachricht (DB-Overlay, nicht Teil des Engine-States). */
   messageStatus: Record<string, string>;
   showBriefing: boolean;
+  /** Amtszeit-Bilanz (Legacy-Report) offen — bei Spielende oder als Vorschau. */
+  legacyOpen: boolean;
+  setLegacyOpen: (open: boolean) => void;
   /** UI-Sprache (Chrome-Labels; Spielinhalte bleiben Deutsch). */
   lang: Locale;
   /** Hochgeladenes Logo (Data-URL) des offenen Spielstands. */
@@ -89,11 +92,13 @@ export const useStore = create<BoardroomStore>((set, get) => ({
   hypothesisMode: true,
   messageStatus: {},
   showBriefing: false,
+  legacyOpen: false,
   lang: getLocale(),
   logoDataUrl: null,
   chatThread: null,
 
   openChatWith: (chatThread) => set({ chatThread, view: 'chat' }),
+  setLegacyOpen: (legacyOpen) => set({ legacyOpen }),
   setLang: (lang) => {
     setLocale(lang);
     set({ lang });
@@ -131,7 +136,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
       ]);
       const latestBriefing = [...state.comms.messages].reverse().find((m) => m.kind === 'briefing');
       const briefingUnread = latestBriefing ? status[latestBriefing.id] === undefined : false;
-      set({ state, evaluations, reports, view: 'dashboard', lastDecision: null, messageStatus: status, showBriefing: briefingUnread });
+      set({ state, evaluations, reports, view: 'dashboard', lastDecision: null, messageStatus: status, showBriefing: briefingUnread, legacyOpen: false });
     } catch (e) {
       set({ error: (e as Error).message });
     } finally {
@@ -164,6 +169,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
     try {
       const { record, state } = await api.act(s.meta.gameId, action, hypothesis);
       set({ state, lastDecision: record });
+      if (state.meta.status !== 'active') set({ legacyOpen: true }); // Amtsende ⇒ Bilanz
       return record;
     } catch (e) {
       set({ error: (e as Error).message });
@@ -185,6 +191,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
         reports: [...prev.reports, report],
         evaluations: [...prev.evaluations, ...evaluations],
       }));
+      if (state.meta.status !== 'active') set({ legacyOpen: true }); // Game Over ⇒ Bilanz (nach Wochenbericht)
     } catch (e) {
       set({ error: (e as Error).message });
     } finally {
@@ -193,7 +200,7 @@ export const useStore = create<BoardroomStore>((set, get) => ({
   },
 
   leaveGame: () => {
-    set({ state: null, evaluations: [], reports: [], view: 'saves', weekReport: null, lastDecision: null });
+    set({ state: null, evaluations: [], reports: [], view: 'saves', weekReport: null, lastDecision: null, legacyOpen: false });
     void get().loadGames();
   },
 }));
