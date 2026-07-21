@@ -125,6 +125,27 @@ body::after {
   font-family: var(--font-serif);
   font-weight: 400;
   letter-spacing: 0.005em;
+  text-wrap: balance; /* ausgewogene Zeilenumbrüche in Schlagzeilen */
+}
+
+/* Fließtext-Absätze: „pretty" verhindert Schusterjungen/Hurenkinder. */
+.prose,
+.lede {
+  text-wrap: pretty;
+}
+.lede {
+  hanging-punctuation: first;
+}
+
+/* Redaktionelle Zwischenüberschrift (kleine Serife, gesperrt). */
+.subhead {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  color: var(--color-ink);
+  border-bottom: 1px solid var(--color-line);
+  padding-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 /* Redaktionelle Rubrik-Regel (2 px Tinte oben). */
