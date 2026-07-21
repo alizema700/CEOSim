@@ -70,7 +70,7 @@ export function DashboardView() {
           {briefing && (
             <>
               <div className="kicker mt-4">Von {state.people.assistant.name}, Assistenz · Woche {state.meta.week}</div>
-              <p className="mt-3.5 max-w-[58ch] text-[15px] leading-[1.6] text-ink2">{lede(briefing.bodyDe)}</p>
+              <p className="dropcap mt-3.5 max-w-[58ch] text-[15px] leading-[1.6] text-ink2">{lede(briefing.bodyDe)}</p>
             </>
           )}
           <div className="mt-5 flex flex-wrap gap-4">

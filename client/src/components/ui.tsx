@@ -76,6 +76,16 @@ export function KpiCard({ id, value, contextDe, history }: { id: KpiId; value: n
   );
 }
 
+/** Herausgehobenes Zitat im Feuilleton-Stil (große Serife, hängendes „). */
+export function PullQuote({ children, cite }: { children: ReactNode; cite?: string }) {
+  return (
+    <figure className="my-4 border-y border-line py-3">
+      <blockquote className="pullquote">{children}</blockquote>
+      {cite && <figcaption className="kicker mt-2 text-dim">— {cite}</figcaption>}
+    </figure>
+  );
+}
+
 export function StatRow({ label, value, hint }: { label: string; value: ReactNode; hint?: string }) {
   return (
     <div className="flex items-baseline justify-between gap-2 border-b border-line py-1.5 last:border-0">

@@ -1,6 +1,6 @@
 import { computeLegacy } from '@boardroom/shared';
 import { useStore } from '../store.js';
-import { Bar, GradeBadge, Modal, scoreColor } from '../components/ui.js';
+import { Bar, GradeBadge, Modal, PullQuote, scoreColor } from '../components/ui.js';
 import { eur } from '../format.js';
 
 /**
@@ -40,12 +40,15 @@ export function LegacyModal() {
         ))}
       </div>
 
-      {/* Urteil */}
-      <div className="mt-4 border-l-2 border-accent bg-panel2 px-3 py-2.5">
-        {r.verdictDe.map((v, i) => (
-          <p key={i} className={`text-[12.5px] leading-relaxed ${i === 0 ? 'font-semibold text-ink' : 'text-ink2'}`}>{v}</p>
-        ))}
-      </div>
+      {/* Urteil — die erste Zeile als herausgehobenes Zitat */}
+      {r.verdictDe.length > 0 && (
+        <div className="mt-4">
+          <PullQuote>{r.verdictDe[0]}</PullQuote>
+          {r.verdictDe.slice(1).map((v, i) => (
+            <p key={i} className="mt-1.5 text-[12.5px] leading-relaxed text-ink2">{v}</p>
+          ))}
+        </div>
+      )}
 
       {/* Arc + Meilensteine */}
       <div className="mt-4 grid gap-6 md:grid-cols-2">
