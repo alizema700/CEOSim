@@ -47,6 +47,7 @@ export type PlayerAction =
   | TakeoverRespondAction
   | CrisisRespondAction
   | HoldBoardMeetingAction
+  | CeoPersonalTimeAction
   | StepDownAction;
 
 /**
@@ -370,6 +371,16 @@ export interface CrisisRespondAction {
 export interface HoldBoardMeetingAction {
   type: 'HOLD_BOARD_MEETING';
   approach: 'data' | 'vision' | 'listen';
+}
+
+/**
+ * Privatzeit des CEO (Phase 23): in Gesundheit (Sport), Beziehungen (Familie)
+ * oder das berufliche Netzwerk investieren. Gesundheit & Work-Life bestimmen die
+ * Erholung; das Netzwerk öffnet Türen (u. a. einen Mentor).
+ */
+export interface CeoPersonalTimeAction {
+  type: 'CEO_PERSONAL_TIME';
+  kind: 'sport' | 'family' | 'network';
 }
 
 /**

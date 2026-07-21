@@ -1,4 +1,4 @@
-import { balancedFocus, buildInitialBoard, fnv1a, generateMaTargets, initialCrisisState, initialMacroState, initialIpoState, initialLaborState, initialLegalState, initialTakeoverState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
+import { balancedFocus, initialCeoPersonal, buildInitialBoard, fnv1a, generateMaTargets, initialCrisisState, initialMacroState, initialIpoState, initialLaborState, initialLegalState, initialTakeoverState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
 
 /**
  * Sanfte Snapshot-Migration: füllt Felder auf, die neuere Engine-Versionen
@@ -67,5 +67,6 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   if (!s.crisis) s.crisis = initialCrisisState();
   if (!s.macro) s.macro = initialMacroState();
   if (s.board && s.board.lastMeetingWeek === undefined) { s.board.lastMeetingWeek = -99; s.board.lastMeeting = null; }
+  if (s.ceo && !s.ceo.personal) s.ceo.personal = initialCeoPersonal();
   return state;
 }

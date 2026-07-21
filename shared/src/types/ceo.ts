@@ -31,6 +31,29 @@ export interface CeoState {
   coach: CeoCoach | null;
   /** Protokoll öffentlicher Auftritte (Interviews, Keynotes). */
   publicLog: CeoPublicEvent[];
+  /** ── Privatleben & Netzwerk (Phase 23) ── */
+  personal: CeoPersonal;
+}
+
+/**
+ * Der ganze Mensch (Phase 23): Gesundheit, Work-Life-Balance und berufliches
+ * Netzwerk. Driftet passiv mit Energie & Arbeitslast; gezielt investierbar.
+ * Wirkt auf die Erholung (Auszeit) und die Wirksamkeit öffentlicher Auftritte —
+ * greift aber bewusst NICHT in den Wochentick der Kern-KPIs ein.
+ */
+export interface CeoPersonal {
+  /** Körperliche & mentale Gesundheit 0..100. */
+  health: Score;
+  /** Work-Life-Balance 0..100 (Dauerlast drückt sie). */
+  workLife: Score;
+  /** Berufliches Netzwerk 0..100 (Türöffner, verfällt ohne Pflege). */
+  network: Score;
+  /** Optionaler Mentor (aus dem Netzwerk). */
+  mentorDe: string | null;
+}
+
+export function initialCeoPersonal(): CeoPersonal {
+  return { health: 78, workLife: 66, network: 42, mentorDe: null };
 }
 
 /**

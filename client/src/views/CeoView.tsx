@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { balancedFocus, ceoNetWorth, FOCUS_POINTS, type CeoFocus } from '@boardroom/shared';
 import { useStore } from '../store.js';
-import { Bar, Drill, Panel } from '../components/ui.js';
+import { Bar, Drill, Panel, scoreColor } from '../components/ui.js';
 import { Icon, type IconName } from '../components/Icon.js';
 import { eur, num, pct } from '../format.js';
 
@@ -66,6 +66,9 @@ export function CeoView() {
       {/* Wochenfokus */}
       <FocusPanel />
 
+      {/* Privatleben & Netzwerk */}
+      <PersonalPanel />
+
       {/* Öffentliche Rolle */}
       <PublicPanel />
 
@@ -75,6 +78,66 @@ export function CeoView() {
       {/* Amtszeit-Bilanz & Rücktritt */}
       <TenurePanel />
     </div>
+  );
+}
+
+/** Privatleben & Netzwerk (Phase 23): Gesundheit, Work-Life, Netzwerk + Mentor. */
+function PersonalPanel() {
+  const { state, act, busy } = useStore();
+  if (!state) return null;
+  const p = state.ceo.personal;
+  const active = state.meta.status === 'active';
+  const rows: { label: string; v: number; hintDe: string }[] = [
+    { label: 'Gesundheit', v: p.health, hintDe: 'Bestimmt, wie viel Energie eine Auszeit zurückgibt.' },
+    { label: 'Work-Life-Balance', v: p.workLife, hintDe: 'Hält dich über die lange Amtszeit stabil.' },
+    { label: 'Netzwerk', v: p.network, hintDe: 'Türöffner für Talent, Kapital & Rat — verfällt ohne Pflege.' },
+  ];
+  const acts: { kind: 'sport' | 'family' | 'network'; icon: IconName; label: string; note: string }[] = [
+    { kind: 'sport', icon: 'heart-pulse', label: 'Sport & Gesundheit', note: '+ Gesundheit' },
+    { kind: 'family', icon: 'leaf', label: 'Familie & Freunde', note: '+ Work-Life' },
+    { kind: 'network', icon: 'users', label: 'Netzwerk pflegen', note: '+ Netzwerk · ~4 k€' },
+  ];
+  return (
+    <Panel icon="heart-pulse" title="Privatleben & Netzwerk">
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="space-y-2.5">
+          {rows.map((r) => (
+            <div key={r.label} className="text-xs">
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-ink2">{r.label}</span>
+                <span className="num">{Math.round(r.v)}</span>
+              </div>
+              <div className="mt-0.5"><Bar value={r.v} color={scoreColor(r.v)} /></div>
+              <div className="mt-0.5 text-[10px] leading-tight text-dim">{r.hintDe}</div>
+            </div>
+          ))}
+          {p.mentorDe && (
+            <div className="mt-1 flex items-start gap-1.5 border-l-2 border-accent bg-panel2 px-2.5 py-1.5 text-[11px] text-ink2">
+              <Icon name="star" size={12} className="mt-0.5 shrink-0 text-accent" />
+              <span>Mentor: Du wirst von {p.mentorDe} begleitet — ein Sparringspartner fürs große Bild.</span>
+            </div>
+          )}
+        </div>
+        <div>
+          <div className="kicker mb-2 text-[9px]">Privatzeit investieren</div>
+          <div className="space-y-2">
+            {acts.map((a) => (
+              <button
+                key={a.kind}
+                className="flex w-full items-center justify-between border border-line p-2.5 text-left transition-colors hover:border-accent disabled:opacity-45"
+                style={{ borderRadius: 2 }}
+                disabled={busy || !active}
+                onClick={() => void act({ type: 'CEO_PERSONAL_TIME', kind: a.kind }, null)}
+              >
+                <span className="flex items-center gap-1.5 text-[13px] text-ink"><Icon name={a.icon} size={15} /> {a.label}</span>
+                <span className="num text-[10px] text-dim">{a.note}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[10px] leading-relaxed text-dim">Die Person hinter dem Amt ist keine Nebensache: Ausgeruht und gut vernetzt triffst du bessere Entscheidungen — und hältst länger durch.</p>
+        </div>
+      </div>
+    </Panel>
   );
 }
 

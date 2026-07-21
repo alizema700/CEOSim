@@ -22,6 +22,7 @@ import { balancedFocus } from '../types/ceo.js';
 import { initialTakeoverState } from '../types/takeover.js';
 import { initialCrisisState } from '../types/crisis.js';
 import { initialMacroState } from '../types/macro.js';
+import { initialCeoPersonal } from '../types/ceo.js';
 import { initialLegalState } from './legal.js';
 import { buildInitialBoard } from './governance.js';
 import { ESOP_CLIFF_WEEKS, ESOP_VEST_WEEKS, defaultGrantPercent } from './equity.js';
@@ -382,6 +383,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
       personalNetCash: 0,
       coach: null,
       publicLog: [],
+      personal: initialCeoPersonal(),
     },
     scheduledEffects: [],
     activeModifiers: [],

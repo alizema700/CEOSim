@@ -7,6 +7,7 @@ import { computeKpis, computeValuation } from './kpis.js';
 import { acceptanceShare, defendedTakeover, succeedTakeover } from './takeover.js';
 import { respondCrisis } from './crisis.js';
 import { BOARD_MEETING_COOLDOWN, BOARD_MEETING_ENERGY, holdBoardMeeting } from './governance.js';
+import { restQuality } from './ceo.js';
 import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
@@ -354,6 +355,11 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       const since = state.meta.week - state.board.lastMeetingWeek;
       if (since < BOARD_MEETING_COOLDOWN) errors.push(`Zu früh für die nächste Sitzung — noch ${BOARD_MEETING_COOLDOWN - since} Woche(n) Sperre.`);
       if (state.ceo.energy < BOARD_MEETING_ENERGY) errors.push(`Zu wenig Energie (${Math.round(state.ceo.energy)}/100) für eine überzeugende Sitzung.`);
+      break;
+    }
+
+    case 'CEO_PERSONAL_TIME': {
+      if (action.kind === 'network' && f.cash < 4_000) errors.push('Zu wenig Liquidität fürs Netzwerken (~4 k€ für Events/Reisen).');
       break;
     }
   }
@@ -719,7 +725,8 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     }
     case 'CEO_REST': {
       const before = state.ceo.energy;
-      state.ceo.energy = Math.min(100, state.ceo.energy + 28);
+      const gain = Math.round(28 * restQuality(state)); // Gesundheit & Work-Life bestimmen die Erholung
+      state.ceo.energy = Math.min(100, state.ceo.energy + gain);
       if (before > 70) {
         state.ceo.boardTrust = Math.max(0, state.ceo.boardTrust - 1);
         state.ceo.trustLog.push({ week, delta: -1, reasonDe: 'CEO nimmt sich bei hoher Energie eine Auszeit — das Board registriert die Abwesenheit.' });
@@ -840,6 +847,33 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       for (const r of rec.reactions) analysis.push(`${r.name} (${r.affiliationDe}): ${r.moodDe} (${r.delta >= 0 ? '+' : ''}${r.delta}).`);
       break;
     }
+    case 'CEO_PERSONAL_TIME': {
+      const p = state.ceo.personal;
+      if (action.kind === 'sport') {
+        p.health = clamp(p.health + 14, 0, 100);
+        summary = `Privatzeit: Sport & Gesundheit — Gesundheit ${Math.round(p.health)}/100`;
+        analysis.push('Bewegung und Schlaf zahlen sich aus: Gesundheit hebt die Wirkung deiner Auszeiten (mehr Energie pro Erholung) und beugt Burnout vor.');
+      } else if (action.kind === 'family') {
+        p.workLife = clamp(p.workLife + 16, 0, 100);
+        summary = `Privatzeit: Familie & Freunde — Work-Life ${Math.round(p.workLife)}/100`;
+        analysis.push('Zeit mit den Menschen, die zählen: Eine bessere Work-Life-Balance macht Erholung wirksamer und hält dich über die lange Amtszeit stabil.');
+      } else {
+        schedule(state, 0, `Netzwerken W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: 4_000, labelDe: 'Netzwerk-Events & Reisen (CEO)' });
+        p.network = clamp(p.network + 14, 0, 100);
+        state.reputation.laborMarket = clamp(state.reputation.laborMarket + 1, 0, 100);
+        // Ab starkem Netzwerk öffnet sich einmalig ein Mentor.
+        if (p.mentorDe === null && p.network >= 62) {
+          const rng = stream(state.meta.seed, 'ceo-mentor', week);
+          const mentors = ['einer erfahrenen Ex-Vorständin', 'einem seriellen Gründer', 'einer Aufsichtsrats-Veteranin'];
+          p.mentorDe = mentors[Math.floor(rng() * mentors.length)] ?? mentors[0]!;
+          state.ceo.skills.strategie = clamp(state.ceo.skills.strategie + 3, 0, 100);
+          analysis.push(`Aus dem Netzwerk wird ein Mentor: Du gewinnst ${p.mentorDe} als Sparringspartner (+Strategie).`);
+        }
+        summary = `Privatzeit: Netzwerk pflegen — Netzwerk ${Math.round(p.network)}/100`;
+        analysis.push('Beziehungen sind Türöffner: Ein starkes Netzwerk bringt Talent, Kapitalzugänge und Rat — und senkt das Risiko von Fettnäpfchen bei öffentlichen Auftritten.');
+      }
+      break;
+    }
     case 'DISTRIBUTE_DIVIDEND': {
       recordResolution(state, 'dividende', `Gewinnausschüttung ${fmt(action.amount)}`);
       schedule(state, 0, `Dividende W${week}`, decisionId, { kind: 'DIVIDEND_PAYOUT', amount: action.amount });
@@ -900,7 +934,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

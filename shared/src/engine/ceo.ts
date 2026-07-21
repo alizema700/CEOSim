@@ -76,6 +76,28 @@ export function tickCeo(state: CompanyState, occ: Occurrence[]): void {
   if (ceo.coach) {
     ceo.skills[ceo.coach.skill] = clamp(ceo.skills[ceo.coach.skill] + 0.25 * (ceo.energy / ENERGY_BASELINE), 0, 100);
   }
+
+  // 5) Privatleben & Netzwerk driften passiv (Golden-Master-sicher: schreibt
+  //    NUR personal.*, greift nicht in Energie/Vertrauen/KPIs ein).
+  tickCeoPersonal(state);
+}
+
+/** Passive Drift von Gesundheit, Work-Life-Balance & Netzwerk. */
+export function tickCeoPersonal(state: CompanyState): void {
+  const p = state.ceo.personal;
+  const energy = state.ceo.energy;
+  const openLoad = state.openEvents.filter((e) => e.status === 'open').length;
+  const healthTarget = clamp(52 + energy * 0.38, 20, 96); // niedrige Energie zieht Gesundheit
+  const wlTarget = clamp(74 - focusIntensity(state.ceo.focus) * 26 - openLoad * 4, 15, 90);
+  p.health = clamp(p.health + (healthTarget - p.health) * 0.06, 0, 100);
+  p.workLife = clamp(p.workLife + (wlTarget - p.workLife) * 0.06, 0, 100);
+  p.network = clamp(p.network + (36 - p.network) * 0.02, 0, 100); // verfällt ohne Pflege
+}
+
+/** Erholungs-Multiplikator aus Gesundheit & Work-Life (für die Auszeit). */
+export function restQuality(state: CompanyState): number {
+  const p = state.ceo.personal;
+  return clamp(0.7 + (p.health + p.workLife) / 400, 0.7, 1.35);
 }
 
 function applyFocusModifiers(state: CompanyState): void {
