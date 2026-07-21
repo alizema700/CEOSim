@@ -9,6 +9,8 @@ import { respondCrisis } from './crisis.js';
 import { BOARD_MEETING_COOLDOWN, BOARD_MEETING_ENERGY, holdBoardMeeting } from './governance.js';
 import { restQuality } from './ceo.js';
 import { respondStrike } from './rivalry.js';
+import { doLobby } from './politics.js';
+import { LOBBY_COST, LOBBY_LABELS } from '../types/politics.js';
 import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
@@ -382,6 +384,12 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       const held = state.ceo.portfolio[action.instrument];
       if (action.amount <= 0) errors.push('Betrag muss positiv sein.');
       if (action.amount > held) errors.push(`So viel ist in diesem Instrument nicht angelegt (aktuell ${fmt(held)}).`);
+      break;
+    }
+
+    case 'LOBBY': {
+      if (f.cash < LOBBY_COST[action.focus]) errors.push(`Zu wenig Liquidität fürs Lobbying (${fmt(LOBBY_COST[action.focus])}).`);
+      if (state.politics.exposure > 55) warnings.push('Hohes Skandal-Risiko: Weiteres aggressives Lobbying kann als Affäre auffliegen (Presse/Investoren).');
       break;
     }
   }
@@ -925,6 +933,15 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push('Der aktuelle Marktwert fließt auf dein Netto-Cash zurück — Gewinne (oder Verluste) sind damit realisiert.');
       break;
     }
+    case 'LOBBY': {
+      const lobbyOcc: Occurrence[] = [];
+      const res = doLobby(state, action.focus, lobbyOcc, decisionId);
+      summary = res.summaryDe;
+      analysis.push(`Lobbying-Schwerpunkt „${LOBBY_LABELS[action.focus]}". Politisches Kapital wächst mit deiner Governance-Kompetenz und schaltet ab Schwellen echte Vorteile frei — gegen ein steigendes Skandal-Risiko.`);
+      for (const n of res.notesDe) analysis.push(n);
+      for (const o of lobbyOcc) analysis.push(`${o.icon} ${o.textDe}`);
+      break;
+    }
     case 'DISTRIBUTE_DIVIDEND': {
       recordResolution(state, 'dividende', `Gewinnausschüttung ${fmt(action.amount)}`);
       schedule(state, 0, `Dividende W${week}`, decisionId, { kind: 'DIVIDEND_PAYOUT', amount: action.amount });
@@ -985,7 +1002,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

@@ -46,6 +46,7 @@ import { tickCeo } from './ceo.js';
 import { tickTakeover } from './takeover.js';
 import { tickCrisis } from './crisis.js';
 import { tickRivalry } from './rivalry.js';
+import { politicsTaxRelief, tickPolitics } from './politics.js';
 import { tickMacro } from './macro.js';
 
 /**
@@ -129,6 +130,7 @@ export function closeWeek(state: CompanyState): WeekReport {
   tickTakeover(state, occurrences);
   tickCrisis(state, occurrences);
   tickRivalry(state, occurrences);
+  tickPolitics(state, occurrences);
 
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);
@@ -740,7 +742,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   // Deutsche Kapitalgesellschaft: KSt + Soli + Gewerbesteuer (Hebesatz je Stadt);
   // ausländische Standorte behalten ihren pauschalen Satz.
   const loc = locationOf(state);
-  const taxRate = effectiveCorporateTaxRate(state.legal, loc.country, loc.taxRate);
+  const taxRate = Math.max(0, effectiveCorporateTaxRate(state.legal, loc.country, loc.taxRate) - politicsTaxRelief(state));
   const tax = ebt > 0 && f.retainedEarnings > 0 ? ebt * taxRate : 0;
   ledger.taxPaid = tax;
   const netIncome = ebt - tax;

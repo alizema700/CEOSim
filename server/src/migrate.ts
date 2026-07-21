@@ -1,4 +1,4 @@
-import { balancedFocus, initialCeoPersonal, initialCeoPortfolio, buildInitialBoard, fnv1a, generateMaTargets, initialCompetitorStrikeState, initialCrisisState, initialMacroState, initialIpoState, initialLaborState, initialLegalState, initialTakeoverState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
+import { balancedFocus, initialCeoPersonal, initialCeoPortfolio, buildInitialBoard, fnv1a, generateMaTargets, initialCompetitorStrikeState, initialCrisisState, initialPoliticsState, initialMacroState, initialIpoState, initialLaborState, initialLegalState, initialTakeoverState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
 
 /**
  * Sanfte Snapshot-Migration: füllt Felder auf, die neuere Engine-Versionen
@@ -67,6 +67,7 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   if (!s.crisis) s.crisis = initialCrisisState();
   if (!s.macro) s.macro = initialMacroState();
   if (!s.rivalry) s.rivalry = initialCompetitorStrikeState();
+  if (!s.politics) s.politics = initialPoliticsState();
   if (s.macro && (s.macro as { inflationPct?: number }).inflationPct === undefined) { (s.macro as { inflationPct: number }).inflationPct = 2.0; (s.macro as { capitalIndex: number }).capitalIndex = 100; }
   if (s.board && s.board.lastMeetingWeek === undefined) { s.board.lastMeetingWeek = -99; s.board.lastMeeting = null; }
   if (s.ceo && !s.ceo.personal) s.ceo.personal = initialCeoPersonal();

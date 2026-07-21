@@ -51,6 +51,7 @@ export type PlayerAction =
   | CounterCompetitorAction
   | CeoInvestAction
   | CeoDivestAction
+  | LobbyAction
   | StepDownAction;
 
 /**
@@ -411,6 +412,15 @@ export interface CeoDivestAction {
   type: 'CEO_DIVEST';
   instrument: InvestInstrument;
   amount: number;
+}
+
+/**
+ * Lobbying (Phase 22): politisches Kapital aufbauen — für Steuerpolitik,
+ * Fördermittel oder Zugang/Netzwerk. Gegen Skandal-Risiko.
+ */
+export interface LobbyAction {
+  type: 'LOBBY';
+  focus: 'steuern' | 'subvention' | 'zugang';
 }
 
 /**

@@ -75,6 +75,7 @@ export interface CompanyState {
   crisis: import('./crisis.js').CrisisState;
   macro: import('./macro.js').MacroState;
   rivalry: import('./rivalry.js').CompetitorStrikeState;
+  politics: import('./politics.js').PoliticsState;
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];

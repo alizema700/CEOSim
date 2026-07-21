@@ -8,6 +8,7 @@ import {
   crisisSummaryDe,
   macroSummaryDe,
   rivalrySummaryDe,
+  politicsSummaryDe,
   laborSummaryDe,
   legalSummaryDe,
   runwayWeeks,
@@ -63,6 +64,7 @@ export function stateBriefDe(state: CompanyState): string {
     ...(state.crisis.status !== 'none' ? [`⚠️ Krise: ${crisisSummaryDe(state)}.`] : []),
     `Konjunktur: ${macroSummaryDe(state)}.`,
     ...(state.rivalry.status !== 'none' ? [`⚔️ Wettbewerber-Angriff: ${rivalrySummaryDe(state)}.`] : []),
+    ...(state.politics.politicalCapital > 8 || state.politics.exposure > 0 ? [`Politik & Lobbyismus: ${politicsSummaryDe(state)}.`] : []),
   ].join('\n');
 }
 

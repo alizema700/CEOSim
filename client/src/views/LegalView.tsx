@@ -1,7 +1,9 @@
-import { EVENT_CARDS } from '@boardroom/shared';
+import { EVENT_CARDS, LOBBY_COST, LOBBY_LABELS } from '@boardroom/shared';
+import type { LobbyFocus } from '@boardroom/shared';
 import { useStore } from '../store.js';
-import { Panel } from '../components/ui.js';
-import { Icon } from '../components/Icon.js';
+import { Panel, Bar } from '../components/ui.js';
+import { Icon, type IconName } from '../components/Icon.js';
+import { eur } from '../format.js';
 import { ThreadPane } from './ChatView.js';
 
 /**
@@ -30,6 +32,8 @@ export function LegalView() {
         </div>
 
         <div className="w-80 shrink-0 space-y-3 overflow-y-auto">
+          <LobbyPanel />
+
           <Panel title="Laufende Fälle & Vorgänge">
             {cases.length === 0 ? (
               <p className="text-xs text-dim">Keine rechtlich relevanten Vorgänge. Genieße die Ruhe.</p>
@@ -74,5 +78,92 @@ export function LegalView() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Politik & Lobbyismus (Phase 22): politisches Kapital aufbauen, um
+ * Steuererleichterung / Fördermittel / Zugang freizuschalten — gegen ein
+ * wachsendes Skandal-Risiko. Der Erfolg hängt an deiner Governance-Kompetenz.
+ */
+function LobbyPanel() {
+  const { state, act, busy } = useStore();
+  if (!state) return null;
+  const pol = state.politics;
+  const active = state.meta.status === 'active';
+  const cash = state.finance.cash;
+  const cap = Math.round(pol.politicalCapital);
+  const exp = Math.round(pol.exposure);
+
+  const foci: { key: LobbyFocus; icon: IconName; hintDe: string; thresholdDe: string }[] = [
+    { key: 'steuern', icon: 'scale', hintDe: 'Senkt ab genug Einfluss den effektiven Steuersatz dauerhaft um 3 Pp.', thresholdDe: 'ab Kapital 55' },
+    { key: 'subvention', icon: 'bank', hintDe: 'Erwirkt ab genug Einfluss einen einmaligen Fördermittel-Zuschuss.', thresholdDe: 'ab Kapital 45' },
+    { key: 'zugang', icon: 'users', hintDe: 'Beziehungspflege: Kapital rauf, Angriffsfläche runter — die Basis.', thresholdDe: 'diskret' },
+  ];
+
+  return (
+    <Panel icon="scale" title="Politik & Lobbyismus">
+      <p className="mb-2 max-w-[42ch] text-[10.5px] leading-relaxed text-dim">
+        Baue politisches Kapital auf — es schaltet ab Schwellen Steuererleichterung, Fördermittel und Zugang frei. Aggressives Lobbying erhöht aber das Skandal-Risiko.
+      </p>
+
+      <div className="mb-1 flex items-center justify-between text-[10px]">
+        <span className="kicker text-[8px]">Politisches Kapital</span>
+        <span className="num text-ink">{cap}/100</span>
+      </div>
+      <Bar value={cap} color="bg-purple" />
+
+      <div className="mb-1 mt-2 flex items-center justify-between text-[10px]">
+        <span className="kicker text-[8px]">Skandal-Risiko</span>
+        <span className={`num ${exp >= 55 ? 'text-bad' : 'text-ink'}`}>{exp}/100</span>
+      </div>
+      <Bar value={exp} color={exp >= 55 ? 'bg-bad' : 'bg-warn'} />
+
+      <div className="mt-2.5 grid grid-cols-3 gap-1.5 text-center">
+        <div className="overflow-hidden border border-line/60 px-0.5 py-1" style={{ borderRadius: 2 }}>
+          <div className="kicker text-[7px] tracking-tight">Steuer</div>
+          <div className="num text-[12px] text-ink">{pol.taxReliefPct > 0 ? `−${(pol.taxReliefPct * 100).toFixed(0)} Pp.` : '—'}</div>
+        </div>
+        <div className="overflow-hidden border border-line/60 px-0.5 py-1" style={{ borderRadius: 2 }}>
+          <div className="kicker text-[7px] tracking-tight">Förder</div>
+          <div className="num text-[12px] text-ink">{pol.subsidiesWon > 0 ? eur(pol.subsidiesWon) : '—'}</div>
+        </div>
+        <div className="overflow-hidden border border-line/60 px-0.5 py-1" style={{ borderRadius: 2 }}>
+          <div className="kicker text-[7px] tracking-tight">Budget</div>
+          <div className="num text-[12px] text-ink">{pol.lobbyingSpendTotal > 0 ? eur(pol.lobbyingSpendTotal) : '—'}</div>
+        </div>
+      </div>
+
+      <div className="mt-2.5 space-y-1.5">
+        {foci.map((f) => {
+          const c = LOBBY_COST[f.key];
+          return (
+            <button
+              key={f.key}
+              className="btn w-full flex-col items-start gap-0.5 py-1.5 text-left"
+              disabled={busy || !active || cash < c}
+              onClick={() => void act({ type: 'LOBBY', focus: f.key }, null)}
+            >
+              <span className="flex w-full items-center justify-between text-[11.5px] font-semibold">
+                <span className="inline-flex items-center gap-1.5"><Icon name={f.icon} size={13} /> {LOBBY_LABELS[f.key]}</span>
+                <span className="num text-dim">{eur(c)}</span>
+              </span>
+              <span className="text-[9.5px] font-normal leading-tight text-dim">{f.hintDe} <span className="text-purple">· {f.thresholdDe}</span></span>
+            </button>
+          );
+        })}
+      </div>
+
+      {pol.logDe.length > 0 && (
+        <div className="mt-2.5 border-t border-line/40 pt-2">
+          <div className="kicker mb-1 text-[8px]">Chronik</div>
+          <ul className="space-y-0.5 text-[9.5px] leading-tight text-dim">
+            {pol.logDe.slice(0, 4).map((l, i) => (
+              <li key={i}>· {l}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </Panel>
   );
 }
