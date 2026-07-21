@@ -1,7 +1,41 @@
-import { totalMrr } from '@boardroom/shared';
+import { macroLeadFactor, macroWinFactor, REGIME_LABELS, REGIME_TONE, totalMrr } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, KpiTrendDrill, Panel, StatRow } from '../components/ui.js';
+import { Icon } from '../components/Icon.js';
 import { eur, num, pct } from '../format.js';
+
+/**
+ * Konjunktur-Banner (Phase 16): Regime, Stimmungs-Anzeige (Rezession…Boom),
+ * Leitzins und die aktuelle Wirkung auf Nachfrage (Lead-Zufluss & Abschlussquote).
+ */
+function MacroPanel() {
+  const { state } = useStore();
+  if (!state) return null;
+  const m = state.macro;
+  const tone = REGIME_TONE[m.regime];
+  const toneCls = tone === 'good' ? 'text-good' : tone === 'warn' ? 'text-warn' : tone === 'bad' ? 'text-bad' : 'text-dim';
+  const barCls = tone === 'good' ? 'bg-good' : tone === 'warn' ? 'bg-warn' : tone === 'bad' ? 'bg-bad' : 'bg-dim';
+  const lead = macroLeadFactor(state);
+  const win = macroWinFactor(state);
+  const gauge = (m.sentiment + 100) / 2; // −100..100 ⇒ 0..100
+  const fmtPct = (f: number) => `${f >= 1 ? '+' : ''}${((f - 1) * 100).toFixed(0)} %`;
+  return (
+    <section className="rule-top pt-3">
+      <div className="flex items-baseline justify-between">
+        <span className="kicker inline-flex items-center gap-1.5 text-ink"><Icon name="globe" size={13} /> Konjunktur · <span className={toneCls}>{REGIME_LABELS[m.regime]}</span></span>
+        <span className={`num text-[12px] ${toneCls}`}>Marktstimmung {Math.round(m.sentiment)}</span>
+      </div>
+      <div className="mt-2"><Bar value={gauge} color={barCls} /></div>
+      <div className="mt-1 flex justify-between text-[9px] uppercase tracking-wider text-faint"><span>Rezession</span><span>Neutral</span><span>Boom</span></div>
+      <div className="mt-3 grid grid-cols-3 gap-3">
+        <div><div className="kicker text-[8.5px]">Leitzins</div><div className="num text-[16px]">{m.interestRatePct.toFixed(1)} %</div></div>
+        <div><div className="kicker text-[8.5px]">Lead-Zufluss</div><div className={`num text-[16px] ${lead >= 1 ? 'text-good' : 'text-bad'}`}>{fmtPct(lead)}</div></div>
+        <div><div className="kicker text-[8.5px]">Abschlussquote</div><div className={`num text-[16px] ${win >= 1 ? 'text-good' : 'text-bad'}`}>{fmtPct(win)}</div></div>
+      </div>
+      {m.lastHeadlineDe && <p className="mt-2 max-w-[70ch] text-[11.5px] italic leading-relaxed text-dim">„{m.lastHeadlineDe}"</p>}
+    </section>
+  );
+}
 
 /** Markt: Konkurrenz-Dossiers, Marktanteile, Nachfrage. Volle Agenten in Phase 5. */
 export function MarketView() {
@@ -14,6 +48,7 @@ export function MarketView() {
 
   return (
     <div className="space-y-4">
+      <MacroPanel />
       <KpiTrendDrill id="market-trend" title="Bewertung, Wachstum & Konzentration · Verlauf" history={state.history} series={[{ kpi: 'valuation', label: 'Bewertung', color: '#2f7f79' }, { kpi: 'mrrGrowthMonthly', label: 'MRR-Wachstum', color: '#b8791f' }, { kpi: 'revenueConcentrationHhi', label: 'Konzentration (HHI)', color: '#5a7d8c' }]} />
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Markt">

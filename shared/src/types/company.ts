@@ -73,6 +73,7 @@ export interface CompanyState {
   /** Feindliche Übernahme: Bieter, Angebot, Verteidigung (Phase 14). */
   takeover: import('./takeover.js').TakeoverState;
   crisis: import('./crisis.js').CrisisState;
+  macro: import('./macro.js').MacroState;
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];

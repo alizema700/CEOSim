@@ -45,6 +45,7 @@ import { tickGovernance } from './governance.js';
 import { tickCeo } from './ceo.js';
 import { tickTakeover } from './takeover.js';
 import { tickCrisis } from './crisis.js';
+import { tickMacro } from './macro.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -102,6 +103,7 @@ export function closeWeek(state: CompanyState): WeekReport {
   // ── 1b. CEO als Mensch: Energie, Vermögen, Fokus-Modifikatoren ─────
   // Früh, damit der Wochenfokus Velocity/Leads/Bindung DIESER Woche prägt.
   tickCeo(state, occurrences);
+  tickMacro(state, occurrences);
 
   // ── 2. Personal ───────────────────────────────────────────────────
   tickPeople(state, ledger, occurrences);

@@ -6,6 +6,7 @@ import {
   effectiveMonthlyChurn,
   takeoverSummaryDe,
   crisisSummaryDe,
+  macroSummaryDe,
   laborSummaryDe,
   legalSummaryDe,
   runwayWeeks,
@@ -59,6 +60,7 @@ export function stateBriefDe(state: CompanyState): string {
     `CEO persönlich: ${ceoLifeSummaryDe(state)}.`,
     ...(state.takeover.status !== 'none' ? [`⚠️ Übernahme: ${takeoverSummaryDe(state)}.`] : []),
     ...(state.crisis.status !== 'none' ? [`⚠️ Krise: ${crisisSummaryDe(state)}.`] : []),
+    `Konjunktur: ${macroSummaryDe(state)}.`,
   ].join('\n');
 }
 

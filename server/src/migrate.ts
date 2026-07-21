@@ -1,4 +1,4 @@
-import { balancedFocus, buildInitialBoard, fnv1a, generateMaTargets, initialCrisisState, initialIpoState, initialLaborState, initialLegalState, initialTakeoverState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
+import { balancedFocus, buildInitialBoard, fnv1a, generateMaTargets, initialCrisisState, initialMacroState, initialIpoState, initialLaborState, initialLegalState, initialTakeoverState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
 
 /**
  * Sanfte Snapshot-Migration: füllt Felder auf, die neuere Engine-Versionen
@@ -65,5 +65,6 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   // Phase 14: Feindliche Übernahme.
   if (!s.takeover) s.takeover = initialTakeoverState();
   if (!s.crisis) s.crisis = initialCrisisState();
+  if (!s.macro) s.macro = initialMacroState();
   return state;
 }
