@@ -39,6 +39,8 @@ import { applyEquityInjection } from './funding.js';
 import { applyMaIntegration } from './ma.js';
 import { applyIpoListing, tickIpo } from './ipo.js';
 import { coveredEmployees, tickLabor } from './labor.js';
+import { tickLegal } from './legal.js';
+import { effectiveCorporateTaxRate } from '../types/legal.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -82,6 +84,7 @@ export function closeWeek(state: CompanyState): WeekReport {
     debtDrawn: 0,
     debtRepaid: 0,
     equityRaised: 0,
+    dividendsPaid: 0,
   };
   const cashStart = state.finance.cash;
 
@@ -110,6 +113,7 @@ export function closeWeek(state: CompanyState): WeekReport {
   tickCompetitorAgents(state, occurrences);
   tickIpo(state, occurrences);
   tickLabor(state, occurrences);
+  tickLegal(state, occurrences);
 
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);
@@ -163,6 +167,7 @@ type Ledger = {
   otherOpexBooked: number; apPaid: number; payrollPaid: number;
   interestPaid: number; taxPaid: number; oneOffsPaid: number;
   debtDrawn: number; debtRepaid: number; equityRaised: number;
+  dividendsPaid: number;
 };
 
 // ────────────────────────────────────────────────────────────────────
@@ -415,6 +420,16 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
       state.reputation.press = clamp(state.reputation.press - (fx.full ? 6 : 3), 0, 100);
       state.pressLog.push({ week, tone: 'negative', topicDe: `${label} bei ${state.identity.companyName} — Belegschaft legt die Arbeit nieder` });
       occ.push({ icon: '✊', textDe: `${label}: Die Belegschaft legt die Arbeit nieder — Velocity und Neugeschäft leiden${fx.full ? ' deutlich' : ''}. Ein Abschluss wird dringend.`, severity: 'bad' });
+      break;
+    }
+    case 'DIVIDEND_PAYOUT': {
+      // Ausschüttung aus der Gewinnrücklage: Cash-Abfluss (CFF) + Rücklage runter.
+      // Bilanz-Identität: Aktiva (Cash) −X, Eigenkapital (Retained) −X.
+      ledger.dividendsPaid += fx.amount;
+      state.finance.retainedEarnings -= fx.amount;
+      state.legal.dividends.push({ week, amount: fx.amount });
+      state.reputation.investors = clamp(state.reputation.investors + 4, 0, 100);
+      occ.push({ icon: '💰', textDe: `Gewinnausschüttung ${k(fx.amount)} an die Gesellschafter beschlossen und ausgezahlt.`, severity: 'info' });
       break;
     }
     case 'IPO_LISTING': {
@@ -706,7 +721,11 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   const ebitda = grossProfit - opexTotal;
   const ebt = ebitda - ledger.oneOffsPaid - ledger.interestPaid;
   // Steuern nur auf positives Ergebnis UND wenn Verlustvorträge aufgebraucht (vereinfachtes Modell).
-  const tax = ebt > 0 && f.retainedEarnings > 0 ? ebt * locationOf(state).taxRate : 0;
+  // Deutsche Kapitalgesellschaft: KSt + Soli + Gewerbesteuer (Hebesatz je Stadt);
+  // ausländische Standorte behalten ihren pauschalen Satz.
+  const loc = locationOf(state);
+  const taxRate = effectiveCorporateTaxRate(state.legal, loc.country, loc.taxRate);
+  const tax = ebt > 0 && f.retainedEarnings > 0 ? ebt * taxRate : 0;
   ledger.taxPaid = tax;
   const netIncome = ebt - tax;
 
@@ -729,7 +748,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   const cfoNet =
     ledger.collections + ledger.annualPrepayCash - ledger.payrollPaid - ledger.apPaid -
     ledger.interestPaid - ledger.taxPaid - ledger.oneOffsPaid;
-  const cffNet = ledger.debtDrawn - ledger.debtRepaid + ledger.equityRaised;
+  const cffNet = ledger.debtDrawn - ledger.debtRepaid + ledger.equityRaised - ledger.dividendsPaid;
   f.cash = cashStart + cfoNet + cffNet;
 
   // Eigenkapital fortschreiben
@@ -758,7 +777,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
     financing: {
       debtDrawn: toCents(ledger.debtDrawn),
       debtRepaid: toCents(-ledger.debtRepaid),
-      equityRaised: toCents(ledger.equityRaised),
+      equityRaised: toCents(ledger.equityRaised - ledger.dividendsPaid),
       net: toCents(cffNet),
     },
     netChange: toCents(cfoNet + cffNet),

@@ -40,6 +40,7 @@ export function Layout({ children }: { children: ReactNode }) {
     { view: 'product', label: t('nav_product') },
     { view: 'market', label: t('nav_market') },
     { view: 'finance', label: t('nav_finance') },
+    { view: 'structure', label: t('nav_structure') },
     { view: 'legal', label: t('nav_legal') },
     { view: 'press', label: t('nav_press') },
     { view: 'strategy', label: t('nav_strategy') },

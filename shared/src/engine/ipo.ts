@@ -58,6 +58,7 @@ export function ipoEligibility(state: CompanyState): { ok: boolean; criteria: { 
     { labelDe: `Board-Vertrauen ≥ 55 (aktuell ${Math.round(state.ceo.boardTrust)})`, ok: state.ceo.boardTrust >= 55 },
     { labelDe: `Mindestens 30 Wochen Historie (aktuell ${state.meta.week})`, ok: state.meta.week >= 30 },
     { labelDe: 'Keine laufende Covenant-Verletzung', ok: state.finance.consecutiveMinCashBreachWeeks === 0 },
+    { labelDe: `Rechtsform ist AG (§ 2 AktG — nur AGs sind börsenfähig, aktuell ${state.legal.rechtsform})`, ok: state.legal.rechtsform === 'AG' },
   ];
   return { ok: criteria.every((c) => c.ok), criteria };
 }
@@ -69,7 +70,8 @@ export function tickIpo(state: CompanyState, occ: Occurrence[]): void {
 
   // ── Freischaltung ──────────────────────────────────────────────────
   if (ipo.status === 'locked' || ipo.status === 'withdrawn') {
-    if (ipoEligibility(state).ok) {
+    const elig = ipoEligibility(state);
+    if (elig.ok) {
       ipo.status = 'eligible';
       ipo.eligibleSinceWeek = week;
       occ.push({ icon: '🔔', textDe: 'Die Firma ist IPO-reif: Investmentbanken haben sich gemeldet (Tab „Börse").', severity: 'good' });
@@ -84,6 +86,27 @@ export function tickIpo(state: CompanyState, occ: Occurrence[]): void {
         templateId: 'ipo-eligible',
         priority: 'hoch',
       });
+    } else {
+      // Nudge: Alle Geschäftskriterien erfüllt, nur die Rechtsform (AG) fehlt.
+      const onlyLegalMissing =
+        state.legal.rechtsform !== 'AG' &&
+        state.legal.pendingConversion === null &&
+        elig.criteria.every((c) => c.ok || /Rechtsform ist AG/.test(c.labelDe));
+      const alreadyNudged = state.comms.messages.some((m) => m.templateId === 'ipo-needs-ag');
+      if (onlyLegalMissing && !alreadyNudged) {
+        occ.push({ icon: '⚖️', textDe: 'Die Zahlen wären reif für einen Börsengang — aber nur eine AG ist börsenfähig. Der Formwechsel wäre der nächste Schritt (Struktur → Formwechsel).', severity: 'warn' });
+        addMessage(state, {
+          from: assistantSender(state),
+          subjectDe: 'IPO-reif — aber ihr seid eine GmbH',
+          bodyDe: `gute Nachricht und ein Haken: Eure Kennzahlen erfüllen inzwischen die IPO-Schwellen. Aber an die Börse geht nur eine Aktiengesellschaft (§ 2 AktG) — als GmbH fehlt die Rechtsform. Der saubere Weg wäre ein Formwechsel zur AG (ggf. vorher eine kleine Kapitalerhöhung auf 50.000 € Grundkapital). Das findest du unter „Struktur". Kein Muss — aber ohne AG kein IPO.`,
+          kind: 'system',
+          eventInstanceId: null,
+          delegable: false,
+          suggestedActionType: null,
+          templateId: 'ipo-needs-ag',
+          priority: 'normal',
+        });
+      }
     }
     return;
   }

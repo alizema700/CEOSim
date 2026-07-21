@@ -116,6 +116,18 @@ function buildCausalChain(state: CompanyState, d: DecisionRecord, now: Record<Kp
     case 'NEGOTIATE_TARIF':
       chain.push('Mechanik: Liegt das Angebot ≥ Forderung, nimmt die Gewerkschaft sofort an; im Korridor bis zur Schmerzgrenze gibt es einen Kompromiss knapp darüber; darunter Ablehnung + Warnstreik, und nach der dritten Runde setzt die Gewerkschaft die volle Forderung per Streik durch (der teuerste Pfad).');
       break;
+    case 'CONVERT_LEGAL_FORM':
+      chain.push('Mechanik: Der Formwechsel wird nach der Umwandlungsfrist im Handelsregister wirksam; Leitungsorgan und Terminologie ändern sich. Als AG öffnet sich der Kapitalmarkt (IPO), zugleich steigen Publizitäts- und Aufsichtspflichten.');
+      break;
+    case 'CAPITAL_INCREASE':
+      chain.push('Mechanik: Umwidmung freier Mittel in gezeichnetes Nennkapital — bilanzneutral, aber das Kapital ist ab jetzt gebunden (Gläubigerschutz) und nicht mehr ausschüttbar.');
+      break;
+    case 'HOLD_SHAREHOLDER_MEETING':
+      chain.push('Mechanik: Feststellung des Jahresabschlusses und Entlastung; bei solider Lage Rückendeckung durchs Gremium (Vertrauen). Ein Governance-Ritual, das den Turnus zurücksetzt.');
+      break;
+    case 'DISTRIBUTE_DIVIDEND':
+      chain.push('Mechanik: Ausschüttung = Finanzierungs-Cashflow (kein Aufwand!); Gewinnrücklage und Cash sinken um denselben Betrag, die Bilanz-Identität bleibt gewahrt. Weniger Puffer, dafür ein Rendite-Signal an die Eigentümer.');
+      break;
     default:
       break;
   }
@@ -344,6 +356,37 @@ function gradeProcess(state: CompanyState, d: DecisionRecord): Grade {
       }
       break;
     }
+    case 'CONVERT_LEGAL_FORM': {
+      if (d.action.toForm === 'AG') {
+        info += 10; timing += 10;
+        reasons.push('Formwechsel zur AG als bewusster Schritt Richtung Kapitalmarkt — die einzige börsenfähige Rechtsform. Sauberes Sequencing, wenn ein IPO das Ziel ist.');
+        if (state.ipo.status === 'locked' && runwayAtDecision < 20) {
+          timing -= 15;
+          reasons.push('Teurer Formwechsel bei knappem Runway, ohne dass ein IPO unmittelbar ansteht — die Kosten binden Liquidität, die woanders fehlt.');
+        }
+      }
+      break;
+    }
+    case 'CAPITAL_INCREASE': {
+      risk += 10;
+      reasons.push('Höheres Haftungskapital stärkt die Bonität und ist Voraussetzung für den AG-Formwechsel — solide Vorbereitung statt Hauruck.');
+      break;
+    }
+    case 'HOLD_SHAREHOLDER_MEETING': {
+      comms += 10; values += 5;
+      reasons.push('Ordentliche Versammlung abgehalten: Governance-Pflichten ernst genommen, Transparenz gegenüber den Eigentümern.');
+      break;
+    }
+    case 'DISTRIBUTE_DIVIDEND': {
+      if (runwayAtDecision < 40) {
+        risk -= 20; timing -= 15;
+        reasons.push('Ausschüttung bei nicht üppigem Runway: Kapital verlässt die Firma, das für Wachstum und Krisenpuffer gebraucht wird — in der Wachstumsphase selten optimal.');
+      } else {
+        risk += 5;
+        reasons.push('Ausschüttung aus komfortabler Liquiditätslage: legitime Kapitalrückführung, wenn das Geld intern keine bessere Rendite findet.');
+      }
+      break;
+    }
     default:
       break;
   }
@@ -424,6 +467,11 @@ function applySkillGains(state: CompanyState, d: DecisionRecord, grade: Grade): 
     case 'SET_TARIF_BINDING': case 'NEGOTIATE_TARIF':
       s.leadership = clamp(s.leadership + gain, 0, 100);
       s.governance = clamp(s.governance + gain * 0.6, 0, 100); break;
+    case 'CONVERT_LEGAL_FORM': case 'CAPITAL_INCREASE': case 'HOLD_SHAREHOLDER_MEETING':
+      s.governance = clamp(s.governance + gain, 0, 100); break;
+    case 'DISTRIBUTE_DIVIDEND':
+      s.finanzen = clamp(s.finanzen + gain, 0, 100);
+      s.governance = clamp(s.governance + gain * 0.5, 0, 100); break;
     default: break;
   }
   // Werte-Konsistenz zahlt auf Governance ein.

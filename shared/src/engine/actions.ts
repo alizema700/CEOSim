@@ -14,6 +14,7 @@ import { maTarget } from './ma.js';
 import { IPO_BANKS, ipoBank, ipoEligibility, subscriptionRatioFor } from './ipo.js';
 import { applyTarifBinding, applyTarifOffer } from './labor.js';
 import type { Occurrence } from '../types/game.js';
+import { FORMWECHSEL_FEE_AG, FORMWECHSEL_WEEKS, MIN_KAPITAL, NOTARY_CAPITAL_FEE_MIN, NOTARY_CAPITAL_FEE_RATE, organNames } from '../types/legal.js';
 
 export { deptDe };
 
@@ -230,6 +231,39 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       else if (state.labor.negotiation && action.offerPct < state.labor.negotiation.floorPct) {
         warnings.push(`Dein Angebot liegt unter der erwarteten Schmerzgrenze (~${(state.labor.negotiation.floorPct * 100).toFixed(1)} %) — mit Ablehnung und Warnstreik ist zu rechnen.`);
       }
+      break;
+    }
+    case 'CONVERT_LEGAL_FORM': {
+      const l = state.legal;
+      const order: Record<import('../types/legal.js').Rechtsform, number> = { UG: 0, GmbH: 1, AG: 2 };
+      if (l.pendingConversion) errors.push('Es läuft bereits ein Formwechsel.');
+      if (action.toForm === l.rechtsform) errors.push('Diese Rechtsform besteht bereits.');
+      else if (order[action.toForm] <= order[l.rechtsform]) errors.push('Ein Rückwechsel in eine „kleinere" Rechtsform ist im Simulator nicht vorgesehen.');
+      if (l.nennkapital < MIN_KAPITAL[action.toForm]) errors.push(`Für die ${action.toForm} sind mindestens ${MIN_KAPITAL[action.toForm].toLocaleString('de-DE')} € Nennkapital nötig — erst Kapitalerhöhung (aktuell ${Math.round(l.nennkapital).toLocaleString('de-DE')} €).`);
+      if (state.ceo.boardTrust < 45) errors.push('Der Aufsichtsrat/die Gesellschafter tragen den Formwechsel bei diesem Vertrauen (< 45) nicht mit.');
+      if (f.cash < FORMWECHSEL_FEE_AG) errors.push(`Für Notar, Umwandlungsbericht und Prüfung sind ${FORMWECHSEL_FEE_AG.toLocaleString('de-DE')} € nötig — die Liquidität reicht nicht.`);
+      if (action.toForm === 'AG') warnings.push('Als AG gelten strengere Publizitäts- und Governance-Pflichten (Vorstand, Aufsichtsrat, Hauptversammlung) — dafür wird ein Börsengang erst möglich.');
+      break;
+    }
+    case 'CAPITAL_INCREASE': {
+      const l = state.legal;
+      if (action.targetNennkapital <= l.nennkapital) errors.push('Das Ziel-Nennkapital muss über dem aktuellen liegen.');
+      if (action.targetNennkapital > f.contributedCapital) errors.push(`Aus Gesellschaftsmitteln lässt sich höchstens bis zum eingezahlten Kapital (${Math.round(f.contributedCapital).toLocaleString('de-DE')} €) erhöhen.`);
+      if (action.targetNennkapital > 10_000_000) errors.push('Unrealistisch hohes Nennkapital.');
+      break;
+    }
+    case 'HOLD_SHAREHOLDER_MEETING': {
+      if (state.legal.lastMeetingWeek !== null && state.meta.week - state.legal.lastMeetingWeek < 8) {
+        warnings.push('Eine weitere Versammlung so kurz nach der letzten ist unüblich — die ordentliche ist erst später wieder fällig.');
+      }
+      break;
+    }
+    case 'DISTRIBUTE_DIVIDEND': {
+      if (action.amount <= 0) errors.push('Ausschüttungsbetrag muss positiv sein.');
+      if (action.amount > f.retainedEarnings) errors.push(`Es lässt sich nur aus der Gewinnrücklage ausschütten (max. ${Math.max(0, Math.round(f.retainedEarnings)).toLocaleString('de-DE')} €).`);
+      const minCashCov = f.debt.covenants.find((c) => c.type === 'minCash');
+      if (minCashCov && minCashCov.type === 'minCash' && f.cash - action.amount < minCashCov.value) errors.push('Die Ausschüttung würde die Mindestliquidität (Covenant) reißen.');
+      if (runwayWeeks(state) < 30) warnings.push('Ausschüttung bei knappem Runway: Das Kapital fehlt dann für Wachstum und Puffer — der Aufsichtsrat schaut genau hin.');
       break;
     }
   }
@@ -534,6 +568,48 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push(...applyTarifOffer(state, action.offerPct, laborOcc));
       for (const o of laborOcc) analysis.push(`${o.icon} ${o.textDe}`);
       summary = `Tarifangebot: +${(action.offerPct * 100).toFixed(1)} % (Forderung war +${(demand * 100).toFixed(1)} %)`;
+      break;
+    }
+    case 'CONVERT_LEGAL_FORM': {
+      const l = state.legal;
+      l.pendingConversion = { toForm: action.toForm, startedWeek: week, effectiveWeek: week + FORMWECHSEL_WEEKS };
+      schedule(state, 0, `Formwechsel W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: FORMWECHSEL_FEE_AG, labelDe: `Formwechsel zur ${action.toForm}: Notar, Umwandlungsbericht, Prüfung` });
+      summary = `Formwechsel zur ${action.toForm} eingeleitet — wirksam in ~${FORMWECHSEL_WEEKS} Wochen`;
+      analysis.push(`Notarielle Beurkundung, Umwandlungsbericht und Registeranmeldung laufen (${fmt(FORMWECHSEL_FEE_AG)} sofort fällig). Erst mit der Eintragung ins Handelsregister ist die ${action.toForm} wirksam.`);
+      if (action.toForm === 'AG') analysis.push('Ab dann leitet ein Vorstand die Gesellschaft, überwacht vom Aufsichtsrat; oberstes Organ ist die Hauptversammlung. Erst als AG ist ein Börsengang rechtlich möglich (§ 2 AktG).');
+      break;
+    }
+    case 'CAPITAL_INCREASE': {
+      const l = state.legal;
+      const inc = action.targetNennkapital - l.nennkapital;
+      const fee = Math.max(NOTARY_CAPITAL_FEE_MIN, Math.round(inc * NOTARY_CAPITAL_FEE_RATE));
+      l.nennkapital = action.targetNennkapital;
+      schedule(state, 0, `Kapitalerhöhung W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: fee, labelDe: 'Kapitalerhöhung: Notar & Handelsregister' });
+      summary = `Nennkapital erhöht auf ${fmt(action.targetNennkapital)}`;
+      analysis.push(`Aus Gesellschaftsmitteln umgewandelt: mehr gezeichnetes Haftungskapital (Vertrauensbasis für Banken & Partner), aber gebunden — nicht ausschüttbar. Notar/Handelsregister: ${fmt(fee)}.`);
+      if (action.targetNennkapital >= MIN_KAPITAL.AG && l.rechtsform === 'GmbH') analysis.push('Das Nennkapital reicht jetzt für einen Formwechsel zur AG.');
+      break;
+    }
+    case 'HOLD_SHAREHOLDER_MEETING': {
+      const l = state.legal;
+      const o = organNames(l.rechtsform);
+      l.lastMeetingWeek = week;
+      l.nextMeetingWeek = week + 52;
+      const solid = state.ceo.boardTrust >= 50 || computeKpis(state).values.ebitdaMonthly > 0;
+      if (solid) {
+        state.ceo.boardTrust = Math.min(100, state.ceo.boardTrust + 2);
+        state.ceo.trustLog.push({ week, delta: 2, reasonDe: `Entlastung durch die ${o.versammlung} erteilt.` });
+      }
+      summary = `${o.versammlung} abgehalten — Jahresabschluss festgestellt, ${l.rechtsform === 'AG' ? 'Vorstand' : 'Geschäftsführung'} ${solid ? 'entlastet' : 'unter Vorbehalt'}`;
+      analysis.push(`Ordentliche ${o.versammlung}: Feststellung des Jahresabschlusses, Ergebnisverwendung und Entlastung. Nächste turnusmäßige Versammlung in 52 Wochen.`);
+      break;
+    }
+    case 'DISTRIBUTE_DIVIDEND': {
+      schedule(state, 0, `Dividende W${week}`, decisionId, { kind: 'DIVIDEND_PAYOUT', amount: action.amount });
+      const ceoCut = action.amount * state.ceo.equityShare;
+      summary = `Gewinnausschüttung ${fmt(action.amount)} beschlossen`;
+      analysis.push('Die Dividende fließt diese Woche ab (Finanzierungs-Cashflow) und mindert die Gewinnrücklage — der Runway sinkt entsprechend.');
+      analysis.push(`Auf deinen Anteil (${(state.ceo.equityShare * 100).toFixed(1)} %) entfallen ~${fmt(ceoCut)} vor Kapitalertragsteuer. Investoren sehen Rendite — aber ausgeschüttetes Kapital fehlt fürs Wachstum.`);
       break;
     }
     case 'IPO_SELECT_BANK': {

@@ -1,4 +1,4 @@
-import { fnv1a, generateMaTargets, initialIpoState, initialLaborState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
+import { fnv1a, generateMaTargets, initialIpoState, initialLaborState, initialLegalState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
 
 /**
  * Sanfte Snapshot-Migration: füllt Felder auf, die neuere Engine-Versionen
@@ -44,6 +44,11 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   if (!s.labor) {
     const loc = s.identity.location ?? resolveLocationProfile(s.identity.locationId);
     s.labor = initialLaborState(loc.regulationDensity, false);
+  }
+  // Phase 9: Rechtsform & Gesellschaftsrecht (GmbH/AG, Kapital, Organe).
+  if (!s.legal) {
+    const loc = s.identity.location ?? resolveLocationProfile(s.identity.locationId);
+    s.legal = initialLegalState(s.meta.seed, loc);
   }
   return state;
 }

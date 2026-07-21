@@ -58,7 +58,9 @@ export type EffectPayload =
   /** Tariflich vereinbarte Lohnerhöhung (Phase 8): trifft die Tarif-Belegschaft (ohne AT/Execs). */
   | { kind: 'TARIF_RAISE'; pct: number; viaStrike: boolean }
   /** (Warn-)Streik (Phase 8): Produktivitäts- & Vertriebseinbruch, Presse. */
-  | { kind: 'WARNING_STRIKE'; full: boolean };
+  | { kind: 'WARNING_STRIKE'; full: boolean }
+  /** Gewinnausschüttung (Phase 9): Cash-Abfluss (CFF) + Minderung der Gewinnrücklage. */
+  | { kind: 'DIVIDEND_PAYOUT'; amount: Money };
 
 /** Zeitlich begrenzter Modifikator auf eine Systemgröße. */
 export interface ActiveModifier {

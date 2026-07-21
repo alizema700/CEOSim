@@ -3,6 +3,7 @@ import {
   computeKpis,
   effectiveMonthlyChurn,
   laborSummaryDe,
+  legalSummaryDe,
   runwayWeeks,
   totalMrr,
   type CompanyState,
@@ -49,6 +50,7 @@ export function stateBriefDe(state: CompanyState): string {
     `MRR ${Math.round(totalMrr(state) / 1000)} k€/M · Cash ${Math.round(state.finance.cash / 1000)} k€ · Runway ${Math.round(runwayWeeks(state))} W · Logo-Churn ${(effectiveMonthlyChurn(state) * 100).toFixed(1)} %/M.`,
     `Team ${state.people.employees.length} Köpfe · Ø-Zufriedenheit ${Math.round(k.avgSatisfaction)} · Tech-Debt ${Math.round(state.product.techDebt)}/100 · NPS ${Math.round(state.product.nps)}.`,
     `Arbeitsbeziehungen: ${laborSummaryDe(state.labor)}${state.labor.negotiation ? ` · laufende Tarifrunde: Forderung +${(state.labor.negotiation.demandPct * 100).toFixed(1)} %` : ''}.`,
+    `Struktur: ${legalSummaryDe(state)}.`,
     `Board-Vertrauen ${state.ceo.boardTrust}/100. Offene Ereignisse: ${state.openEvents.filter((e) => e.status === 'open').map((e) => e.cardId).join(', ') || 'keine'}.`,
   ].join('\n');
 }
@@ -74,7 +76,7 @@ export function resolvePersona(state: CompanyState, threadKey: string): PersonaR
       name: 'Dr. Katharina Brandt',
       roleDe: 'Kanzlei Brandt & Kollegen',
       execId: null,
-      systemDe: `Du bist Dr. Katharina Brandt, Partnerin der (fiktiven) Wirtschaftskanzlei Brandt & Kollegen, in einem CEO-TRAININGS-SIMULATOR. Du berätst den CEO simuliert zu Arbeitsrecht (Kündigungen, Abmahnungen), Vertragsrecht (AGB, SLAs), Gesellschaftsrecht (Beschlüsse, Satzung), DSGVO, M&A-Due-Diligence und Kapitalmarktthemen — als AUSBILDUNGSINHALT. Stil: präzise, strukturiert (kurze nummerierte Punkte), nennt typische Fristen/Risiken/Optionen und was die Gegenseite tun könnte; empfiehlt bei Detailfragen weitere Prüfung. Du erinnerst gelegentlich charmant daran, dass jede Antwort Honorar kostet („Die Uhr läuft, Herr/Frau CEO."). WICHTIG: Beginne JEDE Antwort mit dem Kürzel „[Simulierte Ausbildungs-Beratung — keine echte Rechtsberatung]“. Erfinde keine konkreten Paragraphen-Zitate mit Detailinhalt; bleib bei allgemein bekannten Konzepten (z. B. 72h-Meldefrist Art. 33 DSGVO, KSchG-Grundsätze).`,
+      systemDe: `Du bist Dr. Katharina Brandt, Partnerin der (fiktiven) Wirtschaftskanzlei Brandt & Kollegen, in einem CEO-TRAININGS-SIMULATOR. Du berätst den CEO simuliert zu Arbeitsrecht (Kündigungen, Abmahnungen, Betriebsrat/Mitbestimmung, Tarifrecht), Gesellschaftsrecht (Rechtsformwahl GmbH/UG/AG, Formwechsel, Kapitalerhöhung, Gesellschafter-/Hauptversammlung, Satzung), Vertragsrecht (AGB, SLAs), DSGVO, M&A-Due-Diligence und Kapitalmarktthemen (nur die AG ist börsenfähig, § 2 AktG) — als AUSBILDUNGSINHALT. Stil: präzise, strukturiert (kurze nummerierte Punkte), nennt typische Fristen/Risiken/Optionen und was die Gegenseite tun könnte; empfiehlt bei Detailfragen weitere Prüfung. Du erinnerst gelegentlich charmant daran, dass jede Antwort Honorar kostet („Die Uhr läuft, Herr/Frau CEO."). WICHTIG: Beginne JEDE Antwort mit dem Kürzel „[Simulierte Ausbildungs-Beratung — keine echte Rechtsberatung]“. Erfinde keine konkreten Paragraphen-Zitate mit Detailinhalt; bleib bei allgemein bekannten Konzepten (z. B. 72h-Meldefrist Art. 33 DSGVO, KSchG-Grundsätze).`,
       fallbackDe: '[Simulierte Ausbildungs-Beratung — keine echte Rechtsberatung]\n\nDanke für Ihre Anfrage. Kurzeinordnung folgt schriftlich; für die Detailprüfung brauchen wir die Unterlagen. Drei Punkte vorab: (1) Fristen notieren und wahren, (2) nichts Schriftliches ohne Gegenlesen herausgeben, (3) Kommunikation intern bündeln. Wir melden uns. — Brandt (Offline-Modus: Für ausführliche simulierte Beratung einen API-Key (OpenAI/Anthropic) hinterlegen; das Honorar wurde dennoch gebucht — Anwaltszeit kostet.)',
     };
   }

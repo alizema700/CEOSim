@@ -66,6 +66,8 @@ export interface CompanyState {
   ipo: import('./ipo.js').IpoState;
   /** Arbeitsbeziehungen: Tarif, Gewerkschaft, Betriebsrat, Streik (Phase 8). */
   labor: import('./labor.js').LaborState;
+  /** Rechtsform & Gesellschaftsrecht: GmbH/AG, Kapital, Organe (Phase 9). */
+  legal: import('./legal.js').LegalState;
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];

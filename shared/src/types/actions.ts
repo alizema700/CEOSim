@@ -34,7 +34,11 @@ export type PlayerAction =
   | SetCeoSalaryAction
   | CreateAppointmentAction
   | SetTarifBindingAction
-  | NegotiateTarifAction;
+  | NegotiateTarifAction
+  | ConvertLegalFormAction
+  | CapitalIncreaseAction
+  | HoldShareholderMeetingAction
+  | DistributeDividendAction;
 
 /**
  * Listenpreis ändern (± %). Sofort: Neugeschäfts-ARPA. Verzögert: Bestand wird
@@ -250,6 +254,43 @@ export interface NegotiateTarifAction {
   type: 'NEGOTIATE_TARIF';
   /** Angebotene Lohnerhöhung in Prozent (0 .. 0.15). */
   offerPct: import('./common.js').Fraction;
+}
+
+/**
+ * Formwechsel der Rechtsform (Phase 9), z. B. GmbH → AG. Voraussetzung fürs
+ * IPO (§ 2 AktG). Braucht ausreichendes Nennkapital, Zustimmung des Gremiums
+ * und Notar-/Handelsregisterkosten; wird nach der Umwandlungsfrist wirksam.
+ */
+export interface ConvertLegalFormAction {
+  type: 'CONVERT_LEGAL_FORM';
+  toForm: import('./legal.js').Rechtsform;
+}
+
+/**
+ * Kapitalerhöhung aus Gesellschaftsmitteln (Phase 9): mehr gezeichnetes
+ * Nennkapital (Haftungskapital) — Voraussetzung z. B. für den AG-Formwechsel.
+ */
+export interface CapitalIncreaseAction {
+  type: 'CAPITAL_INCREASE';
+  /** Ziel-Nennkapital (muss über dem aktuellen liegen). */
+  targetNennkapital: Money;
+}
+
+/**
+ * Ordentliche Gesellschafter-/Hauptversammlung (Phase 9): Feststellung des
+ * Jahresabschlusses und Entlastung der Geschäftsführung/des Vorstands.
+ */
+export interface HoldShareholderMeetingAction {
+  type: 'HOLD_SHAREHOLDER_MEETING';
+}
+
+/**
+ * Gewinnausschüttung (Phase 9): Dividende aus der Gewinnrücklage. Cash fließt
+ * ab (CFF), Investoren freut es — der Runway sinkt.
+ */
+export interface DistributeDividendAction {
+  type: 'DISTRIBUTE_DIVIDEND';
+  amount: Money;
 }
 
 /** Ergebnis der Aktions-Validierung durch die Engine. */
