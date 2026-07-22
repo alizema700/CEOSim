@@ -65,6 +65,9 @@ export type PlayerAction =
   | BuyInsuranceAction
   | CancelInsuranceAction
   | PursueCertificationAction
+  | BuildModuleAction
+  | SetPositioningAction
+  | SetPackagingAction
   | LobbyAction
   | StepDownAction;
 
@@ -505,6 +508,25 @@ export interface BuyInsuranceAction {
 export interface CancelInsuranceAction {
   type: 'CANCEL_INSURANCE';
   kind: import('./insurance.js').InsuranceKind;
+}
+
+// ── Produkt-Studio (Phase 22, FB3) ───────────────────────────────────
+/** Produkt-Modul bauen (Build-Prozess über Wochen, dann dauerhaft live). */
+export interface BuildModuleAction {
+  type: 'BUILD_MODULE';
+  module: import('./product.js').ProductModuleKind;
+}
+
+/** Produkt-Positionierung setzen (Einfachheit/Balance/Power). */
+export interface SetPositioningAction {
+  type: 'SET_POSITIONING';
+  positioning: import('./product.js').ProductPositioning;
+}
+
+/** Preis-Verpackung setzen (Ein Preis / 3 Tarife / nutzungsbasiert). */
+export interface SetPackagingAction {
+  type: 'SET_PACKAGING';
+  packaging: import('./product.js').PricingPackaging;
 }
 
 // ── Zertifizierungen (Phase 22, V2) ──────────────────────────────────

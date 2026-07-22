@@ -26,6 +26,7 @@ import { initialCompetitorStrikeState } from '../types/rivalry.js';
 import { initialPoliticsState } from '../types/politics.js';
 import { initialInsuranceState } from '../types/insurance.js';
 import { initialCertificationState } from '../types/certifications.js';
+import { initialProductModules } from '../types/product.js';
 import { initialCeoPersonal, initialCeoPortfolio } from '../types/ceo.js';
 import { initialLegalState } from './legal.js';
 import { buildInitialBoard } from './governance.js';
@@ -333,6 +334,9 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
       dauMauRatio: 0.42,
       featurePointsShipped: 0,
       rndAllocation: { features: 0.7, techDebt: 0.15, bugfixes: 0.15 },
+      modules: initialProductModules(),
+      positioning: 'balance',
+      packaging: 'single',
     },
     market: {
       tamMrr: 4_200_000,

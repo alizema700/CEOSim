@@ -1,4 +1,4 @@
-import { balancedFocus, initialCeoPersonal, initialCeoPortfolio, buildInitialBoard, fnv1a, generateMaTargets, initialCompetitorStrikeState, initialCrisisState, initialPoliticsState, initialInsuranceState, initialCertificationState, initialMacroState, initialIpoState, initialLaborState, initialLegalState, initialTakeoverState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
+import { balancedFocus, initialCeoPersonal, initialCeoPortfolio, buildInitialBoard, fnv1a, generateMaTargets, initialCompetitorStrikeState, initialCrisisState, initialPoliticsState, initialInsuranceState, initialCertificationState, initialProductModules, initialMacroState, initialIpoState, initialLaborState, initialLegalState, initialTakeoverState, personaBits, resolveLocationProfile, stream, type CompanyState } from '@boardroom/shared';
 
 /**
  * Sanfte Snapshot-Migration: füllt Felder auf, die neuere Engine-Versionen
@@ -71,6 +71,7 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   if (s.politics && (s.politics as { regulatoryPressure?: number }).regulatoryPressure === undefined) { const p = s.politics as { regulatoryPressure: number; activeRegulation: null; lastRegulationWeek: number }; p.regulatoryPressure = 0; p.activeRegulation = null; p.lastRegulationWeek = -99; }
   if (!s.insurance) s.insurance = initialInsuranceState();
   if (!s.certifications) s.certifications = initialCertificationState();
+  if (s.product && !(s.product as { modules?: unknown }).modules) { const p = s.product as { modules: ReturnType<typeof initialProductModules>; positioning: string; packaging: string }; p.modules = initialProductModules(); p.positioning = 'balance'; p.packaging = 'single'; }
   if (s.macro && (s.macro as { inflationPct?: number }).inflationPct === undefined) { (s.macro as { inflationPct: number }).inflationPct = 2.0; (s.macro as { capitalIndex: number }).capitalIndex = 100; }
   if (s.macro && (s.macro as { shock?: unknown }).shock === undefined) { (s.macro as { shock: null }).shock = null; (s.macro as { lastShockEpisodeWeek: number }).lastShockEpisodeWeek = -99; }
   if (s.finance && (s.finance as { treasury?: number }).treasury === undefined) { (s.finance as { treasury: number }).treasury = 0; (s.finance as { treasuryYieldTotal: number }).treasuryYieldTotal = 0; }

@@ -52,6 +52,7 @@ import { tickMacro } from './macro.js';
 import { tickMacroShocks } from './macroShocks.js';
 import { insurancePremiumMonthly, fileInsuranceClaim, classifyClaim } from './insurance.js';
 import { tickCertifications, certMaintenanceMonthly } from './certifications.js';
+import { tickProductStudio, moduleMaintenanceMonthly } from './productStudio.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -141,6 +142,7 @@ export function closeWeek(state: CompanyState): WeekReport {
   tickPolitics(state, occurrences);
   tickRegulation(state, occurrences);
   tickCertifications(state, occurrences);
+  tickProductStudio(state, occurrences);
 
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);
@@ -742,7 +744,8 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   const coachFee = state.ceo.coach?.monthlyFee ?? 0; // Executive-Coaching (Phase 12)
   const insurancePremiumM = insurancePremiumMonthly(state); // Versicherungsprämien (V1) → G&A
   const certMaintenanceM = certMaintenanceMonthly(state); // Zertifikats-Pflege (V2) → G&A
-  const otherOpexMonthly = b.marketing + b.customerSuccess + b.rndTools + b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee + insurancePremiumM + certMaintenanceM;
+  const moduleMaintM = moduleMaintenanceMonthly(state); // Modul-Pflege (FB3) → R&D-Sachkosten
+  const otherOpexMonthly = b.marketing + b.customerSuccess + b.rndTools + b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee + insurancePremiumM + certMaintenanceM + moduleMaintM;
   ledger.otherOpexBooked = otherOpexMonthly * wf;
   if (state.insurance) state.insurance.premiumsPaidTotal += insurancePremiumM * wf;
   f.accountsPayable += ledger.cogsBooked + ledger.otherOpexBooked;
@@ -764,7 +767,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   // GuV
   const opex: Record<OpexLine, { payroll: number; other: number }> = {
     salesMarketing: { payroll: payrollByDept.sales + payrollByDept.marketing, other: b.marketing * wf },
-    rnd: { payroll: payrollByDept.engineering, other: b.rndTools * wf },
+    rnd: { payroll: payrollByDept.engineering, other: (b.rndTools + moduleMaintM) * wf },
     customerSuccess: { payroll: payrollByDept.cs, other: b.customerSuccess * wf },
     ga: { payroll: payrollByDept.ga + ceoPay, other: (b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee + insurancePremiumM + certMaintenanceM) * wf },
   };

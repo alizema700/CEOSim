@@ -78,6 +78,7 @@ export * from './engine/insurance.js';
 export * from './types/certifications.js';
 export * from './engine/certifications.js';
 export * from './engine/voices.js';
+export * from './engine/productStudio.js';
 export * from './engine/legacy.js';
 
 // ── Kuratierte Daten (Phase 4) ───────────────────────────────────────

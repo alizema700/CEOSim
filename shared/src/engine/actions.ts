@@ -15,6 +15,8 @@ import { buyInsurance, cancelInsurance } from './insurance.js';
 import { INSURANCE_SPECS } from '../types/insurance.js';
 import { startCertification } from './certifications.js';
 import { CERTIFICATION_SPECS } from '../types/certifications.js';
+import { startModuleBuild } from './productStudio.js';
+import { MODULE_SPECS, PACKAGING_SPECS, POSITIONING_SPECS } from '../types/product.js';
 import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
@@ -468,6 +470,24 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       if (cert.status === 'certified') errors.push(`${cSpec.labelDe} ist bereits zertifiziert.`);
       else if (cert.status === 'in_progress') errors.push(`${cSpec.labelDe} befindet sich bereits im Audit.`);
       if (f.cash < cSpec.prepCost) errors.push(`Zu wenig Liquidität für Vorbereitung & Audit (~${fmt(cSpec.prepCost)}).`);
+      break;
+    }
+    case 'BUILD_MODULE': {
+      const mSpec = MODULE_SPECS[action.module];
+      const mod = state.product.modules[action.module];
+      if (mod.status === 'live') errors.push(`${mSpec.labelDe} ist bereits live.`);
+      else if (mod.status === 'building') errors.push(`${mSpec.labelDe} ist bereits im Bau.`);
+      if (f.cash < mSpec.buildCost) errors.push(`Zu wenig Liquidität für den Modul-Bau (~${fmt(mSpec.buildCost)}).`);
+      if (state.product.techDebt > 75) warnings.push('Bei diesem Tech-Debt baut ihr auf Sand — das neue Modul wird die Altlasten spüren.');
+      break;
+    }
+    case 'SET_POSITIONING': {
+      if (state.product.positioning === action.positioning) errors.push('Diese Positionierung ist bereits gesetzt.');
+      break;
+    }
+    case 'SET_PACKAGING': {
+      if (state.product.packaging === action.packaging) errors.push('Dieses Preismodell ist bereits aktiv.');
+      if (action.packaging === 'usage') warnings.push('Nutzungsbasiert wächst mit den Kunden — aber Rechnungsschock kostet erfahrungsgemäß Bindung.');
       break;
     }
 
@@ -1150,6 +1170,29 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push('Zertifikate sind gekaufte Glaubwürdigkeit: Sie öffnen Türen zu Großkunden, die ohne Nachweis gar nicht erst mit dir sprechen.');
       break;
     }
+    case 'BUILD_MODULE': {
+      const mSpec = MODULE_SPECS[action.module];
+      schedule(state, 0, `Modul-Bau ${mSpec.labelDe} W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: mSpec.buildCost, labelDe: `Produkt-Modul: ${mSpec.labelDe} (Entwicklung)` });
+      startModuleBuild(state, action.module);
+      summary = `Modul-Bau gestartet: ${mSpec.labelDe} (~${mSpec.buildWeeks} Wochen)`;
+      analysis.push(`${mSpec.shortDe} Entwicklung ~${mSpec.buildWeeks} Wochen (${fmt(mSpec.buildCost)}), danach dauerhaft live mit ~${fmt(mSpec.maintenanceMonthly)}/Monat Pflege (R&D-Sachkosten).`);
+      analysis.push('Module sind Produkt-Substanz: Sie wirken dauerhaft auf Abschlussquote, Bindung, Expansion oder Sichtbarkeit — und ein Launch bringt frischen NPS-Schwung (plus ein wenig neue Komplexität im Code).');
+      break;
+    }
+    case 'SET_POSITIONING': {
+      const pSpec = POSITIONING_SPECS[action.positioning];
+      state.product.positioning = action.positioning;
+      summary = `Positionierung: ${pSpec.labelDe}`;
+      analysis.push(`${pSpec.hintDe} Die Wirkung greift ab dem nächsten Wochenschluss auf Abschlussquote und Expansion.`);
+      break;
+    }
+    case 'SET_PACKAGING': {
+      const pkSpec = PACKAGING_SPECS[action.packaging];
+      state.product.packaging = action.packaging;
+      summary = `Preismodell: ${pkSpec.labelDe}`;
+      analysis.push(`${pkSpec.hintDe} Die Wirkung greift ab dem nächsten Wochenschluss (Abschlussquote, Bindung, Expansion).`);
+      break;
+    }
     case 'COUNTER_COMPETITOR': {
       const strikeOcc: Occurrence[] = [];
       const attacker = state.rivalry.attackerName;
@@ -1261,7 +1304,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'TOWNHALL' || action.type === 'AUSTERITY' || action.type === 'KEY_ACCOUNT_OFFENSIVE' || action.type === 'SPECIAL_BONUS' || action.type === 'STAR_HIRE' || action.type === 'CUSTOMER_ADVISORY_BOARD' || action.type === 'ETHICS_PROGRAM' || action.type === 'BUY_INSURANCE' || action.type === 'CANCEL_INSURANCE' || action.type === 'PURSUE_CERTIFICATION' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'TOWNHALL' || action.type === 'AUSTERITY' || action.type === 'KEY_ACCOUNT_OFFENSIVE' || action.type === 'SPECIAL_BONUS' || action.type === 'STAR_HIRE' || action.type === 'CUSTOMER_ADVISORY_BOARD' || action.type === 'ETHICS_PROGRAM' || action.type === 'BUY_INSURANCE' || action.type === 'CANCEL_INSURANCE' || action.type === 'PURSUE_CERTIFICATION' || action.type === 'SET_POSITIONING' || action.type === 'SET_PACKAGING' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,
