@@ -429,6 +429,25 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       if (action.budget > 0 && action.budget < 15_000) warnings.push('Unter ~15 k€ verpufft eine Markenkampagne meist — für Sichtbarkeit braucht es Reichweite.');
       break;
     }
+    case 'SPECIAL_BONUS': {
+      if (action.amount <= 0) errors.push('Bonus-Summe muss positiv sein.');
+      if (action.amount > f.cash) errors.push(`Zu wenig Liquidität für den Bonus (Kasse ${fmt(f.cash)}).`);
+      if (action.amount > 0 && action.amount < 5_000) warnings.push('Ein sehr kleiner Bonus wirkt eher symbolisch — die Geste zählt, aber der Moral-Effekt ist gering.');
+      break;
+    }
+    case 'STAR_HIRE': {
+      if (f.cash < 60_000) errors.push('Zu wenig Liquidität für einen Star-Neuzugang (~60 k€ Signing/Package).');
+      if (runwayWeeks(state) < 16) warnings.push('Ein teurer Top-Hire bei knappem Runway ist ein Risiko — der Aufsichtsrat schaut genau hin.');
+      break;
+    }
+    case 'CUSTOMER_ADVISORY_BOARD': {
+      if (f.cash < 15_000) errors.push('Zu wenig Liquidität für einen Kundenbeirat (~15 k€ Organisation/Events).');
+      break;
+    }
+    case 'ETHICS_PROGRAM': {
+      if (f.cash < 25_000) errors.push('Zu wenig Liquidität für ein Ethik-/Compliance-Programm (~25 k€).');
+      break;
+    }
 
     case 'LOBBY': {
       if (f.cash < LOBBY_COST[action.focus]) errors.push(`Zu wenig Liquidität fürs Lobbying (${fmt(LOBBY_COST[action.focus])}).`);
@@ -1038,6 +1057,53 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push(`Ein einmaliger Reichweiten-Push hebt den Lead-Zufluss (+${Math.round(15 * intensity)} % für ~6 Wochen) und die Presse-/Arbeitgeber-Wahrnehmung. Anders als das laufende Marketing-Budget wirkt die Kampagne als Welle.`);
       break;
     }
+    case 'SPECIAL_BONUS': {
+      schedule(state, 0, `Sonderbonus W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: action.amount, labelDe: 'Sonderbonus an die Belegschaft' });
+      const headcount = Math.max(1, state.people.employees.length);
+      const perHead = action.amount / headcount;
+      const boost = Math.round(clamp((perHead / 1000) * 3, 3, 14));
+      schedule(state, 0, `Bonus-Moral W${week}`, decisionId, { kind: 'SATISFACTION_DELTA', dept: 'all', amount: boost });
+      state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'attritionRisk', factor: 0.85, startWeek: week, endWeek: week + 4, sourceDe: 'Sonderbonus' });
+      summary = `Sonderbonus (${fmt(action.amount)}) — Zufriedenheit +${boost}`;
+      analysis.push(`~${fmt(perHead)} pro Kopf: Ein sichtbares Dankeschön hebt die Zufriedenheit spürbar und senkt kurzfristig die Kündigungsneigung. Wirkung pro Kopf zählt — bei großer Belegschaft braucht es entsprechend mehr.`);
+      break;
+    }
+    case 'STAR_HIRE': {
+      schedule(state, 0, `Star-Hire W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: 60_000, labelDe: `Star-Neuzugang (${deptDe(action.dept)}): Signing & Package` });
+      const deptLabel = deptDe(action.dept);
+      if (action.dept === 'engineering') {
+        state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'velocity', factor: 1.1, startWeek: week, endWeek: week + 8, sourceDe: `Star-Neuzugang (${deptLabel})` });
+      } else if (action.dept === 'sales') {
+        state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'leadGen', factor: 1.08, startWeek: week, endWeek: week + 8, sourceDe: `Star-Neuzugang (${deptLabel})` });
+        state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'trialWinRate', factor: 1.05, startWeek: week, endWeek: week + 8, sourceDe: `Star-Neuzugang (${deptLabel})` });
+      } else {
+        state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'leadGen', factor: 1.12, startWeek: week, endWeek: week + 8, sourceDe: `Star-Neuzugang (${deptLabel})` });
+      }
+      state.reputation.laborMarket = clamp(state.reputation.laborMarket + 3, 0, 100);
+      summary = `Star-Neuzugang für ${deptLabel} gewonnen`;
+      analysis.push(`Ein prägender Kopf hebt die Schlagkraft in ${deptLabel} für ~8 Wochen und strahlt auf die Arbeitgebermarke aus (Talent zieht Talent an). Das Package kostet 60 k€ — die Wirkung ist real, aber endlich.`);
+      break;
+    }
+    case 'CUSTOMER_ADVISORY_BOARD': {
+      schedule(state, 0, `Kundenbeirat W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: 15_000, labelDe: 'Kundenbeirat: Organisation & Events' });
+      state.product.nps = clamp(state.product.nps + 5, -100, 100);
+      state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'churnMonthly', factor: 0.92, startWeek: week, endWeek: week + 8, sourceDe: 'Kundenbeirat' });
+      state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'expansionMonthly', factor: 1.05, startWeek: week, endWeek: week + 8, sourceDe: 'Kundenbeirat' });
+      summary = 'Kundenbeirat eingerichtet — engere Bindung, klareres Produkt';
+      analysis.push('Die wichtigsten Kunden am Tisch: Der Beirat schärft die Roadmap (NPS +5), senkt den Churn und öffnet Expansionschancen über die nächsten ~8 Wochen. Kundennähe als Chefsache.');
+      break;
+    }
+    case 'ETHICS_PROGRAM': {
+      schedule(state, 0, `Ethik-Programm W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: 25_000, labelDe: 'Ethik- & Compliance-Programm' });
+      const pol = state.politics;
+      pol.regulatoryPressure = clamp(pol.regulatoryPressure - 12, 0, 100);
+      pol.exposure = clamp(pol.exposure - 10, 0, 100);
+      schedule(state, 0, `Integrität W${week}`, decisionId, { kind: 'SATISFACTION_DELTA', dept: 'all', amount: 2 });
+      state.reputation.laborMarket = clamp(state.reputation.laborMarket + 2, 0, 100);
+      summary = 'Ethik- & Compliance-Programm aufgesetzt — weniger Angriffsfläche';
+      analysis.push('Integrität als System: Klare Regeln und Schulungen senken den Regulierungsdruck und das Skandal-Risiko (Lobby-Exposure) — die beste Verteidigung gegen Auflagen und Affären. Zahlt zudem auf die Arbeitgebermarke ein.');
+      break;
+    }
     case 'COUNTER_COMPETITOR': {
       const strikeOcc: Occurrence[] = [];
       const attacker = state.rivalry.attackerName;
@@ -1149,7 +1215,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'TOWNHALL' || action.type === 'AUSTERITY' || action.type === 'KEY_ACCOUNT_OFFENSIVE' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'TOWNHALL' || action.type === 'AUSTERITY' || action.type === 'KEY_ACCOUNT_OFFENSIVE' || action.type === 'SPECIAL_BONUS' || action.type === 'STAR_HIRE' || action.type === 'CUSTOMER_ADVISORY_BOARD' || action.type === 'ETHICS_PROGRAM' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

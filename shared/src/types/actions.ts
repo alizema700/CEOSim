@@ -58,6 +58,10 @@ export type PlayerAction =
   | AusterityAction
   | KeyAccountOffensiveAction
   | BrandCampaignAction
+  | SpecialBonusAction
+  | StarHireAction
+  | CustomerAdvisoryBoardAction
+  | EthicsProgramAction
   | LobbyAction
   | StepDownAction;
 
@@ -462,6 +466,29 @@ export interface KeyAccountOffensiveAction {
 export interface BrandCampaignAction {
   type: 'BRAND_CAMPAIGN';
   budget: number;
+}
+
+// ── Weitere CEO-Züge (Phase 22, C2) ──────────────────────────────────
+/** Einmaliger Sonderbonus an die Belegschaft (Moral & Bindung, kostet Cash). */
+export interface SpecialBonusAction {
+  type: 'SPECIAL_BONUS';
+  amount: number;
+}
+
+/** Star-Neuzugang persönlich abwerben (teuer, hebt eine Abteilung + Arbeitgebermarke). */
+export interface StarHireAction {
+  type: 'STAR_HIRE';
+  dept: 'engineering' | 'sales' | 'marketing';
+}
+
+/** Kundenbeirat einrichten (NPS & Bindung über Zeit). */
+export interface CustomerAdvisoryBoardAction {
+  type: 'CUSTOMER_ADVISORY_BOARD';
+}
+
+/** Ethik- & Compliance-Programm (senkt Regulierungsdruck & Skandal-Risiko; Integrität). */
+export interface EthicsProgramAction {
+  type: 'ETHICS_PROGRAM';
 }
 
 /**

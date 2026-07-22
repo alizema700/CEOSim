@@ -70,6 +70,9 @@ export function CeoView() {
       {/* Strategische CEO-Züge */}
       <StrategicMovesPanel />
 
+      {/* Menschen & Verantwortung */}
+      <PeopleMovesPanel />
+
       {/* Privatleben & Netzwerk */}
       <PersonalPanel />
 
@@ -172,6 +175,71 @@ function StrategicMovesPanel() {
             <input type="number" className="input w-24 py-1 text-[12px]" value={campBudget} min={0} step={20_000} onChange={(e) => setCampBudget(Math.max(0, Number(e.target.value)))} />
             <button className="btn flex-1 justify-center py-1 text-[11px]" disabled={busy || !active || campBudget <= 0 || campBudget > cash} onClick={() => go({ type: 'BRAND_CAMPAIGN', budget: campBudget })}>Markenkampagne</button>
           </div>
+        </div>
+      </div>
+    </Panel>
+  );
+}
+
+/**
+ * Menschen & Verantwortung (Phase 22, C2): CEO-Züge rund um Team, Kunden und
+ * Integrität — Sonderbonus, Star-Neuzugang, Kundenbeirat, Ethik-/Compliance-Programm.
+ */
+function PeopleMovesPanel() {
+  const { state, act, busy } = useStore();
+  const [bonus, setBonus] = useState(40_000);
+  const [starDept, setStarDept] = useState<'engineering' | 'sales' | 'marketing'>('engineering');
+  if (!state) return null;
+  const active = state.meta.status === 'active';
+  const cash = state.finance.cash;
+  const go = (action: Parameters<typeof act>[0]) => void act(action, null);
+  const depts: { key: 'engineering' | 'sales' | 'marketing'; label: string }[] = [
+    { key: 'engineering', label: 'Engineering' },
+    { key: 'sales', label: 'Vertrieb' },
+    { key: 'marketing', label: 'Marketing' },
+  ];
+
+  return (
+    <Panel icon="users" title="Menschen & Verantwortung">
+      <p className="mb-3 max-w-[76ch] text-[11.5px] leading-relaxed text-dim">
+        Team, Kunden und Integrität als Chefsache — Hebel, die Bindung, Produkt und Angriffsfläche langfristig prägen.
+      </p>
+      <div className="grid gap-2.5 md:grid-cols-2">
+        {/* Sonderbonus */}
+        <div className="border border-line p-2.5" style={{ borderRadius: 2 }}>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><Icon name="coins" size={15} /> Sonderbonus</div>
+          <div className="mt-0.5 text-[10px] text-dim">Einmaliges Dankeschön an die Belegschaft → Moral & Bindung</div>
+          <div className="mt-2 flex items-center gap-1.5">
+            <input type="number" className="input w-28 py-1 text-[12px]" value={bonus} min={0} step={10_000} onChange={(e) => setBonus(Math.max(0, Number(e.target.value)))} />
+            <button className="btn flex-1 justify-center py-1 text-[11px]" disabled={busy || !active || bonus <= 0 || bonus > cash} onClick={() => go({ type: 'SPECIAL_BONUS', amount: bonus })}>Ausschütten</button>
+          </div>
+          <div className="mt-1 text-[9px] text-dim">Wirkung zählt pro Kopf — bei großem Team braucht es mehr.</div>
+        </div>
+
+        {/* Star-Neuzugang */}
+        <div className="border border-line p-2.5" style={{ borderRadius: 2 }}>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><Icon name="star" size={15} /> Star-Neuzugang</div>
+          <div className="mt-0.5 text-[10px] text-dim">Top-Talent abwerben (~60 k€) → Abteilungs-Boost + Arbeitgebermarke</div>
+          <div className="mt-2 flex gap-1">
+            {depts.map((d) => (
+              <button key={d.key} className={`chip flex-1 justify-center ${starDept === d.key ? 'border-accent text-accent' : ''}`} onClick={() => setStarDept(d.key)}>{d.label}</button>
+            ))}
+          </div>
+          <button className="btn mt-2 w-full justify-center py-1 text-[11px]" disabled={busy || !active || cash < 60_000} onClick={() => go({ type: 'STAR_HIRE', dept: starDept })}>Abwerben</button>
+        </div>
+
+        {/* Kundenbeirat */}
+        <div className="border border-line p-2.5" style={{ borderRadius: 2 }}>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><Icon name="handshake" size={15} /> Kundenbeirat</div>
+          <div className="mt-0.5 text-[10px] text-dim">Wichtigste Kunden an den Tisch (~15 k€) → NPS, Bindung, Expansion</div>
+          <button className="btn mt-2 w-full justify-center py-1.5 text-[11px]" disabled={busy || !active || cash < 15_000} onClick={() => go({ type: 'CUSTOMER_ADVISORY_BOARD' })}>Beirat einrichten</button>
+        </div>
+
+        {/* Ethik-Programm */}
+        <div className="border border-line p-2.5" style={{ borderRadius: 2 }}>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><Icon name="shield" size={15} /> Ethik & Compliance</div>
+          <div className="mt-0.5 text-[10px] text-dim">Integritätsprogramm (~25 k€) → senkt Regulierungsdruck & Skandal-Risiko</div>
+          <button className="btn mt-2 w-full justify-center py-1.5 text-[11px]" disabled={busy || !active || cash < 25_000} onClick={() => go({ type: 'ETHICS_PROGRAM' })}>Programm aufsetzen</button>
         </div>
       </div>
     </Panel>
