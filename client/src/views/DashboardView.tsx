@@ -2,6 +2,7 @@ import { useState, type CSSProperties } from 'react';
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   EVENT_CARDS,
+  MACRO_SHOCK_SPECS,
   effectiveMonthlyChurn,
   runwayWeeks,
   totalMrr,
@@ -187,6 +188,24 @@ export function DashboardView() {
           <p className="mt-1 max-w-[70ch] text-[13px] leading-relaxed text-ink2">{state.rivalry.headlineDe} — Intensität {Math.round(state.rivalry.intensity)}/100. Mitgehen, differenzieren, aushalten oder zurückschlagen — sonst legt der Rivale nach.</p>
         </section>
       )}
+
+      {/* ── Wirtschaftsschock (M4): tonabhängiges Banner ──────────────── */}
+      {state.macro.shock && (() => {
+        const spec = MACRO_SHOCK_SPECS[state.macro.shock.kind];
+        const left = Math.max(0, state.macro.shock.endWeek - state.meta.week);
+        const tone = spec.tone === 'good' ? 'good' : spec.tone === 'warn' ? 'warn' : 'bad';
+        const cls = tone === 'good' ? 'border-good text-good' : tone === 'warn' ? 'border-warn text-warn' : 'border-bad text-bad';
+        const bg = tone === 'good' ? 'bg-good/5' : tone === 'warn' ? 'bg-warn/5' : 'bg-bad/5';
+        return (
+          <section className={`breaking border-2 ${cls.split(' ')[0]} ${bg} px-4 py-3`} style={{ borderRadius: 3 }}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className={`breaking-kicker kicker inline-flex items-center gap-1.5 px-1 ${cls.split(' ')[1]}`}><Glyph e={spec.emoji} size={13} /> Wirtschaftsschock · {spec.labelDe}</span>
+              <button className={`btn ${cls}`} onClick={() => useStore.getState().setView('market')}>Zum Markt →</button>
+            </div>
+            <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-ink2">{spec.headlineDe} Die Episode prägt die Märkte noch ~{left} {left === 1 ? 'Woche' : 'Wochen'} — Stimmung, Inflation, Zins und Kapitalmarkt bewegen sich, das wirkt auf Nachfrage und Bewertungen.</p>
+          </section>
+        );
+      })()}
 
       {/* ── Nächste Züge (kontextuelle Empfehlungen) ──────────────────── */}
       <NextMovesPanel />

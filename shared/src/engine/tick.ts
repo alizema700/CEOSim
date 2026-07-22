@@ -48,6 +48,7 @@ import { tickCrisis } from './crisis.js';
 import { tickRivalry } from './rivalry.js';
 import { politicsTaxRelief, tickPolitics } from './politics.js';
 import { tickMacro } from './macro.js';
+import { tickMacroShocks } from './macroShocks.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -106,6 +107,7 @@ export function closeWeek(state: CompanyState): WeekReport {
   // Früh, damit der Wochenfokus Velocity/Leads/Bindung DIESER Woche prägt.
   tickCeo(state, occurrences);
   tickMacro(state, occurrences);
+  tickMacroShocks(state, occurrences);
 
   // ── 2. Personal ───────────────────────────────────────────────────
   tickPeople(state, ledger, occurrences);

@@ -1,7 +1,7 @@
-import { macroLeadFactor, macroWinFactor, REGIME_LABELS, REGIME_TONE, totalMrr } from '@boardroom/shared';
+import { macroLeadFactor, macroWinFactor, MACRO_SHOCK_SPECS, REGIME_LABELS, REGIME_TONE, totalMrr } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, KpiTrendDrill, Panel, StatRow } from '../components/ui.js';
-import { Icon } from '../components/Icon.js';
+import { Icon, Glyph } from '../components/Icon.js';
 import { eur, num, pct } from '../format.js';
 
 /**
@@ -27,6 +27,21 @@ function MacroPanel() {
       </div>
       <div className="mt-2"><Bar value={gauge} color={barCls} /></div>
       <div className="mt-1 flex justify-between text-[9px] uppercase tracking-wider text-faint"><span>Rezession</span><span>Neutral</span><span>Boom</span></div>
+      {m.shock && (() => {
+        const spec = MACRO_SHOCK_SPECS[m.shock.kind];
+        const left = Math.max(0, m.shock.endWeek - state.meta.week);
+        const stCls = spec.tone === 'good' ? 'text-good' : spec.tone === 'warn' ? 'text-warn' : 'text-bad';
+        const stBorder = spec.tone === 'good' ? 'border-good/60' : spec.tone === 'warn' ? 'border-warn/60' : 'border-bad/60';
+        return (
+          <div className={`mt-3 flex items-start gap-2 border-l-2 ${stBorder} bg-panel2/40 px-2.5 py-1.5`} style={{ borderRadius: 2 }}>
+            <Glyph e={spec.emoji} size={16} className={`mt-0.5 shrink-0 ${stCls}`} />
+            <div className="min-w-0">
+              <div className={`text-[11.5px] font-semibold ${stCls}`}>Wirtschaftsschock: {spec.labelDe} <span className="font-normal text-dim">· noch ~{left} {left === 1 ? 'Woche' : 'Wochen'}</span></div>
+              <div className="text-[10.5px] leading-tight text-dim">{spec.headlineDe}</div>
+            </div>
+          </div>
+        );
+      })()}
       <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-3 sm:grid-cols-5">
         <div><div className="kicker text-[8.5px]">Leitzins</div><div className="num text-[16px]">{m.interestRatePct.toFixed(1)} %</div></div>
         <div><div className="kicker text-[8.5px]">Inflation</div><div className={`num text-[16px] ${m.inflationPct > 4 ? 'text-bad' : m.inflationPct > 3 ? 'text-warn' : 'text-ink'}`}>{m.inflationPct.toFixed(1)} %</div></div>

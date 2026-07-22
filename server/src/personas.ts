@@ -7,6 +7,7 @@ import {
   takeoverSummaryDe,
   crisisSummaryDe,
   macroSummaryDe,
+  macroShockSummaryDe,
   rivalrySummaryDe,
   politicsSummaryDe,
   laborSummaryDe,
@@ -63,6 +64,7 @@ export function stateBriefDe(state: CompanyState): string {
     ...(state.takeover.status !== 'none' ? [`⚠️ Übernahme: ${takeoverSummaryDe(state)}.`] : []),
     ...(state.crisis.status !== 'none' ? [`⚠️ Krise: ${crisisSummaryDe(state)}.`] : []),
     `Konjunktur: ${macroSummaryDe(state)}.`,
+    ...(state.macro.shock ? [`⚠️ Wirtschaftsschock — ${macroShockSummaryDe(state)}.`] : []),
     ...(state.rivalry.status !== 'none' ? [`⚔️ Wettbewerber-Angriff: ${rivalrySummaryDe(state)}.`] : []),
     ...(state.politics.politicalCapital > 8 || state.politics.exposure > 0 ? [`Politik & Lobbyismus: ${politicsSummaryDe(state)}.`] : []),
   ].join('\n');
