@@ -53,6 +53,7 @@ import { tickMacroShocks } from './macroShocks.js';
 import { insurancePremiumMonthly, fileInsuranceClaim, classifyClaim } from './insurance.js';
 import { tickCertifications, certMaintenanceMonthly } from './certifications.js';
 import { tickProductStudio, moduleMaintenanceMonthly } from './productStudio.js';
+import { tickFiskus, taxStrategyFactor, bookTaxSavings } from './fiskus.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -143,6 +144,7 @@ export function closeWeek(state: CompanyState): WeekReport {
   tickRegulation(state, occurrences);
   tickCertifications(state, occurrences);
   tickProductStudio(state, occurrences);
+  tickFiskus(state, occurrences);
 
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);
@@ -782,7 +784,11 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   // ausländische Standorte behalten ihren pauschalen Satz.
   const loc = locationOf(state);
   const taxRate = Math.max(0, effectiveCorporateTaxRate(state.legal, loc.country, loc.taxRate) - politicsTaxRelief(state));
-  const tax = ebt > 0 && f.retainedEarnings > 0 ? ebt * taxRate : 0;
+  const taxBase = ebt > 0 && f.retainedEarnings > 0 ? ebt * taxRate : 0;
+  // Steuerstrategie (FB4): Nur der deklarierte Anteil wird gezahlt; die
+  // „Ersparnis" wandert anteilig ins Schwarzbuch (Prüfungsrisiko).
+  const tax = taxBase * taxStrategyFactor(state);
+  if (taxBase > tax) bookTaxSavings(state, taxBase - tax);
   ledger.taxPaid = tax;
   const netIncome = ebt - tax;
 

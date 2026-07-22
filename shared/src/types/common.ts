@@ -58,7 +58,8 @@ export type GameStatus =
   | 'insolvent' // Cash < 0 ⇒ Game Over
   | 'fired' // Board-Misstrauensvotum ⇒ Game Over
   | 'exited' // Verkauf/Exit (spätere Phase)
-  | 'retired'; // Freiwilliger Rücktritt / Amtsende (Phase 13)
+  | 'retired' // Freiwilliger Rücktritt / Amtsende (Phase 13)
+  | 'convicted'; // Haftbefehl (Steuerhinterziehung > 1 Mio €, Phase 22 FB4)
 
 /** Umrechnungskonstanten. */
 export const DAYS_PER_MONTH = 30.44;

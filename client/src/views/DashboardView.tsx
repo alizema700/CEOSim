@@ -208,6 +208,17 @@ export function DashboardView() {
         );
       })()}
 
+      {/* ── Steuerfahndung (FB4): Razzia-Banner ───────────────────────── */}
+      {state.fiskus.activeAudit?.kind === 'steuerfahndung' && (
+        <section className="breaking border-2 border-bad bg-bad/5 px-4 py-3" style={{ borderRadius: 3 }}>
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <span className="breaking-kicker kicker inline-flex items-center gap-1.5 px-1 text-bad"><Icon name="alert" size={13} /> RAZZIA · Steuerfahndung im Haus</span>
+            <button className="btn border-bad text-bad" onClick={() => useStore.getState().setView('finance')}>Zu Steuern & Prüfungen →</button>
+          </div>
+          <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-ink2">Die Fahndung hat Büro und Server durchsucht (§ 208 AO), Unterlagen sind sichergestellt — noch ~{Math.max(0, state.fiskus.activeAudit.endWeek - state.meta.week)} Wochen bis zum Ergebnis. {state.fiskus.hinterzogenTotal >= 1_000_000 ? 'Über 1 Mio € hinterzogen: Wenn sie fündig werden, endet das in Haft.' : 'Was sie finden, wird teuer — Nachzahlung plus Strafzuschlag.'}</p>
+        </section>
+      )}
+
       {/* ── Regulierung/Aufsicht (M5): warn-Banner bei aktiver Auflage ── */}
       {state.politics.activeRegulation && (() => {
         const rspec = REGULATION_SPECS[state.politics.activeRegulation.kind];

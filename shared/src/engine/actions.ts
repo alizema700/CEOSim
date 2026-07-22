@@ -17,6 +17,7 @@ import { startCertification } from './certifications.js';
 import { CERTIFICATION_SPECS } from '../types/certifications.js';
 import { startModuleBuild } from './productStudio.js';
 import { MODULE_SPECS, PACKAGING_SPECS, POSITIONING_SPECS } from '../types/product.js';
+import { TAX_STRATEGY_SPECS } from '../types/fiskus.js';
 import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
@@ -488,6 +489,17 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
     case 'SET_PACKAGING': {
       if (state.product.packaging === action.packaging) errors.push('Dieses Preismodell ist bereits aktiv.');
       if (action.packaging === 'usage') warnings.push('Nutzungsbasiert wächst mit den Kunden — aber Rechnungsschock kostet erfahrungsgemäß Bindung.');
+      break;
+    }
+    case 'SET_TAX_STRATEGY': {
+      if (state.fiskus.strategy === action.strategy) errors.push('Diese Steuerstrategie ist bereits aktiv.');
+      if (action.strategy === 'aggressiv') warnings.push('Graubereich: spart Steuern, aber bei einer Betriebsprüfung drohen Nachzahlung plus 6 % Zinsen p. a. — das Prüfrisiko steigt Woche für Woche.');
+      if (action.strategy === 'illegal') {
+        warnings.push('STRAFBAR (§ 370 AO): Hinterziehung spart kurzfristig viel — aber Betriebsprüfung und Steuerfahndung existieren wirklich. Bei Entdeckung: Nachzahlung + Strafzuschlag, Presse, Board.');
+        warnings.push('Ab 1.000.000 € hinterzogener Summe gibt es nach BGH-Rechtsprechung keine Bewährung mehr: Auffliegen bei der Fahndung heißt dann Haft — und Spielende.');
+        warnings.push('Auch die D&O-Versicherung schützt NICHT bei Vorsatz.');
+      }
+      if (action.strategy === 'konservativ' && state.fiskus.schwarzbuch > 0) warnings.push(`Der Kurswechsel stoppt neues Risiko — die bereits offenen ${Math.round(state.fiskus.schwarzbuch / 1000)} k€ im Schwarzbuch bleiben aber bestehen, bis eine Prüfung kommt (oder nie).`);
       break;
     }
 
@@ -1193,6 +1205,16 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push(`${pkSpec.hintDe} Die Wirkung greift ab dem nächsten Wochenschluss (Abschlussquote, Bindung, Expansion).`);
       break;
     }
+    case 'SET_TAX_STRATEGY': {
+      const tSpec = TAX_STRATEGY_SPECS[action.strategy];
+      state.fiskus.strategy = action.strategy;
+      state.fiskus.logDe.unshift(`W${week}: Steuerstrategie umgestellt auf „${tSpec.labelDe}".`);
+      summary = `Steuerstrategie: ${tSpec.labelDe}`;
+      analysis.push(tSpec.hintDe);
+      if (action.strategy === 'illegal') analysis.push('Ab jetzt fließt jede Woche ein Teil der eigentlich fälligen Steuer am Fiskus vorbei — und wandert als offenes Risiko ins Schwarzbuch. Betriebsprüfung und Steuerfahndung sind keine Theorie: Das Prüfrisiko wächst jede Woche.');
+      if (action.strategy === 'konservativ') analysis.push('Sauberer Kurs: keine neue Risikoposition, das Prüfrisiko klingt langsam ab. Bestehendes Schwarzbuch verschwindet dadurch nicht.');
+      break;
+    }
     case 'COUNTER_COMPETITOR': {
       const strikeOcc: Occurrence[] = [];
       const attacker = state.rivalry.attackerName;
@@ -1304,7 +1326,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'TOWNHALL' || action.type === 'AUSTERITY' || action.type === 'KEY_ACCOUNT_OFFENSIVE' || action.type === 'SPECIAL_BONUS' || action.type === 'STAR_HIRE' || action.type === 'CUSTOMER_ADVISORY_BOARD' || action.type === 'ETHICS_PROGRAM' || action.type === 'BUY_INSURANCE' || action.type === 'CANCEL_INSURANCE' || action.type === 'PURSUE_CERTIFICATION' || action.type === 'SET_POSITIONING' || action.type === 'SET_PACKAGING' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'TOWNHALL' || action.type === 'AUSTERITY' || action.type === 'KEY_ACCOUNT_OFFENSIVE' || action.type === 'SPECIAL_BONUS' || action.type === 'STAR_HIRE' || action.type === 'CUSTOMER_ADVISORY_BOARD' || action.type === 'ETHICS_PROGRAM' || action.type === 'BUY_INSURANCE' || action.type === 'CANCEL_INSURANCE' || action.type === 'PURSUE_CERTIFICATION' || action.type === 'SET_POSITIONING' || action.type === 'SET_PACKAGING' || action.type === 'SET_TAX_STRATEGY' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

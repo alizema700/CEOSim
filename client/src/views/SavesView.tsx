@@ -18,7 +18,7 @@ export function SavesView() {
     void loadGames();
   }, [loadGames]);
 
-  const statusDe: Record<string, string> = { active: '● aktiv', insolvent: 'insolvent', fired: 'abgewählt', exited: 'Exit' };
+  const statusDe: Record<string, string> = { active: '● aktiv', insolvent: 'insolvent', fired: 'abgewählt', exited: 'Exit', retired: 'Amtsende', convicted: 'verhaftet' };
 
   return (
     <div className="min-h-full bg-bg">

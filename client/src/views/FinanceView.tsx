@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { totalMrr, INSURANCE_KINDS, INSURANCE_SPECS, insurancePremiumMonthly } from '@boardroom/shared';
-import type { InsuranceKind } from '@boardroom/shared';
+import { totalMrr, INSURANCE_KINDS, INSURANCE_SPECS, insurancePremiumMonthly, TAX_AUDIT_SPECS, TAX_STRATEGY_SPECS } from '@boardroom/shared';
+import type { InsuranceKind, TaxStrategy } from '@boardroom/shared';
 import { useStore } from '../store.js';
-import { KpiTrendDrill, Panel, StatRow } from '../components/ui.js';
+import { Bar, KpiTrendDrill, Panel, StatRow } from '../components/ui.js';
 import { Icon } from '../components/Icon.js';
 import { eur, pct } from '../format.js';
 
@@ -102,7 +102,87 @@ export function FinanceView() {
       </div>
 
       <InsurancePanel />
+
+      <FiskusPanel />
     </div>
+  );
+}
+
+/**
+ * Fiskus & Prüfungen (Phase 22, FB4): Steuerstrategie inkl. der strafbaren
+ * Option — dem gegenüber ein echtes Prüfwesen (Betriebsprüfung, Steuerfahndung,
+ * WP, DRV, Fördermittel). Wer hinterzieht, kann auffliegen.
+ */
+function FiskusPanel() {
+  const { state, act, busy } = useStore();
+  if (!state) return null;
+  const fk = state.fiskus;
+  const active = state.meta.status === 'active';
+  const audit = fk.activeAudit;
+  const risk = Math.round(fk.auditRisk);
+
+  return (
+    <Panel icon="scale" title="Steuern & Prüfungen" right={<span className="num text-[12px] text-dim">{fk.cleanAudits} Prüfung(en) ohne Beanstandung · Strafen {eur(fk.finesTotal)}</span>}>
+      <p className="mb-3 max-w-[82ch] text-[11px] leading-relaxed text-dim">
+        Wie hältst du es mit dem Fiskus? Auch der Graubereich und der Rechtsbruch stehen offen — aber Betriebsprüfung, Steuerfahndung & Co. existieren wirklich. Was du „sparst", liegt als offenes Risiko im Schwarzbuch, bis eine Prüfung kommt. Oder eben nicht.
+      </p>
+
+      <div className="grid gap-2.5 md:grid-cols-3">
+        {(Object.keys(TAX_STRATEGY_SPECS) as TaxStrategy[]).map((key) => {
+          const spec = TAX_STRATEGY_SPECS[key];
+          const isActive = fk.strategy === key;
+          const danger = key === 'illegal';
+          return (
+            <button
+              key={key}
+              className={`border p-2.5 text-left transition-colors ${isActive ? (danger ? 'border-bad bg-bad/10' : 'border-accent bg-accent/5') : danger ? 'border-bad/40 hover:border-bad' : 'border-line hover:border-accent'}`}
+              style={{ borderRadius: 2 }}
+              disabled={busy || !active || isActive}
+              onClick={() => void act({ type: 'SET_TAX_STRATEGY', strategy: key }, null)}
+            >
+              <div className={`text-[12.5px] font-semibold ${danger ? 'text-bad' : 'text-ink'}`}>{spec.labelDe} {isActive && '●'}</div>
+              <div className="mt-0.5 text-[10px] leading-tight text-dim">{spec.hintDe}</div>
+              <div className="num mt-1 text-[10px] text-dim">deklariert: {(spec.declaredFactor * 100).toFixed(0)} % der Steuerlast</div>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-3 grid gap-x-6 gap-y-2 md:grid-cols-3">
+        <div>
+          <div className="mb-0.5 flex justify-between text-[10px]"><span className="kicker text-[8px]">Prüfrisiko</span><span className={`num ${risk >= 55 ? 'text-bad' : risk >= 30 ? 'text-warn' : 'text-ink'}`}>{risk}/100</span></div>
+          <Bar value={risk} color={risk >= 55 ? 'bg-bad' : 'bg-warn'} />
+        </div>
+        <div className="text-[11px]">
+          <span className="kicker text-[8px]">Schwarzbuch (unversteuert) </span>
+          <span className={`num ${fk.schwarzbuch > 0 ? 'text-bad' : 'text-dim'}`}>{fk.schwarzbuch > 0 ? eur(fk.schwarzbuch) : '— sauber'}</span>
+        </div>
+        <div className="text-[11px]">
+          <span className="kicker text-[8px]">Hinterzogen (Lebenszeit) </span>
+          <span className={`num ${fk.hinterzogenTotal >= 1_000_000 ? 'text-bad' : fk.hinterzogenTotal > 0 ? 'text-warn' : 'text-dim'}`}>{fk.hinterzogenTotal > 0 ? eur(fk.hinterzogenTotal) : '—'}</span>
+          {fk.hinterzogenTotal >= 700_000 && fk.hinterzogenTotal < 1_000_000 && <span className="ml-1 text-[9px] text-bad">nahe der 1-Mio-Haftgrenze!</span>}
+        </div>
+      </div>
+
+      {audit && (
+        <div className="mt-3 flex items-start gap-2 border-l-2 border-bad/70 bg-panel2/40 px-2.5 py-1.5" style={{ borderRadius: 2 }}>
+          <Icon name="search" size={14} className="mt-0.5 shrink-0 text-bad" />
+          <div className="min-w-0">
+            <div className="text-[11.5px] font-semibold text-bad">{TAX_AUDIT_SPECS[audit.kind].labelDe} läuft <span className="font-normal text-dim">· noch ~{Math.max(0, audit.endWeek - state.meta.week)} Wo.</span></div>
+            <div className="text-[10px] leading-tight text-dim">Die Prüfer sitzen im Haus. {fk.schwarzbuch > 0 ? 'Und im Schwarzbuch liegt etwas, das sie finden könnten.' : 'Saubere Bücher — dann ist das Routine.'}</div>
+          </div>
+        </div>
+      )}
+
+      {fk.logDe.length > 0 && (
+        <div className="mt-3 border-t border-line/40 pt-2">
+          <div className="kicker mb-1 text-[8px]">Chronik</div>
+          <ul className="grid gap-x-4 gap-y-0.5 text-[9.5px] leading-tight text-dim sm:grid-cols-2">
+            {fk.logDe.slice(0, 6).map((l, i) => <li key={i}>· {l}</li>)}
+          </ul>
+        </div>
+      )}
+    </Panel>
   );
 }
 

@@ -68,6 +68,7 @@ export type PlayerAction =
   | BuildModuleAction
   | SetPositioningAction
   | SetPackagingAction
+  | SetTaxStrategyAction
   | LobbyAction
   | StepDownAction;
 
@@ -527,6 +528,13 @@ export interface SetPositioningAction {
 export interface SetPackagingAction {
   type: 'SET_PACKAGING';
   packaging: import('./product.js').PricingPackaging;
+}
+
+// ── Fiskus (Phase 22, FB4) ───────────────────────────────────────────
+/** Steuerstrategie setzen — inkl. der (strafbaren) Option Hinterziehung. */
+export interface SetTaxStrategyAction {
+  type: 'SET_TAX_STRATEGY';
+  strategy: import('./fiskus.js').TaxStrategy;
 }
 
 // ── Zertifizierungen (Phase 22, V2) ──────────────────────────────────

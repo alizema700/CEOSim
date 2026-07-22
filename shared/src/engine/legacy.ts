@@ -49,7 +49,7 @@ export function computeLegacy(state: CompanyState): LegacyReport {
   const dCompany = clamp(45 + (mrrRatio - 1) * 70 + clamp(now.ebitdaMarginPct, -0.4, 0.4) * 60, 0, 100);
   const dCompanyNote = mrrRatio >= 1.5 ? 'die Firma ist unter dir deutlich gewachsen' : mrrRatio >= 1.05 ? 'solides Wachstum des Umsatzmotors' : mrrRatio >= 0.9 ? 'der Umsatz stagnierte' : 'der Umsatz schrumpfte in deiner Zeit';
 
-  const survived = status !== 'insolvent';
+  const survived = status !== 'insolvent' && status !== 'convicted';
   const dCapital = survived ? clamp(30 + Math.min(now.runwayWeeks, 104) / 104 * 50 + (now.ebitdaMonthly > 0 ? 20 : 0), 0, 100) : 8;
   const dCapitalNote = !survived ? 'die Kasse lief leer — der schwerste aller Fehler' : now.ebitdaMonthly > 0 ? 'profitabel und mit Puffer geführt' : now.runwayWeeks > 40 ? 'komfortabler Runway gehalten' : 'am Liquiditätslimit balanciert';
 
@@ -89,6 +89,7 @@ export function computeLegacy(state: CompanyState): LegacyReport {
   const weights: Record<string, number> = { company: 0.22, capital: 0.16, customers: 0.18, people: 0.16, governance: 0.16, personal: 0.12 };
   let overall = dimensions.reduce((s, d) => s + d.score * weights[d.key]!, 0);
   if (status === 'insolvent') overall = Math.min(overall, 28);
+  if (status === 'convicted') overall = Math.min(overall, 18);
   if (status === 'fired') overall = Math.min(overall, 40);
   overall = Math.round(overall);
   const grade = overall >= 85 ? 1 : overall >= 70 ? 2 : overall >= 55 ? 3 : overall >= 42 ? 4 : overall >= 30 ? 5 : 6;
@@ -137,6 +138,7 @@ function legacyTitle(state: CompanyState, overall: number): string {
   const s = state.meta.status;
   const listed = state.ipo.status === 'public';
   if (s === 'insolvent') return 'Der Absturz — Insolvenz';
+  if (s === 'convicted') return 'Der Fall — in Handschellen aus dem Amt';
   if (s === 'fired') return 'Abberufen — das Vertrauen verspielt';
   if (s === 'exited') return overall >= 70 ? 'Der Exit-Stratege' : 'Notverkauf unter Wert';
   const base = overall >= 88 ? 'Legende an der Spitze' : overall >= 75 ? 'Baumeister:in eines Champions' : overall >= 60 ? 'Solide Amtszeit' : overall >= 45 ? 'Durchwachsene Bilanz' : 'Schwere Jahre';
@@ -145,6 +147,7 @@ function legacyTitle(state: CompanyState, overall: number): string {
 
 function legacyClosingLine(status: GameStatus, grade: number): string {
   if (status === 'insolvent') return 'Lektion: Cash ist Sauerstoff. Alles andere ist erst danach wichtig.';
+  if (status === 'convicted') return 'Lektion: Es gibt Abkürzungen, die direkt in die Zelle führen. Steuern sind keine Verhandlungsmasse.';
   if (status === 'fired') return 'Lektion: Ein Board führt man nicht mit Ergebnissen allein, sondern mit Vertrauen und Kommunikation.';
   if (grade <= 2) return 'Ein Vermächtnis, das bleibt: Wachstum, Rückhalt und Haltung in Balance.';
   if (grade <= 4) return 'Eine respektable Amtszeit mit klaren Baustellen — aus denen die nächste Runde lernt.';

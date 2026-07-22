@@ -78,6 +78,7 @@ export interface CompanyState {
   politics: import('./politics.js').PoliticsState;
   insurance: import('./insurance.js').InsuranceState;
   certifications: import('./certifications.js').CertificationState;
+  fiskus: import('./fiskus.js').FiskusState;
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];

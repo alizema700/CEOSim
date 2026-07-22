@@ -148,6 +148,7 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('BUILD_MODULE'), module: z.enum(['analytics', 'api', 'mobile', 'kiAssistent', 'whitelabel']) }),
   z.object({ type: z.literal('SET_POSITIONING'), positioning: z.enum(['einfachheit', 'balance', 'power']) }),
   z.object({ type: z.literal('SET_PACKAGING'), packaging: z.enum(['single', 'tiers', 'usage']) }),
+  z.object({ type: z.literal('SET_TAX_STRATEGY'), strategy: z.enum(['konservativ', 'aggressiv', 'illegal']) }),
 ]);
 
 const zHypothesis = z
