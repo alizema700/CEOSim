@@ -57,6 +57,7 @@ export function stateBriefDe(state: CompanyState): string {
     `Firma: ${state.identity.companyName} (${state.identity.productPitch || 'B2B-SaaS'}), Woche ${state.meta.week}.`,
     `Werte: ${state.identity.values.join(', ')} · Motto: „${state.identity.motto}“.`,
     `MRR ${Math.round(totalMrr(state) / 1000)} k€/M · Cash ${Math.round(state.finance.cash / 1000)} k€ · Runway ${Math.round(runwayWeeks(state))} W · Logo-Churn ${(effectiveMonthlyChurn(state) * 100).toFixed(1)} %/M.`,
+    ...(state.finance.treasury > 0 ? [`Treasury (Geldmarkt): ${Math.round(state.finance.treasury / 1000)} k€ angelegt, verzinst mit ${state.macro.interestRatePct.toFixed(1)} % p. a. — nicht als Runway-Puffer verfügbar.`] : []),
     `Team ${state.people.employees.length} Köpfe · Ø-Zufriedenheit ${Math.round(k.avgSatisfaction)} · Tech-Debt ${Math.round(state.product.techDebt)}/100 · NPS ${Math.round(state.product.nps)}.`,
     `Arbeitsbeziehungen: ${laborSummaryDe(state.labor)}${state.labor.negotiation ? ` · laufende Tarifrunde: Forderung +${(state.labor.negotiation.demandPct * 100).toFixed(1)} %` : ''}.`,
     `Struktur: ${legalSummaryDe(state)}.`,

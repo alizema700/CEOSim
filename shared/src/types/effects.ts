@@ -60,7 +60,11 @@ export type EffectPayload =
   /** (Warn-)Streik (Phase 8): Produktivitäts- & Vertriebseinbruch, Presse. */
   | { kind: 'WARNING_STRIKE'; full: boolean }
   /** Gewinnausschüttung (Phase 9): Cash-Abfluss (CFF) + Minderung der Gewinnrücklage. */
-  | { kind: 'DIVIDEND_PAYOUT'; amount: Money };
+  | { kind: 'DIVIDEND_PAYOUT'; amount: Money }
+  /** Treasury-Anlage (Phase 22, M6): Cash → Geldmarkt-Treasury (CFI-Abfluss). */
+  | { kind: 'TREASURY_ALLOCATE'; amount: Money }
+  /** Treasury-Auflösung (Phase 22, M6): Treasury → Cash (CFI-Zufluss). */
+  | { kind: 'TREASURY_WITHDRAW'; amount: Money };
 
 /** Zeitlich begrenzter Modifikator auf eine Systemgröße. */
 export interface ActiveModifier {

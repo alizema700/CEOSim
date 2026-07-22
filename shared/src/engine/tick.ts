@@ -94,6 +94,9 @@ export function closeWeek(state: CompanyState): WeekReport {
     debtRepaid: 0,
     equityRaised: 0,
     dividendsPaid: 0,
+    treasuryIn: 0,
+    treasuryOut: 0,
+    treasuryYield: 0,
   };
   const cashStart = state.finance.cash;
 
@@ -189,6 +192,7 @@ type Ledger = {
   interestPaid: number; taxPaid: number; oneOffsPaid: number;
   debtDrawn: number; debtRepaid: number; equityRaised: number;
   dividendsPaid: number;
+  treasuryIn: number; treasuryOut: number; treasuryYield: number;
 };
 
 // ────────────────────────────────────────────────────────────────────
@@ -272,6 +276,22 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
       state.finance.debt.principal += fx.amount;
       occ.push({ icon: '🏦', textDe: `Kreditlinie gezogen: ${k(fx.amount)}.`, severity: 'info' });
       break;
+    case 'TREASURY_ALLOCATE': {
+      // Cash → Treasury (CFI-Abfluss). Nicht mehr anlegen als vorhanden.
+      const amt = Math.max(0, Math.min(fx.amount, state.finance.cash));
+      state.finance.treasury += amt;
+      ledger.treasuryIn += amt;
+      occ.push({ icon: '🏦', textDe: `Treasury-Anlage: ${k(amt)} in den Geldmarkt.`, severity: 'info' });
+      break;
+    }
+    case 'TREASURY_WITHDRAW': {
+      // Treasury → Cash (CFI-Zufluss). Nicht mehr auflösen als vorhanden.
+      const amt = Math.max(0, Math.min(fx.amount, state.finance.treasury));
+      state.finance.treasury -= amt;
+      ledger.treasuryOut += amt;
+      occ.push({ icon: '🏦', textDe: `Treasury aufgelöst: ${k(amt)} zurück aufs Firmenkonto.`, severity: 'info' });
+      break;
+    }
     case 'DEBT_REPAY': {
       const amt = Math.min(fx.amount, state.finance.debt.principal);
       ledger.debtRepaid += amt;
@@ -730,6 +750,8 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
 
   // Zins (wöchentlich zahlungswirksam)
   ledger.interestPaid = f.debt.principal * f.debt.annualRate * (7 / 365);
+  // Treasury-Zinsertrag (M6): Geldmarkt verzinst sich mit dem Leitzins.
+  ledger.treasuryYield = f.treasury * (state.macro.interestRatePct / 100) * (7 / 365);
 
   // GuV
   const opex: Record<OpexLine, { payroll: number; other: number }> = {
@@ -741,7 +763,9 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   const opexTotal = Object.values(opex).reduce((s, o) => s + o.payroll + o.other, 0);
   const grossProfit = ledger.revenueRecognized - ledger.cogsBooked;
   const ebitda = grossProfit - opexTotal;
-  const ebt = ebitda - ledger.oneOffsPaid - ledger.interestPaid;
+  // Netto-Zins = Zinsaufwand − Treasury-Zinsertrag (M6). Der Ertrag hebt das EBT.
+  const netInterest = ledger.interestPaid - ledger.treasuryYield;
+  const ebt = ebitda - ledger.oneOffsPaid - netInterest;
   // Steuern nur auf positives Ergebnis UND wenn Verlustvorträge aufgebraucht (vereinfachtes Modell).
   // Deutsche Kapitalgesellschaft: KSt + Soli + Gewerbesteuer (Hebesatz je Stadt);
   // ausländische Standorte behalten ihren pauschalen Satz.
@@ -761,7 +785,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
     opexTotal: toCents(opexTotal),
     ebitda: toCents(ebitda),
     oneOffs: toCents(ledger.oneOffsPaid),
-    interest: toCents(ledger.interestPaid),
+    interest: toCents(netInterest),
     tax: toCents(tax),
     netIncome: toCents(netIncome),
   };
@@ -770,8 +794,11 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   const cfoNet =
     ledger.collections + ledger.annualPrepayCash - ledger.payrollPaid - ledger.apPaid -
     ledger.interestPaid - ledger.taxPaid - ledger.oneOffsPaid;
+  // Investitions-Cashflow (M6): Treasury-Zufluss (Auflösung) − Abfluss (Anlage) + Zinsertrag.
+  const cfiNet = ledger.treasuryOut - ledger.treasuryIn + ledger.treasuryYield;
   const cffNet = ledger.debtDrawn - ledger.debtRepaid + ledger.equityRaised - ledger.dividendsPaid;
-  f.cash = cashStart + cfoNet + cffNet;
+  f.cash = cashStart + cfoNet + cfiNet + cffNet;
+  f.treasuryYieldTotal += ledger.treasuryYield;
 
   // Eigenkapital fortschreiben
   f.retainedEarnings += netIncome;
@@ -795,22 +822,26 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
       oneOffs: toCents(-ledger.oneOffsPaid),
       net: toCents(cfoNet),
     },
-    investing: { net: 0 },
+    investing: {
+      treasuryFlows: toCents(ledger.treasuryOut - ledger.treasuryIn),
+      treasuryYield: toCents(ledger.treasuryYield),
+      net: toCents(cfiNet),
+    },
     financing: {
       debtDrawn: toCents(ledger.debtDrawn),
       debtRepaid: toCents(-ledger.debtRepaid),
       equityRaised: toCents(ledger.equityRaised - ledger.dividendsPaid),
       net: toCents(cffNet),
     },
-    netChange: toCents(cfoNet + cffNet),
+    netChange: toCents(cfoNet + cfiNet + cffNet),
     cashEnd: toCents(f.cash),
   };
 
-  const assetsTotal = f.cash + f.accountsReceivable;
+  const assetsTotal = f.cash + f.accountsReceivable + f.treasury;
   const liabTotal = f.accountsPayable + f.deferredRevenue + f.debt.principal;
   const equityTotal = f.contributedCapital + f.retainedEarnings;
   const balance: BalanceSheet = {
-    assets: { cash: toCents(f.cash), accountsReceivable: toCents(f.accountsReceivable), total: toCents(assetsTotal) },
+    assets: { cash: toCents(f.cash), accountsReceivable: toCents(f.accountsReceivable), treasury: toCents(f.treasury), total: toCents(assetsTotal) },
     liabilities: {
       accountsPayable: toCents(f.accountsPayable),
       deferredRevenue: toCents(f.deferredRevenue),

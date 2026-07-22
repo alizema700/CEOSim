@@ -28,6 +28,14 @@ export interface FinanceState {
   contributedCapital: Money;
   /** Kumulierte Gewinne/Verluste. */
   retainedEarnings: Money;
+  /**
+   * Firmen-Treasury (Phase 22, M6): in den Geldmarkt angelegte liquide Mittel.
+   * Eigene Aktiva-Klasse (nicht Teil von `cash`) — verzinst sich mit dem Leitzins,
+   * ist aber nicht sofort als Runway-Puffer verfügbar. Aktiva = Cash + AR + Treasury.
+   */
+  treasury: Money;
+  /** Kumuliert vereinnahmte Treasury-Zinserträge (fürs UI). */
+  treasuryYieldTotal: Money;
 
   /** Days Sales Outstanding — Zahlungsziel-Realität der Kunden (Tage). */
   dsoDays: number;
@@ -101,7 +109,8 @@ export interface CashFlowStatement {
     oneOffs: Money; // Abfindungen etc.
     net: Money;
   };
-  investing: { net: Money };
+  /** Investitions-Cashflow: Treasury-Zu-/Abflüsse + vereinnahmte Zinserträge (M6). */
+  investing: { treasuryFlows: Money; treasuryYield: Money; net: Money };
   financing: {
     debtDrawn: Money;
     debtRepaid: Money;
@@ -115,7 +124,7 @@ export interface CashFlowStatement {
 
 /** Bilanz zum Wochenende. */
 export interface BalanceSheet {
-  assets: { cash: Money; accountsReceivable: Money; total: Money };
+  assets: { cash: Money; accountsReceivable: Money; treasury: Money; total: Money };
   liabilities: {
     accountsPayable: Money;
     deferredRevenue: Money;

@@ -283,6 +283,8 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
       },
       contributedCapital,
       retainedEarnings,
+      treasury: 0,
+      treasuryYieldTotal: 0,
       dsoDays: dso,
       dpoDays: dz ? 33 : 24,
       cogsRate: 0.22,

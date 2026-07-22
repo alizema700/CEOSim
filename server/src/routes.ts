@@ -131,6 +131,8 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('CEO_INVEST'), instrument: z.enum(['geldmarkt', 'aktienindex', 'angel']), amount: z.number() }),
   z.object({ type: z.literal('CEO_DIVEST'), instrument: z.enum(['geldmarkt', 'aktienindex', 'angel']), amount: z.number() }),
   z.object({ type: z.literal('LOBBY'), focus: z.enum(['steuern', 'subvention', 'zugang']) }),
+  z.object({ type: z.literal('TREASURY_ALLOCATE'), amount: z.number().positive() }),
+  z.object({ type: z.literal('TREASURY_WITHDRAW'), amount: z.number().positive() }),
 ]);
 
 const zHypothesis = z

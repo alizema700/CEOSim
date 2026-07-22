@@ -71,6 +71,7 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   if (s.politics && (s.politics as { regulatoryPressure?: number }).regulatoryPressure === undefined) { const p = s.politics as { regulatoryPressure: number; activeRegulation: null; lastRegulationWeek: number }; p.regulatoryPressure = 0; p.activeRegulation = null; p.lastRegulationWeek = -99; }
   if (s.macro && (s.macro as { inflationPct?: number }).inflationPct === undefined) { (s.macro as { inflationPct: number }).inflationPct = 2.0; (s.macro as { capitalIndex: number }).capitalIndex = 100; }
   if (s.macro && (s.macro as { shock?: unknown }).shock === undefined) { (s.macro as { shock: null }).shock = null; (s.macro as { lastShockEpisodeWeek: number }).lastShockEpisodeWeek = -99; }
+  if (s.finance && (s.finance as { treasury?: number }).treasury === undefined) { (s.finance as { treasury: number }).treasury = 0; (s.finance as { treasuryYieldTotal: number }).treasuryYieldTotal = 0; }
   if (s.board && s.board.lastMeetingWeek === undefined) { s.board.lastMeetingWeek = -99; s.board.lastMeeting = null; }
   if (s.ceo && !s.ceo.personal) s.ceo.personal = initialCeoPersonal();
   if (s.ceo && !s.ceo.portfolio) s.ceo.portfolio = initialCeoPortfolio();

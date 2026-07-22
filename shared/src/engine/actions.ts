@@ -387,6 +387,20 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       break;
     }
 
+    case 'TREASURY_ALLOCATE': {
+      if (action.amount <= 0) errors.push('Betrag muss positiv sein.');
+      if (action.amount > f.cash) errors.push(`So viel liquide Mittel sind nicht frei (Kasse ${fmt(f.cash)}).`);
+      const minCash = f.debt.covenants.find((c) => c.type === 'minCash');
+      if (minCash && f.cash - action.amount < minCash.value) warnings.push(`Nach der Anlage unterschreitet die Kasse die Mindestliquidität (${fmt(minCash.value)}) — Covenant-Risiko. Treasury zählt nicht als Runway-Puffer.`);
+      else if (action.amount > f.cash * 0.6) warnings.push('Ein großer Teil der Liquidität wandert in die Treasury — sie ist nicht sofort als Runway-Puffer verfügbar.');
+      break;
+    }
+    case 'TREASURY_WITHDRAW': {
+      if (action.amount <= 0) errors.push('Betrag muss positiv sein.');
+      if (action.amount > f.treasury) errors.push(`So viel ist nicht in der Treasury angelegt (aktuell ${fmt(f.treasury)}).`);
+      break;
+    }
+
     case 'LOBBY': {
       if (f.cash < LOBBY_COST[action.focus]) errors.push(`Zu wenig Liquidität fürs Lobbying (${fmt(LOBBY_COST[action.focus])}).`);
       if (state.politics.exposure > 55) warnings.push('Hohes Skandal-Risiko: Weiteres aggressives Lobbying kann als Affäre auffliegen (Presse/Investoren).');
@@ -933,6 +947,19 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push('Der aktuelle Marktwert fließt auf dein Netto-Cash zurück — Gewinne (oder Verluste) sind damit realisiert.');
       break;
     }
+    case 'TREASURY_ALLOCATE': {
+      schedule(state, 0, `Treasury-Anlage W${week}`, decisionId, { kind: 'TREASURY_ALLOCATE', amount: action.amount });
+      summary = `Treasury-Anlage: ${fmt(action.amount)} in den Geldmarkt`;
+      analysis.push(`Die Firmen-Liquidität wandert zum Wochenschluss in die Geldmarkt-Treasury und verzinst sich mit dem Leitzins (${state.macro.interestRatePct.toFixed(1)} % p. a.). Der Zinsertrag hebt das Ergebnis.`);
+      analysis.push('Wichtig: Treasury ist eine eigene Aktiva-Klasse und zählt NICHT als Runway-Puffer — bei Zinsschocks (steigenden Zinsen) steigt der Ertrag, aber die angelegten Mittel fehlen kurzfristig im Cash.');
+      break;
+    }
+    case 'TREASURY_WITHDRAW': {
+      schedule(state, 0, `Treasury-Auflösung W${week}`, decisionId, { kind: 'TREASURY_WITHDRAW', amount: action.amount });
+      summary = `Treasury-Auflösung: ${fmt(action.amount)} zurück aufs Firmenkonto`;
+      analysis.push('Die aufgelöste Anlage fließt zum Wochenschluss zurück in die Kasse und steht wieder als Liquidität/Runway zur Verfügung.');
+      break;
+    }
     case 'LOBBY': {
       const lobbyOcc: Occurrence[] = [];
       const res = doLobby(state, action.focus, lobbyOcc, decisionId);
@@ -1002,7 +1029,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

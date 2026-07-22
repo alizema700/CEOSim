@@ -1,6 +1,8 @@
+import { useState } from 'react';
 import { totalMrr } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { KpiTrendDrill, Panel, StatRow } from '../components/ui.js';
+import { Icon } from '../components/Icon.js';
 import { eur, pct } from '../format.js';
 
 /** Finanzen: GuV, Cash-Flow, Bilanz (letzte Woche), Cap Table, Covenants. */
@@ -44,6 +46,7 @@ export function FinanceView() {
             <StatRow label="− Lieferanten" value={eur(r.cashFlow.operations.suppliers)} />
             <StatRow label="− Zins/Steuer/Einmalig" value={eur(r.cashFlow.operations.interest + r.cashFlow.operations.tax + r.cashFlow.operations.oneOffs)} />
             <StatRow label="= CF operativ" value={<b>{eur(r.cashFlow.operations.net)}</b>} />
+            {r.cashFlow.investing.net !== 0 && <StatRow label="CF Investition (Treasury)" value={eur(r.cashFlow.investing.net)} hint="Treasury-Zu-/Abflüsse + Zinsertrag" />}
             <StatRow label="CF Finanzierung" value={eur(r.cashFlow.financing.net)} />
             <StatRow label="Kasse Ende" value={<b>{eur(r.cashFlow.cashEnd)}</b>} />
             <p className="mt-2 text-[10px] text-good">✓ Invarianten geprüft: Bilanz-Identität & CF-Konsistenz</p>
@@ -57,6 +60,7 @@ export function FinanceView() {
         <div className="mb-1 text-[10px] uppercase text-dim">Aktiva</div>
         <StatRow label="Cash" value={eur(f.cash)} />
         <StatRow label="Forderungen (DSO ~ Zahlungsziel)" value={eur(f.accountsReceivable)} hint={`DSO: ${f.dsoDays} Tage`} />
+        {f.treasury > 0 && <StatRow label="Treasury (Geldmarkt)" value={eur(f.treasury)} hint="Angelegte Liquidität — verzinst, aber kein Runway-Puffer" />}
         <div className="mb-1 mt-3 text-[10px] uppercase text-dim">Passiva</div>
         <StatRow label="Verbindlichkeiten" value={eur(f.accountsPayable)} hint={`DPO: ${f.dpoDays} Tage`} />
         <StatRow label="Deferred Revenue" value={eur(f.deferredRevenue)} hint="Vorausbezahlte Jahresverträge — Leistung noch zu erbringen" />
@@ -92,7 +96,68 @@ export function FinanceView() {
         <StatRow label="G&A-Sachkosten" value={`${eur(f.budgetsMonthly.gaOther)}/M`} />
         <StatRow label="COGS-Quote" value={pct(f.cogsRate)} />
       </Panel>
+
+      <TreasuryPanel />
       </div>
     </div>
+  );
+}
+
+/**
+ * Firmen-Treasury (Phase 22, M6): freie Firmen-Liquidität in den Geldmarkt anlegen.
+ * Verzinst sich mit dem Leitzins, ist aber kein Runway-Puffer — der Reiz liegt im
+ * Trade-off zwischen Zinsertrag und liquider Reserve (v. a. bei Zinsschocks).
+ */
+function TreasuryPanel() {
+  const { state, act, busy } = useStore();
+  const [amount, setAmount] = useState(100_000);
+  if (!state) return null;
+  const f = state.finance;
+  const active = state.meta.status === 'active';
+  const rate = state.macro.interestRatePct;
+  const weeklYield = Math.round(f.treasury * (rate / 100) * (7 / 365));
+  const minCash = f.debt.covenants.find((c) => c.type === 'minCash')?.value ?? 0;
+  const wouldBreach = f.cash - amount < minCash;
+
+  return (
+    <Panel icon="bank" title="Treasury · Geldmarkt-Anlage">
+      <p className="mb-2 max-w-[46ch] text-[10.5px] leading-relaxed text-dim">
+        Lege freie Firmen-Liquidität in den Geldmarkt an — verzinst mit dem Leitzins ({rate.toFixed(1)} % p. a.). Achtung: die Treasury zählt <b>nicht</b> als Runway-Puffer.
+      </p>
+      <div className="grid grid-cols-3 gap-1.5 text-center">
+        <div className="border border-line/60 py-1.5" style={{ borderRadius: 2 }}>
+          <div className="kicker text-[8px]">Angelegt</div>
+          <div className="num text-[15px] text-ink">{f.treasury > 0 ? eur(f.treasury) : '—'}</div>
+        </div>
+        <div className="border border-line/60 py-1.5" style={{ borderRadius: 2 }}>
+          <div className="kicker text-[8px]">Zins p. a.</div>
+          <div className="num text-[15px] text-good">{rate.toFixed(1)} %</div>
+        </div>
+        <div className="border border-line/60 py-1.5" style={{ borderRadius: 2 }}>
+          <div className="kicker text-[8px]">Ertrag/Woche</div>
+          <div className="num text-[15px] text-ink">{weeklYield > 0 ? eur(weeklYield) : '—'}</div>
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <span className="kicker text-[9px]">Betrag</span>
+        <input type="number" className="input w-32 py-1 text-[13px]" value={amount} min={0} step={25_000} onChange={(e) => setAmount(Math.max(0, Number(e.target.value)))} />
+        {[50_000, 100_000, 250_000].map((q) => (
+          <button key={q} className="chip" onClick={() => setAmount(q)}>{eur(q, false)}</button>
+        ))}
+      </div>
+      <div className="mt-2 flex gap-1.5">
+        <button className="btn flex-1 justify-center py-1.5 text-[12px]" disabled={busy || !active || amount <= 0 || amount > f.cash} onClick={() => void act({ type: 'TREASURY_ALLOCATE', amount }, null)}>
+          <Icon name="bank" size={13} className="mr-1" /> Anlegen
+        </button>
+        <button className="btn flex-1 justify-center py-1.5 text-[12px]" disabled={busy || !active || f.treasury <= 0} onClick={() => void act({ type: 'TREASURY_WITHDRAW', amount: Math.min(amount, f.treasury) }, null)}>
+          Auflösen
+        </button>
+      </div>
+      {wouldBreach && amount > 0 && amount <= f.cash && (
+        <p className="mt-2 text-[10px] leading-tight text-warn">Achtung: Nach der Anlage unterschreitet die Kasse die Mindestliquidität ({eur(minCash)}) — Covenant-Risiko.</p>
+      )}
+      {f.treasuryYieldTotal > 0 && <p className="mt-2 text-[10px] text-dim">Kumulierter Zinsertrag bisher: <span className="num text-good">{eur(f.treasuryYieldTotal)}</span>.</p>}
+    </Panel>
   );
 }

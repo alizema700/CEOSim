@@ -25,7 +25,7 @@ export function checkInvariants(
   push(
     'Bilanz: Aktiva = Passiva',
     f.accountsPayable + f.deferredRevenue + f.debt.principal + f.contributedCapital + f.retainedEarnings,
-    f.cash + f.accountsReceivable,
+    f.cash + f.accountsReceivable + f.treasury,
   );
 
   // 2. Cash-Flow-Konsistenz: Endbestand = Anfang + CFO + CFI + CFF

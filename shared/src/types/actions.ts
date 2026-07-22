@@ -51,6 +51,8 @@ export type PlayerAction =
   | CounterCompetitorAction
   | CeoInvestAction
   | CeoDivestAction
+  | TreasuryAllocateAction
+  | TreasuryWithdrawAction
   | LobbyAction
   | StepDownAction;
 
@@ -411,6 +413,18 @@ export interface CeoInvestAction {
 export interface CeoDivestAction {
   type: 'CEO_DIVEST';
   instrument: InvestInstrument;
+  amount: number;
+}
+
+/** Firmen-Cash in die Geldmarkt-Treasury anlegen (Phase 22, M6). */
+export interface TreasuryAllocateAction {
+  type: 'TREASURY_ALLOCATE';
+  amount: number;
+}
+
+/** Treasury auflösen — zurück aufs Firmenkonto (Phase 22, M6). */
+export interface TreasuryWithdrawAction {
+  type: 'TREASURY_WITHDRAW';
   amount: number;
 }
 
