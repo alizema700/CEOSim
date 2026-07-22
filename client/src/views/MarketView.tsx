@@ -1,4 +1,4 @@
-import { macroLeadFactor, macroWinFactor, MACRO_SHOCK_SPECS, REGIME_LABELS, REGIME_TONE, totalMrr } from '@boardroom/shared';
+import { computeEconomicOutlook, macroLeadFactor, macroWinFactor, MACRO_SHOCK_SPECS, REGIME_LABELS, REGIME_TONE, totalMrr } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, KpiTrendDrill, Panel, StatRow } from '../components/ui.js';
 import { Icon, Glyph } from '../components/Icon.js';
@@ -54,6 +54,48 @@ function MacroPanel() {
   );
 }
 
+/**
+ * Analysten-Ausblick (Phase 22, M7): bündelt Konjunktur, Finanzierungsklima,
+ * Bewertungsfenster, Zins-Trajektorie, Nachfrage & Risiken zu einem Vorausblick.
+ */
+function OutlookPanel() {
+  const { state } = useStore();
+  if (!state) return null;
+  const o = computeEconomicOutlook(state);
+  const toneCls = (t: string) => (t === 'good' ? 'text-good' : t === 'warn' ? 'text-warn' : t === 'bad' ? 'text-bad' : 'text-ink');
+  const scorePos = (o.score + 100) / 2; // −100..100 ⇒ 0..100
+  const scoreCls = o.score >= 15 ? 'text-good' : o.score <= -15 ? 'text-bad' : 'text-dim';
+  const scoreBar = o.score >= 15 ? 'bg-good' : o.score <= -15 ? 'bg-bad' : 'bg-warn';
+  return (
+    <section className="rule-top pt-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="kicker inline-flex items-center gap-1.5 text-ink"><Icon name="search" size={13} /> Analysten-Ausblick</span>
+        <span className={`num text-[12px] ${scoreCls}`}>Rückenwind-Index {o.score > 0 ? '+' : ''}{o.score}</span>
+      </div>
+      <p className="mt-1.5 max-w-[86ch] text-[12.5px] leading-relaxed text-ink2">{o.headlineDe}</p>
+      <div className="mt-1"><Bar value={scorePos} color={scoreBar} /></div>
+      <div className="mt-3 grid grid-cols-2 gap-x-3 gap-y-2 sm:grid-cols-4">
+        {o.signals.map((sig) => (
+          <div key={sig.labelDe}>
+            <div className="kicker text-[8.5px]">{sig.labelDe}</div>
+            <div className={`text-[13px] font-semibold capitalize ${toneCls(sig.tone)}`}>{sig.valueDe}</div>
+          </div>
+        ))}
+      </div>
+      {o.risksDe.length > 0 && (
+        <div className="mt-3 border-t border-line/40 pt-2">
+          <div className="kicker mb-1 text-[8px] text-warn">Risiken im Blick</div>
+          <ul className="grid gap-x-4 gap-y-0.5 text-[10.5px] leading-tight text-dim sm:grid-cols-2">
+            {o.risksDe.map((r, i) => (
+              <li key={i} className="flex items-start gap-1"><Icon name="alert" size={11} className="mt-0.5 shrink-0 text-warn" /> {r}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </section>
+  );
+}
+
 /** Markt: Konkurrenz-Dossiers, Marktanteile, Nachfrage. Volle Agenten in Phase 5. */
 export function MarketView() {
   const { state } = useStore();
@@ -66,6 +108,7 @@ export function MarketView() {
   return (
     <div className="space-y-4">
       <MacroPanel />
+      <OutlookPanel />
       <KpiTrendDrill id="market-trend" title="Bewertung, Wachstum & Konzentration · Verlauf" history={state.history} series={[{ kpi: 'valuation', label: 'Bewertung', color: '#2f7f79' }, { kpi: 'mrrGrowthMonthly', label: 'MRR-Wachstum', color: '#b8791f' }, { kpi: 'revenueConcentrationHhi', label: 'Konzentration (HHI)', color: '#5a7d8c' }]} />
       <div className="grid gap-4 lg:grid-cols-3">
         <Panel title="Markt">
