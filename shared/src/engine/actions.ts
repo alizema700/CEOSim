@@ -401,6 +401,35 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
       break;
     }
 
+    case 'TOWNHALL': {
+      if (state.ceo.energy < 8) errors.push(`Zu wenig Energie (${Math.round(state.ceo.energy)}/100) für eine überzeugende Betriebsversammlung.`);
+      if (action.theme === 'transparenz' && runwayWeeks(state) < 10) warnings.push('Radikale Transparenz bei knappem Runway ist mutig: Ehrlichkeit schafft Vertrauen — kann bei schlechter Lage aber auch verunsichern.');
+      break;
+    }
+    case 'LAUNCH_INITIATIVE': {
+      if (action.budget <= 0) errors.push('Budget muss positiv sein.');
+      if (action.budget > f.cash) errors.push(`Zu wenig Liquidität für dieses Initiativ-Budget (Kasse ${fmt(f.cash)}).`);
+      if (action.budget > 0 && action.budget < 20_000) warnings.push('Unter ~20 k€ ist die Wirkung einer strategischen Initiative gering — Erfolgschance & Hebel sind klein.');
+      if (action.budget > f.cash * 0.5) warnings.push('Ein großer Teil der Kasse fließt in eine unsichere Wette — bei Misserfolg ist das Budget verbrannt.');
+      break;
+    }
+    case 'AUSTERITY': {
+      if (f.budgetsMonthly.marketing + f.budgetsMonthly.gaOther < 5_000) warnings.push('Die kürzbaren Budgets (Marketing, G&A) sind bereits sehr niedrig — viel Spielraum bleibt nicht.');
+      else warnings.push('Ein Sparprogramm verlängert den Runway, dämpft aber Lead-Zufluss und Moral — als Signal an die Belegschaft nicht zu unterschätzen.');
+      break;
+    }
+    case 'KEY_ACCOUNT_OFFENSIVE': {
+      if (state.ceo.energy < 7) errors.push(`Zu wenig Energie (${Math.round(state.ceo.energy)}/100) für eine Kunden-Offensive.`);
+      if (f.cash < 8_000) errors.push('Zu wenig Liquidität für Reisen & Betreuung (~8 k€).');
+      break;
+    }
+    case 'BRAND_CAMPAIGN': {
+      if (action.budget <= 0) errors.push('Budget muss positiv sein.');
+      if (action.budget > f.cash) errors.push(`Zu wenig Liquidität für die Kampagne (Kasse ${fmt(f.cash)}).`);
+      if (action.budget > 0 && action.budget < 15_000) warnings.push('Unter ~15 k€ verpufft eine Markenkampagne meist — für Sichtbarkeit braucht es Reichweite.');
+      break;
+    }
+
     case 'LOBBY': {
       if (f.cash < LOBBY_COST[action.focus]) errors.push(`Zu wenig Liquidität fürs Lobbying (${fmt(LOBBY_COST[action.focus])}).`);
       if (state.politics.exposure > 55) warnings.push('Hohes Skandal-Risiko: Weiteres aggressives Lobbying kann als Affäre auffliegen (Presse/Investoren).');
@@ -918,6 +947,97 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       }
       break;
     }
+
+    // ── Strategische CEO-Züge (Phase 22, C1) ─────────────────────────
+    case 'TOWNHALL': {
+      state.ceo.energy = Math.max(0, state.ceo.energy - 8);
+      schedule(state, 0, `Townhall W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: 5_000, labelDe: 'Betriebsversammlung: Organisation & Catering' });
+      const komm = state.ceo.skills.kommunikation ?? 50;
+      const lead = state.ceo.skills.leadership ?? 50;
+      const eff = 0.6 + komm / 250; // 0,6..1,0
+      if (action.theme === 'motivation') {
+        schedule(state, 0, `Townhall-Moral W${week}`, decisionId, { kind: 'SATISFACTION_DELTA', dept: 'all', amount: Math.round(8 * eff) });
+        state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'attritionRisk', factor: 0.85, startWeek: week, endWeek: week + 4, sourceDe: 'Townhall: Motivation' });
+        summary = 'Townhall (Motivation): die Belegschaft zieht wieder an einem Strang';
+        analysis.push(`Eine mitreißende Ansprache hebt Zufriedenheit und senkt kurzfristig die Kündigungsneigung. Wirkung skaliert mit deiner Kommunikationsstärke (${Math.round(komm)}/100).`);
+      } else if (action.theme === 'strategie') {
+        const vf = 1 + 0.08 * eff;
+        state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'velocity', factor: vf, startWeek: week, endWeek: week + 4, sourceDe: 'Townhall: Strategie' });
+        schedule(state, 0, `Townhall-Fokus W${week}`, decisionId, { kind: 'SATISFACTION_DELTA', dept: 'all', amount: Math.round(3 * eff) });
+        summary = 'Townhall (Strategie): klare Richtung, mehr Fokus im Team';
+        analysis.push(`Ein klares „Warum" richtet die Kräfte aus — Engineering-Velocity +${Math.round((vf - 1) * 100)} % für ~4 Wochen (skaliert mit Leadership ${Math.round(lead)}/100).`);
+      } else {
+        state.reputation.laborMarket = clamp(state.reputation.laborMarket + Math.round(5 * eff), 0, 100);
+        schedule(state, 0, `Townhall-Transparenz W${week}`, decisionId, { kind: 'SATISFACTION_DELTA', dept: 'all', amount: Math.round(4 * eff) });
+        state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'attritionRisk', factor: 0.9, startWeek: week, endWeek: week + 4, sourceDe: 'Townhall: Transparenz' });
+        summary = 'Townhall (Transparenz): offene Zahlen, mehr Vertrauen';
+        analysis.push('Radikale Offenheit über Lage und Ziele zahlt auf Vertrauen und Arbeitgebermarke ein — die Bindung steigt, das Team trägt harte Entscheidungen eher mit.');
+      }
+      break;
+    }
+    case 'LAUNCH_INITIATIVE': {
+      schedule(state, 0, `Initiative W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: action.budget, labelDe: `Strategische Initiative: ${action.focus}` });
+      const strat = state.ceo.skills.strategie ?? 50;
+      const successProb = clamp(0.35 + strat / 220 + Math.min(action.budget, 300_000) / 1_500_000, 0.3, 0.85);
+      const rng = stream(state.meta.seed, 'ceo-initiative', week);
+      const success = rng() < successProb;
+      const focusLabel = action.focus === 'produkt' ? 'Produkt-Offensive' : action.focus === 'markt' ? 'Markt-Expansion' : 'Effizienz-Programm';
+      if (success) {
+        if (action.focus === 'produkt') {
+          state.product.nps = clamp(state.product.nps + 8, -100, 100);
+          state.product.techDebt = clamp(state.product.techDebt - 6, 0, 100);
+        } else if (action.focus === 'markt') {
+          state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'demandIndex', factor: 1.12, startWeek: week, endWeek: week + 8, sourceDe: 'Initiative: Markt-Expansion' });
+          state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'leadGen', factor: 1.1, startWeek: week, endWeek: week + 8, sourceDe: 'Initiative: Markt-Expansion' });
+        } else {
+          state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'velocity', factor: 1.12, startWeek: week, endWeek: week + 8, sourceDe: 'Initiative: Effizienz' });
+          state.product.techDebt = clamp(state.product.techDebt - 8, 0, 100);
+        }
+        summary = `Strategische Initiative „${focusLabel}" zahlt sich aus`;
+        analysis.push(`Die Wette geht auf (Erfolgschance war ~${Math.round(successProb * 100)} %, skaliert mit Strategie ${Math.round(strat)}/100 & Budget). Der Effekt wirkt über die nächsten Wochen.`);
+      } else {
+        if (action.focus === 'produkt') state.product.nps = clamp(state.product.nps - 2, -100, 100);
+        else schedule(state, 0, `Initiative-Nachwehen W${week}`, decisionId, { kind: 'SATISFACTION_DELTA', dept: 'all', amount: -2 });
+        summary = `Strategische Initiative „${focusLabel}" floppt — Budget verbrannt`;
+        analysis.push(`Die Wette geht nicht auf: Das Budget von ${fmt(action.budget)} ist ausgegeben, der erhoffte Hebel bleibt aus. Größeres Budget und mehr Strategie-Kompetenz heben die Erfolgschance.`);
+      }
+      break;
+    }
+    case 'AUSTERITY': {
+      const fin = state.finance;
+      const cut = action.intensity === 'mild' ? 0.8 : 0.6;
+      const savedM = Math.round(fin.budgetsMonthly.marketing * (1 - cut));
+      const savedG = Math.round(fin.budgetsMonthly.gaOther * (1 - cut));
+      fin.budgetsMonthly.marketing = Math.round(fin.budgetsMonthly.marketing * cut);
+      fin.budgetsMonthly.gaOther = Math.round(fin.budgetsMonthly.gaOther * cut);
+      schedule(state, 0, `Sparprogramm W${week}`, decisionId, { kind: 'SATISFACTION_DELTA', dept: 'all', amount: action.intensity === 'mild' ? -3 : -6 });
+      state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'attritionRisk', factor: action.intensity === 'mild' ? 1.08 : 1.18, startWeek: week, endWeek: week + 4, sourceDe: 'Sparprogramm' });
+      summary = `Sparprogramm (${action.intensity === 'mild' ? 'moderat' : 'hart'}): Budgets gekürzt, Runway verlängert`;
+      analysis.push(`Marketing & G&A gekürzt (−${fmt((savedM + savedG))}/Monat). Der Runway steigt, aber weniger Marketing bremst den Lead-Zufluss und das Sparsignal drückt die Moral. Budgets später wieder unter „Entscheidungen" hochsetzen.`);
+      break;
+    }
+    case 'KEY_ACCOUNT_OFFENSIVE': {
+      state.ceo.energy = Math.max(0, state.ceo.energy - 7);
+      schedule(state, 0, `Key-Accounts W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: 8_000, labelDe: 'Key-Account-Betreuung: Reisen & Events' });
+      const komm = state.ceo.skills.kommunikation ?? 50;
+      const lead = state.ceo.skills.leadership ?? 50;
+      const eff = 0.6 + (komm + lead) / 500;
+      state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'churnMonthly', factor: clamp(1 - 0.15 * eff, 0.8, 0.97), startWeek: week, endWeek: week + 4, sourceDe: 'Key-Account-Offensive' });
+      state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'expansionMonthly', factor: 1 + 0.06 * eff, startWeek: week, endWeek: week + 4, sourceDe: 'Key-Account-Offensive' });
+      summary = 'Key-Account-Offensive: Top-Kunden persönlich betreut';
+      analysis.push(`Chefsache Kundenbindung: Persönliche Betreuung senkt den Churn und öffnet Upsell-Türen bei den größten Accounts (~4 Wochen). Wirkung skaliert mit Kommunikation & Leadership (${Math.round((komm + lead) / 2)}/100).`);
+      break;
+    }
+    case 'BRAND_CAMPAIGN': {
+      schedule(state, 0, `Markenkampagne W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: action.budget, labelDe: 'Markenkampagne (PR & Reichweite)' });
+      const intensity = clamp(action.budget / 150_000, 0.3, 1.2);
+      state.activeModifiers.push({ id: nextId(state, 'mod'), target: 'leadGen', factor: 1 + 0.15 * intensity, startWeek: week, endWeek: week + 6, sourceDe: 'Markenkampagne' });
+      state.reputation.press = clamp(state.reputation.press + Math.round(4 * intensity), 0, 100);
+      state.reputation.laborMarket = clamp(state.reputation.laborMarket + Math.round(2 * intensity), 0, 100);
+      summary = `Markenkampagne gestartet (${fmt(action.budget)}) — mehr Sichtbarkeit & Leads`;
+      analysis.push(`Ein einmaliger Reichweiten-Push hebt den Lead-Zufluss (+${Math.round(15 * intensity)} % für ~6 Wochen) und die Presse-/Arbeitgeber-Wahrnehmung. Anders als das laufende Marketing-Budget wirkt die Kampagne als Welle.`);
+      break;
+    }
     case 'COUNTER_COMPETITOR': {
       const strikeOcc: Occurrence[] = [];
       const attacker = state.rivalry.attackerName;
@@ -1029,7 +1149,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'TOWNHALL' || action.type === 'AUSTERITY' || action.type === 'KEY_ACCOUNT_OFFENSIVE' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

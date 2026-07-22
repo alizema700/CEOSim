@@ -67,6 +67,9 @@ export function CeoView() {
       {/* Wochenfokus */}
       <FocusPanel />
 
+      {/* Strategische CEO-Züge */}
+      <StrategicMovesPanel />
+
       {/* Privatleben & Netzwerk */}
       <PersonalPanel />
 
@@ -82,6 +85,96 @@ export function CeoView() {
       {/* Amtszeit-Bilanz & Rücktritt */}
       <TenurePanel />
     </div>
+  );
+}
+
+/**
+ * Strategische CEO-Züge (Phase 22, C1): proaktive Hebel der Chefin/des Chefs —
+ * Betriebsversammlung, strategische Wette, Sparprogramm, Kunden-Offensive, Kampagne.
+ */
+function StrategicMovesPanel() {
+  const { state, act, busy } = useStore();
+  const [initFocus, setInitFocus] = useState<'produkt' | 'markt' | 'effizienz'>('produkt');
+  const [initBudget, setInitBudget] = useState(100_000);
+  const [campBudget, setCampBudget] = useState(60_000);
+  if (!state) return null;
+  const active = state.meta.status === 'active';
+  const energy = state.ceo.energy;
+  const cash = state.finance.cash;
+  const go = (action: Parameters<typeof act>[0]) => void act(action, null);
+
+  const themes: { key: 'motivation' | 'strategie' | 'transparenz'; label: string; hint: string }[] = [
+    { key: 'motivation', label: 'Motivation', hint: 'Moral rauf, Kündigungen runter' },
+    { key: 'strategie', label: 'Strategie', hint: 'Klarer Fokus → Velocity' },
+    { key: 'transparenz', label: 'Transparenz', hint: 'Offene Zahlen → Vertrauen' },
+  ];
+  const initFoci: { key: 'produkt' | 'markt' | 'effizienz'; label: string }[] = [
+    { key: 'produkt', label: 'Produkt' },
+    { key: 'markt', label: 'Markt' },
+    { key: 'effizienz', label: 'Effizienz' },
+  ];
+
+  return (
+    <Panel icon="crown" title="Strategische Züge">
+      <p className="mb-3 max-w-[76ch] text-[11.5px] leading-relaxed text-dim">
+        Proaktive Chefsache: Diese Hebel prägen Moral, Wachstum, Bindung und Runway — jeder mit klarem Tradeoff. Wirkung hängt an deinen Kompetenzen (Kommunikation, Leadership, Strategie).
+      </p>
+      <div className="grid gap-2.5 md:grid-cols-2">
+        {/* Townhall */}
+        <div className="border border-line p-2.5" style={{ borderRadius: 2 }}>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><Icon name="users" size={15} /> Betriebsversammlung</div>
+          <div className="mt-0.5 text-[10px] text-dim">Die ganze Firma ansprechen · −8 Energie · ~5 k€</div>
+          <div className="mt-2 flex flex-col gap-1.5">
+            {themes.map((t) => (
+              <button key={t.key} className="btn flex-col items-start gap-0 py-1 text-left text-[11px]" disabled={busy || !active || energy < 8} onClick={() => go({ type: 'TOWNHALL', theme: t.key })}>
+                <span className="font-semibold">{t.label}</span>
+                <span className="text-[9px] font-normal text-dim">{t.hint}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Strategische Initiative */}
+        <div className="border border-line p-2.5" style={{ borderRadius: 2 }}>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><Icon name="rocket" size={15} /> Strategische Wette</div>
+          <div className="mt-0.5 text-[10px] text-dim">Budget setzen · Chance skaliert mit Strategie & Budget</div>
+          <div className="mt-2 flex gap-1">
+            {initFoci.map((fo) => (
+              <button key={fo.key} className={`chip flex-1 justify-center ${initFocus === fo.key ? 'border-accent text-accent' : ''}`} onClick={() => setInitFocus(fo.key)}>{fo.label}</button>
+            ))}
+          </div>
+          <div className="mt-2 flex items-center gap-1.5">
+            <input type="number" className="input w-28 py-1 text-[12px]" value={initBudget} min={0} step={25_000} onChange={(e) => setInitBudget(Math.max(0, Number(e.target.value)))} />
+            <button className="btn flex-1 justify-center py-1 text-[11px]" disabled={busy || !active || initBudget <= 0 || initBudget > cash} onClick={() => go({ type: 'LAUNCH_INITIATIVE', focus: initFocus, budget: initBudget })}>Wette platzieren</button>
+          </div>
+          <div className="mt-1 text-[9px] text-dim">Erfolg: Produkt (NPS/Tech-Debt), Markt (Nachfrage/Leads) oder Effizienz (Velocity). Misserfolg: Budget verbrannt.</div>
+        </div>
+
+        {/* Sparprogramm */}
+        <div className="border border-line p-2.5" style={{ borderRadius: 2 }}>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><Icon name="trending-down" size={15} /> Sparprogramm</div>
+          <div className="mt-0.5 text-[10px] text-dim">Marketing & G&A kürzen → Runway rauf, Moral & Leads runter</div>
+          <div className="mt-2 flex gap-1.5">
+            <button className="btn flex-1 justify-center py-1 text-[11px]" disabled={busy || !active} onClick={() => go({ type: 'AUSTERITY', intensity: 'mild' })}>Moderat (−20 %)</button>
+            <button className="btn flex-1 justify-center py-1 text-[11px]" disabled={busy || !active} onClick={() => go({ type: 'AUSTERITY', intensity: 'hart' })}>Hart (−40 %)</button>
+          </div>
+        </div>
+
+        {/* Key-Account-Offensive + Markenkampagne */}
+        <div className="border border-line p-2.5" style={{ borderRadius: 2 }}>
+          <div className="flex items-center gap-1.5 text-[13px] font-semibold text-ink"><Icon name="handshake" size={15} /> Kunden & Marke</div>
+          <div className="mt-0.5 text-[10px] text-dim">Bindung & Sichtbarkeit als Chefsache</div>
+          <button className="btn mt-2 w-full flex-col items-start gap-0 py-1 text-left text-[11px]" disabled={busy || !active || energy < 7 || cash < 8_000} onClick={() => go({ type: 'KEY_ACCOUNT_OFFENSIVE' })}>
+            <span className="font-semibold">Key-Account-Offensive · −7 Energie · ~8 k€</span>
+            <span className="text-[9px] font-normal text-dim">Top-Kunden persönlich betreuen → weniger Churn, mehr Upsell</span>
+          </button>
+          <div className="mt-2 flex items-center gap-1.5">
+            <input type="number" className="input w-24 py-1 text-[12px]" value={campBudget} min={0} step={20_000} onChange={(e) => setCampBudget(Math.max(0, Number(e.target.value)))} />
+            <button className="btn flex-1 justify-center py-1 text-[11px]" disabled={busy || !active || campBudget <= 0 || campBudget > cash} onClick={() => go({ type: 'BRAND_CAMPAIGN', budget: campBudget })}>Markenkampagne</button>
+          </div>
+        </div>
+      </div>
+    </Panel>
   );
 }
 

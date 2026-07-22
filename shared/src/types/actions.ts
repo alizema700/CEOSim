@@ -53,6 +53,11 @@ export type PlayerAction =
   | CeoDivestAction
   | TreasuryAllocateAction
   | TreasuryWithdrawAction
+  | TownhallAction
+  | LaunchInitiativeAction
+  | AusterityAction
+  | KeyAccountOffensiveAction
+  | BrandCampaignAction
   | LobbyAction
   | StepDownAction;
 
@@ -426,6 +431,37 @@ export interface TreasuryAllocateAction {
 export interface TreasuryWithdrawAction {
   type: 'TREASURY_WITHDRAW';
   amount: number;
+}
+
+// ── Strategische CEO-Züge (Phase 22, C1) ─────────────────────────────
+/** Betriebsversammlung/Townhall: die ganze Firma ansprechen (Moral/Fokus/Vertrauen). */
+export interface TownhallAction {
+  type: 'TOWNHALL';
+  theme: 'motivation' | 'strategie' | 'transparenz';
+}
+
+/** Strategische Initiative/Wette: Budget auf Produkt/Markt/Effizienz setzen (Chance & Risiko). */
+export interface LaunchInitiativeAction {
+  type: 'LAUNCH_INITIATIVE';
+  focus: 'produkt' | 'markt' | 'effizienz';
+  budget: number;
+}
+
+/** Sparprogramm: Budgets kürzen, Runway verlängern — auf Kosten von Wachstum & Moral. */
+export interface AusterityAction {
+  type: 'AUSTERITY';
+  intensity: 'mild' | 'hart';
+}
+
+/** Key-Account-Offensive: Top-Kunden persönlich betreuen (Bindung & Expansion). */
+export interface KeyAccountOffensiveAction {
+  type: 'KEY_ACCOUNT_OFFENSIVE';
+}
+
+/** Markenkampagne: einmaliger Sichtbarkeits-/PR-Push (Leads & Reputation). */
+export interface BrandCampaignAction {
+  type: 'BRAND_CAMPAIGN';
+  budget: number;
 }
 
 /**

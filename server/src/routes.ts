@@ -133,6 +133,11 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('LOBBY'), focus: z.enum(['steuern', 'subvention', 'zugang']) }),
   z.object({ type: z.literal('TREASURY_ALLOCATE'), amount: z.number().positive() }),
   z.object({ type: z.literal('TREASURY_WITHDRAW'), amount: z.number().positive() }),
+  z.object({ type: z.literal('TOWNHALL'), theme: z.enum(['motivation', 'strategie', 'transparenz']) }),
+  z.object({ type: z.literal('LAUNCH_INITIATIVE'), focus: z.enum(['produkt', 'markt', 'effizienz']), budget: z.number().positive() }),
+  z.object({ type: z.literal('AUSTERITY'), intensity: z.enum(['mild', 'hart']) }),
+  z.object({ type: z.literal('KEY_ACCOUNT_OFFENSIVE') }),
+  z.object({ type: z.literal('BRAND_CAMPAIGN'), budget: z.number().positive() }),
 ]);
 
 const zHypothesis = z
