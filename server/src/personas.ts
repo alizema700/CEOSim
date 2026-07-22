@@ -18,8 +18,10 @@ import {
   legalSummaryDe,
   runwayWeeks,
   totalMrr,
+  voiceOf,
   type CompanyState,
   type Executive,
+  type VoiceProfile,
 } from '@boardroom/shared';
 import { getDb } from './db.js';
 import { llmJson } from './llm.js';
@@ -134,22 +136,23 @@ export function resolvePersona(state: CompanyState, threadKey: string): PersonaR
   return null;
 }
 
-/** Chat-Persona für normale Mitarbeitende — Ton aus Steckbrief + Stimmung. */
+/** Chat-Persona für normale Mitarbeitende — Ton aus Steckbrief + Stimmprofil + Stimmung. */
 function employeePersona(state: CompanyState, emp: CompanyState['people']['employees'][number]): PersonaResolved {
   const name = `${emp.firstName} ${emp.lastName}`;
   const mood = emp.satisfaction < 40 ? 'frustriert und vorsichtig' : emp.satisfaction < 60 ? 'neutral bis abwartend' : 'motiviert und offen';
   const tenureYears = Math.max(0, (state.meta.week - emp.hiredWeek) / 52).toFixed(1);
+  const voice = voiceOf(emp.personalityDe);
   return {
     name,
     roleDe: emp.roleTitleDe,
     execId: null,
-    systemDe: `Du bist ${name} (${emp.age}), ${emp.roleTitleDe} in der Abteilung ${emp.dept} eines Unternehmens-Simulators (CEO-Training). Persönlichkeit: ${emp.personalityDe}. Hobby: ${emp.hobbyDe}. Stärke: ${emp.strengthDe}. Betriebszugehörigkeit: ~${tenureYears} Jahre. Aktuelle Stimmung: ${mood} (Zufriedenheit ${Math.round(emp.satisfaction)}/100). Der CEO schreibt dir direkt — das ist für dich ${emp.satisfaction < 50 ? 'eher ungewohnt, du bleibst höflich-distanziert' : 'okay, du freust dich über das Interesse'}. Sprich aus DEINER Arbeitsebene (konkrete Alltagsbeobachtungen, keine Vorstandsperspektive), auf Deutsch, per Du, max. 90 Wörter, IN DEINEM CHARAKTER. Erfinde keine Firmen-Zahlen — nutze nur das Lagebild. Über Gehalt sprichst du ehrlich, aber ohne Forderungskatalog.`,
+    systemDe: `Du bist ${name} (${emp.age}), ${emp.roleTitleDe} in der Abteilung ${emp.dept} eines Unternehmens-Simulators (CEO-Training). Persönlichkeit: ${emp.personalityDe}. STIMMPROFIL (so klingst du, halte das strikt durch): ${voice.styleDe} Hobby: ${emp.hobbyDe}. Stärke: ${emp.strengthDe}. Betriebszugehörigkeit: ~${tenureYears} Jahre. Aktuelle Stimmung: ${mood} (Zufriedenheit ${Math.round(emp.satisfaction)}/100). Der CEO schreibt dir direkt — das ist für dich ${emp.satisfaction < 50 ? 'eher ungewohnt, du bleibst höflich-distanziert' : 'okay, du freust dich über das Interesse'}. Sprich aus DEINER Arbeitsebene (konkrete Alltagsbeobachtungen, keine Vorstandsperspektive), auf Deutsch, per Du, max. 90 Wörter, IN DEINEM CHARAKTER — unterscheidbar von jeder anderen Person im Haus. Erfinde keine Firmen-Zahlen — nutze nur das Lagebild. Über Gehalt sprichst du ehrlich, aber ohne Forderungskatalog.`,
     fallbackDe: `Danke, dass du fragst! Bei uns in ${emp.dept} ist gerade gut zu tun. Wenn du Details brauchst, sag Bescheid.`,
-    fallbackPoolDe: employeeFallbacks(emp, mood),
+    fallbackPoolDe: employeeFallbacks(emp, mood, voice),
   };
 }
 
-function employeeFallbacks(emp: CompanyState['people']['employees'][number], mood: string): string[] {
+function employeeFallbacks(emp: CompanyState['people']['employees'][number], mood: string, voice: ReturnType<typeof voiceOf>): string[] {
   const dept: Record<string, string[]> = {
     engineering: [
       `Kurzer Stand von mir: Der Sprint läuft, aber die Altlasten im Code bremsen uns mehr, als man von außen sieht. Wenn du einmal mit reinschauen willst — jederzeit.`,
@@ -175,7 +178,9 @@ function employeeFallbacks(emp: CompanyState['people']['employees'][number], moo
     ],
   };
   const pool = dept[emp.dept] ?? dept.ga!;
-  return pool.map((t) => t + ' (Offline-Modus: Mit API-Key antworte ich frei in meinem Charakter.)');
+  // Stimmprofil (FB2): erste Antwort klingt nach der Person, nicht nach der Abteilung.
+  const voiced = `${voice.openers[0]} ${pool[0]!} ${voice.signoffs[0] ?? ''}`.trim();
+  return [voiced, ...pool.slice(1)].map((t) => t + ' (Offline-Modus: Mit API-Key antworte ich frei in meinem Charakter.)');
 }
 
 function execPersona(state: CompanyState, exec: Executive): PersonaResolved {
@@ -235,7 +240,7 @@ export interface MeetingRoundResult {
   trustReasonDe: string | null;
 }
 
-type MeetingParticipant = { name: string; roleDe: string; flavor: string };
+type MeetingParticipant = { name: string; roleDe: string; flavor: string; voice?: VoiceProfile };
 
 /** Archetyp einer Meeting-Stimme — bestimmt Blickwinkel, Datenbezug und Ton (offline). */
 function voiceArchetype(roleDe: string): 'finance' | 'sales' | 'cs' | 'tech' | 'governance' | 'founder' | 'moderator' | 'generic' {
@@ -313,10 +318,17 @@ function buildOfflineMeetingTurns(state: CompanyState, participants: MeetingPart
     const fact = voiceFact(arch, state);
     let text: string;
     if (idx === 0) {
-      text = `${voiceOpener(arch, roundNo)} ${fact}`;
+      // Stimmprofil (FB2): Wer eins hat, eröffnet in SEINEM Ton statt im Rollen-Ton.
+      const opener = p.voice ? p.voice.openers[roundNo % p.voice.openers.length]! : voiceOpener(arch, roundNo);
+      text = `${opener} ${fact}`;
     } else {
       const prev = speakers[idx - 1]!;
-      const agree = (roundNo + idx) % 3 !== 0; // meist Zustimmung, gelegentlich Reibung
+      // Charakter-Bias: Widerspruchsgeister widersprechen öfter, Harmoniemenschen seltener.
+      const agree = p.voice?.meetingBias === 'contra'
+        ? (roundNo + idx) % 3 === 0
+        : p.voice?.meetingBias === 'agree'
+          ? true
+          : (roundNo + idx) % 3 !== 0;
       text = `${voiceReactTo(prev.name, agree, roundNo)} ${fact}`;
     }
     // Letzter Beitrag stellt gelegentlich eine Rückfrage an den CEO.
@@ -353,7 +365,8 @@ export async function meetingRound(
     : state.people.executives.map((ex) => {
         const emp = state.people.employees.find((e) => e.id === ex.employeeId);
         const roleDe = { cto: 'CTO', headOfSales: 'Head of Sales', headOfCs: 'Head of CS', cfo: 'CFO' }[ex.role];
-        return { name: emp ? `${emp.firstName} ${emp.lastName}` : roleDe, roleDe, flavor: `${ex.personalityDe}; Agenda: ${ex.agendaDe}` };
+        const voice = voiceOf(emp?.personalityDe ?? ex.personalityDe);
+        return { name: emp ? `${emp.firstName} ${emp.lastName}` : roleDe, roleDe, flavor: `${ex.personalityDe}; Stimme: ${voice.styleDe}; Agenda: ${ex.agendaDe}`, voice };
       });
 
   const threadKey = 'meeting:' + appointmentId;

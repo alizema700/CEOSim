@@ -6,6 +6,7 @@ import type { Occurrence } from '../types/game.js';
 import { deptDe, nextId, schedule } from './stateHelpers.js';
 import { avgSatisfaction, effectiveMonthlyChurn, netBurnMonthly, runwayWeeks, totalMrr, currentVelocity } from './derive.js';
 import { stream } from './rng.js';
+import { voiceOf } from './voices.js';
 
 /**
  * Kommunikations-Engine (Phase 2): erzeugt deterministisch Inbox-Nachrichten,
@@ -18,9 +19,13 @@ const MAX_MESSAGES = 250;
 export function addMessage(
   state: CompanyState,
   msg: Omit<InboxMessage, 'id' | 'week' | 'priority' | 'handledWeek'> & { priority?: InboxMessage['priority'] },
+  opts?: { id?: string },
 ): InboxMessage {
   const full: InboxMessage = {
-    id: nextId(state, 'msg'),
+    // Spontan-Nachrichten (FB2) liefern eine eigene deterministische ID mit,
+    // damit der globale idCounter unberührt bleibt — der salzt u. a. die
+    // Hire-RNG-Streams und ist damit Golden-Master-relevant.
+    id: opts?.id ?? nextId(state, 'msg'),
     week: state.meta.week,
     priority: msg.priority ?? prioritize(msg),
     handledWeek: null,
@@ -204,6 +209,9 @@ export function generateWeeklyComms(state: CompanyState): void {
     }
   }
 
+  // Spontane Stimmen aus der Belegschaft (FB2): random, aber an echte Signale gekoppelt.
+  generateSpontaneousComms(state);
+
   // Sekretärin: Wochen-Briefing (immer)
   addMessage(state, {
     from: assistantSender(state),
@@ -216,6 +224,124 @@ export function generateWeeklyComms(state: CompanyState): void {
     templateId: 'briefing',
     priority: state.openEvents.some((e) => e.status === 'open') ? 'hoch' : 'normal',
   });
+}
+
+/**
+ * Spontane Mitarbeiter-Nachrichten (FB2): Einzelne schreiben von sich aus, wenn
+ * es etwas Wichtiges gibt — in IHRER Stimme (voiceOf). Random, aber an echte
+ * Signale gekoppelt (Einarbeitung fertig, Frust, Tech-Debt, Spitzenleistung,
+ * Kollegen-Lob, Ideen). Max. 1 pro Woche, eigene Cooldowns.
+ *
+ * Golden-Master-sicher: eigener RNG-Substream ('spontan') und deterministische
+ * IDs (msg_sp…) am globalen idCounter vorbei — kein anderer Stream verschiebt sich.
+ */
+export function generateSpontaneousComms(state: CompanyState): void {
+  const w = state.meta.week;
+  const emps = state.people.employees;
+  if (emps.length === 0) return;
+  const rng = stream(state.meta.seed, 'spontan', w);
+
+  const cd = (key: string, weeks: number): boolean => {
+    const last = state.comms.cooldowns[key];
+    if (last !== undefined && w - last < weeks) return false;
+    state.comms.cooldowns[key] = w;
+    return true;
+  };
+
+  type Emp = (typeof emps)[number];
+  const send = (emp: Emp, templateId: string, subjectDe: string, body: string, priority?: InboxMessage['priority']): void => {
+    const v = voiceOf(emp.personalityDe);
+    const opener = v.openers[Math.floor(rng() * v.openers.length)]!;
+    const signoff = rng() < 0.6 ? ` ${v.signoffs[Math.floor(rng() * v.signoffs.length)]!}` : '';
+    addMessage(
+      state,
+      {
+        from: { name: `${emp.firstName} ${emp.lastName}`, roleDe: emp.roleTitleDe, refId: emp.id, company: null },
+        subjectDe,
+        bodyDe: `${opener} ${body}${signoff}`,
+        kind: 'employee',
+        eventInstanceId: null,
+        delegable: true,
+        suggestedActionType: null,
+        templateId,
+        priority,
+      },
+      { id: `msg_sp${w.toString(36)}_${templateId}` },
+    );
+  };
+
+  // Unregelmäßigkeit gehört zum Realismus: in ~1 von 4 Wochen schreibt niemand.
+  if (rng() >= 0.78) return;
+
+  // 1) Frisch eingearbeitet: „Ich bin angekommen" (genau am Ende der Ramp-Phase).
+  const fresh = emps.find((e) => e.rampWeeksRemaining === 0 && (w - e.hiredWeek === 6 || (e.seniority === 'werkstudent' && w - e.hiredWeek === 3)));
+  if (fresh && cd('sp-angekommen', 4)) {
+    const note: Record<string, string> = {
+      engineering: 'Der Code hat mehr Geschichte als die Doku verrät — aber ich finde mich zurecht.',
+      sales: 'Die ersten eigenen Gespräche laufen; das Produkt lässt sich ehrlicher verkaufen als mein letztes.',
+      marketing: 'Ich habe die Tonalität jetzt im Ohr — die nächsten Kampagnen klingen nach uns.',
+      cs: 'Die Kunden sind direkter als erwartet — das mag ich.',
+      ga: 'Die Prozesse sitzen; ich weiß jetzt, wo alles liegt (und wo nichts liegen sollte).',
+    };
+    send(fresh, 'sp-angekommen', `Angekommen: meine ersten Wochen in ${deptDe(fresh.dept)}`,
+      `Ich bin seit ${w - fresh.hiredWeek} Wochen an Bord und offiziell eingearbeitet. ${note[fresh.dept] ?? 'Ich bin drin.'} Danke für den Vertrauensvorschuss — jetzt liefere ich.`);
+    return;
+  }
+
+  // 2) Persönlicher Frust (unabhängig von der Abteilungs-Moral-Mail).
+  const frustrated = emps
+    .filter((e) => e.satisfaction <= 38)
+    .sort((a, b) => Number(b.keyPerson) - Number(a.keyPerson) || a.satisfaction - b.satisfaction)[0];
+  if (frustrated && rng() < 0.75 && cd('sp-frust', 6)) {
+    send(frustrated, 'sp-frust', 'Persönlich: So kann ich nicht arbeiten',
+      `Meine Zufriedenheit ist ehrlich gesagt im Keller (Arbeitslast, und das Gefühl, dass Entscheidungen an uns vorbeilaufen). Ich schreibe dir das direkt, statt es im Flur zu erzählen.${frustrated.keyPerson ? ' Und du weißt selbst, was mein Abgang kosten würde.' : ''}`,
+      frustrated.keyPerson ? 'hoch' : undefined);
+    return;
+  }
+
+  // 3) Engineering-Frust über Altlasten (an echten Tech-Debt gekoppelt).
+  if (state.product.techDebt > 68) {
+    const dev = emps.filter((e) => e.dept === 'engineering').sort((a, b) => b.performance - a.performance)[0];
+    if (dev && rng() < 0.6 && cd('sp-debt', 7)) {
+      send(dev, 'sp-debt', 'Aus dem Maschinenraum: die Altlasten fressen uns',
+        `Tech-Debt steht bei ${Math.round(state.product.techDebt)}/100, und jede Woche Feature-Druck macht es schlimmer. Gib uns einen Sprint Luft für Aufräumarbeiten — sonst schreibt der nächste Ausfall die Rechnung.`);
+      return;
+    }
+  }
+
+  // 4) Leistungsträger:in will mehr Verantwortung.
+  const star = emps.filter((e) => e.performance >= 88 && e.satisfaction >= 60).sort((a, b) => b.performance - a.performance)[0];
+  if (star && rng() < 0.5 && cd('sp-star', 8)) {
+    send(star, 'sp-star', 'Ich will mehr Verantwortung',
+      `Mein Bereich läuft — die Zahlen sagen das deutlicher, als ich es je würde. Ich möchte mehr Verantwortung übernehmen: ein Projekt, eine Mentorenrolle, irgendwas mit Zug. Gib mir etwas, an dem ich wachsen kann, bevor mir langweilig wird.`);
+    return;
+  }
+
+  // 5) Kolleg:innen-Lob (soziale Textur: Menschen reden übereinander).
+  if (emps.length >= 2 && rng() < 0.35 && cd('sp-kudos', 5)) {
+    const a = emps[Math.floor(rng() * emps.length)]!;
+    const peers = emps.filter((e) => e.id !== a.id);
+    const b = peers.sort((x, y) => y.performance - x.performance)[Math.floor(rng() * Math.min(3, peers.length))] ?? peers[0]!;
+    send(a, 'sp-kudos', `Kurzes Lob für ${b.firstName}`,
+      `${b.firstName} ${b.lastName} hat diese Woche in ${deptDe(b.dept)} den Laden zusammengehalten — still, ohne Bühne. Solche Leute verlieren wir nur einmal. Vielleicht magst du kurz Danke sagen; von dir wiegt das doppelt.`);
+    return;
+  }
+
+  // 6) Idee aus dem Alltag (abteilungsspezifisch, konkret).
+  if (rng() < 0.5 && cd('sp-idee', 3)) {
+    const emp = emps[Math.floor(rng() * emps.length)]!;
+    const ideas: Record<string, string[]> = {
+      engineering: ['ein internes Tool, das unsere Deploy-Zeiten halbiert — der Prototyp existiert schon', 'eine Bug-Triage-Rotation, damit nicht immer dieselben Leute unterbrochen werden', 'ein wöchentlicher „Fix-Friday" nur für die kleinen Ärgernisse, die sonst nie drankommen'],
+      sales: ['eine Zwei-Seiten-Battlecard gegen die lauten Wettbewerber — die Einwände wiederholen sich', 'standardisierte Discovery-Fragen; die Abschlussquote würde es uns danken', 'verlorene Deals systematisch nachfassen — nach 6 Monaten sind viele wieder gesprächsbereit'],
+      marketing: ['eine Kundenstory-Serie statt der nächsten Anzeige — echte Stimmen konvertieren besser', 'eine Webinar-Reihe zusammen mit Customer Success', 'die Website-Texte einmal in Kundensprache statt Feature-Sprache umschreiben'],
+      cs: ['automatisierte Onboarding-Mails für die ersten 30 Tage — genau da verlieren wir Kunden', 'ein Health-Score-Alarm für Kunden, die still werden', 'eine kleine Kunden-Community; die besten Antworten kommen oft von anderen Kunden'],
+      ga: ['den Spesenprozess digitalisieren — das spart jede Woche allen Zeit', 'die Vertragsablage endlich durchsuchbar machen', 'ein gemeinsamer Team-Kalender für Abwesenheiten — das Chaos kostet jeden Montag Zeit'],
+    };
+    const pool = ideas[emp.dept] ?? ideas.ga!;
+    const idea = pool[Math.floor(rng() * pool.length)]!;
+    send(emp, 'sp-idee', 'Eine Idee aus dem Alltag',
+      `Mir geht eine Idee nicht aus dem Kopf: ${idea}. Kostet fast nichts, bringt sichtbar etwas — darf ich das nebenher aufsetzen?`);
+  }
 }
 
 /** Regelbasiertes Briefing der Sekretärin — erste Anlaufstelle beim Login. */

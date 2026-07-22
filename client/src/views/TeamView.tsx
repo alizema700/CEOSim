@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { DEPARTMENTS, deptDe, EMPLOYER_COST_FACTOR, esopUnallocated, laborSummaryDe, vestedFraction, vestedPercent, type Employee, type TarifStatus } from '@boardroom/shared';
+import { DEPARTMENTS, deptDe, EMPLOYER_COST_FACTOR, esopUnallocated, laborSummaryDe, vestedFraction, vestedPercent, voiceOf, type Employee, type TarifStatus } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, Drill, GradeBadge, Modal, Panel, scoreColor } from '../components/ui.js';
 import { Icon } from '../components/Icon.js';
@@ -370,7 +370,11 @@ function EmployeeModal({ emp, onClose }: { emp: Employee; onClose: () => void })
       </div>
 
       <div className="mt-4 space-y-1.5 text-[12.5px] leading-relaxed">
-        <p><span className="kicker text-[9px]">Persönlichkeit </span> {emp.personalityDe ?? '—'}</p>
+        <p>
+          <span className="kicker text-[9px]">Persönlichkeit </span>
+          <span className="mr-1.5 inline-block border border-purple/50 px-1.5 py-px align-middle text-[9.5px] font-semibold uppercase tracking-wide text-purple" style={{ borderRadius: 2 }}>{voiceOf(emp.personalityDe).labelDe}</span>
+          {emp.personalityDe ?? '—'}
+        </p>
         <p><span className="kicker text-[9px]">Stärke </span> {emp.strengthDe ?? '—'}</p>
         <p><span className="kicker text-[9px]">Hobby </span> {emp.hobbyDe ?? '—'}</p>
         {exec && <p><span className="kicker text-[9px]">Agenda </span> {exec.agendaDe}</p>}
