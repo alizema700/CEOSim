@@ -11,6 +11,8 @@ import { restQuality } from './ceo.js';
 import { respondStrike } from './rivalry.js';
 import { doLobby } from './politics.js';
 import { LOBBY_COST, LOBBY_LABELS } from '../types/politics.js';
+import { buyInsurance, cancelInsurance } from './insurance.js';
+import { INSURANCE_SPECS } from '../types/insurance.js';
 import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
@@ -446,6 +448,16 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
     }
     case 'ETHICS_PROGRAM': {
       if (f.cash < 25_000) errors.push('Zu wenig Liquidität für ein Ethik-/Compliance-Programm (~25 k€).');
+      break;
+    }
+    case 'BUY_INSURANCE': {
+      if (state.insurance.policies[action.kind]?.active) errors.push(`${INSURANCE_SPECS[action.kind].labelDe} ist bereits abgeschlossen.`);
+      if (runwayWeeks(state) < 8) warnings.push('Sehr knapper Runway: Prämien sind laufende Kosten — bei akuter Liquiditätsnot zuerst das Überleben sichern.');
+      break;
+    }
+    case 'CANCEL_INSURANCE': {
+      if (!state.insurance.policies[action.kind]?.active) errors.push(`${INSURANCE_SPECS[action.kind].labelDe} ist nicht aktiv.`);
+      else warnings.push('Kündigen spart die Prämie — aber ein Schaden trifft dich danach ungedeckt (volles Eigenrisiko).');
       break;
     }
 
@@ -1104,6 +1116,21 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push('Integrität als System: Klare Regeln und Schulungen senken den Regulierungsdruck und das Skandal-Risiko (Lobby-Exposure) — die beste Verteidigung gegen Auflagen und Affären. Zahlt zudem auf die Arbeitgebermarke ein.');
       break;
     }
+    case 'BUY_INSURANCE': {
+      const spec = INSURANCE_SPECS[action.kind];
+      buyInsurance(state, action.kind);
+      summary = `Police abgeschlossen: ${spec.labelDe} (${fmt(spec.monthlyPremium)}/Monat)`;
+      analysis.push(`${spec.shortDe} Deckung ${(spec.coverage * 100).toFixed(0)} % je Schaden bis ${fmt(spec.capPerClaim)}. Die Prämie läuft als G&A-Kosten — im Schadensfall (v. a. bei aufgedeckten Skandalen/Bußgeldern und behördlichen Auflagen) übernimmt die Police einen Teil.`);
+      analysis.push('Versicherung ist gekaufte Ruhe: Du zahlst sicher wenig, um im Ernstfall nicht viel zu verlieren — der Wert zeigt sich erst, wenn es kracht.');
+      break;
+    }
+    case 'CANCEL_INSURANCE': {
+      const spec = INSURANCE_SPECS[action.kind];
+      cancelInsurance(state, action.kind);
+      summary = `Police gekündigt: ${spec.labelDe} — Prämie gespart`;
+      analysis.push('Die laufende Prämie entfällt. Ab sofort trägst du Schäden dieser Art wieder voll selbst — kalkuliere das Restrisiko bewusst.');
+      break;
+    }
     case 'COUNTER_COMPETITOR': {
       const strikeOcc: Occurrence[] = [];
       const attacker = state.rivalry.attackerName;
@@ -1215,7 +1242,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'TOWNHALL' || action.type === 'AUSTERITY' || action.type === 'KEY_ACCOUNT_OFFENSIVE' || action.type === 'SPECIAL_BONUS' || action.type === 'STAR_HIRE' || action.type === 'CUSTOMER_ADVISORY_BOARD' || action.type === 'ETHICS_PROGRAM' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'TOWNHALL' || action.type === 'AUSTERITY' || action.type === 'KEY_ACCOUNT_OFFENSIVE' || action.type === 'SPECIAL_BONUS' || action.type === 'STAR_HIRE' || action.type === 'CUSTOMER_ADVISORY_BOARD' || action.type === 'ETHICS_PROGRAM' || action.type === 'BUY_INSURANCE' || action.type === 'CANCEL_INSURANCE' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

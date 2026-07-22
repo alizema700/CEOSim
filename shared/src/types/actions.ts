@@ -62,6 +62,8 @@ export type PlayerAction =
   | StarHireAction
   | CustomerAdvisoryBoardAction
   | EthicsProgramAction
+  | BuyInsuranceAction
+  | CancelInsuranceAction
   | LobbyAction
   | StepDownAction;
 
@@ -489,6 +491,19 @@ export interface CustomerAdvisoryBoardAction {
 /** Ethik- & Compliance-Programm (senkt Regulierungsdruck & Skandal-Risiko; Integrität). */
 export interface EthicsProgramAction {
   type: 'ETHICS_PROGRAM';
+}
+
+// ── Versicherungen (Phase 22, V1) ────────────────────────────────────
+/** Versicherungspolice abschließen. */
+export interface BuyInsuranceAction {
+  type: 'BUY_INSURANCE';
+  kind: import('./insurance.js').InsuranceKind;
+}
+
+/** Versicherungspolice kündigen. */
+export interface CancelInsuranceAction {
+  type: 'CANCEL_INSURANCE';
+  kind: import('./insurance.js').InsuranceKind;
 }
 
 /**

@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { totalMrr } from '@boardroom/shared';
+import { totalMrr, INSURANCE_KINDS, INSURANCE_SPECS, insurancePremiumMonthly } from '@boardroom/shared';
+import type { InsuranceKind } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { KpiTrendDrill, Panel, StatRow } from '../components/ui.js';
 import { Icon } from '../components/Icon.js';
@@ -99,7 +100,67 @@ export function FinanceView() {
 
       <TreasuryPanel />
       </div>
+
+      <InsurancePanel />
     </div>
+  );
+}
+
+/**
+ * Versicherungen (Phase 22, V1): Policen abschließen/kündigen. Prämien laufen als
+ * G&A-Kosten; im Schadensfall (Skandale/Bußgelder, behördliche Auflagen) deckt die
+ * passende Police einen Teil — der Wert zeigt sich erst, wenn es kracht.
+ */
+function InsurancePanel() {
+  const { state, act, busy } = useStore();
+  if (!state) return null;
+  const ins = state.insurance;
+  const active = state.meta.status === 'active';
+  const premiumM = insurancePremiumMonthly(state);
+  const claimKindLabel: Record<string, string> = { cyber: 'Cyber', legal: 'Recht/Haftung', fraud: 'Betrug', regulation: 'Aufsicht' };
+
+  return (
+    <Panel icon="shield" title="Versicherungen · Risikomanagement" right={<span className="num text-[12px] text-dim">Prämien {eur(premiumM)}/M · Deckung bisher {eur(ins.claimsPaidTotal)}</span>}>
+      <p className="mb-3 max-w-[80ch] text-[11px] leading-relaxed text-dim">
+        Alles, was ein Unternehmen absichern kann: laufende Prämie (G&A) gegen Deckung im Ernstfall. Schäden entstehen im Spiel vor allem durch aufgedeckte Skandale/Bußgelder (Datenpanne, Betrug, Klagen, Patentstreit, M&A-Altlasten) und behördliche Auflagen — genau dort greifen die Policen.
+      </p>
+      <div className="grid gap-2.5 md:grid-cols-2 xl:grid-cols-3">
+        {INSURANCE_KINDS.map((kind: InsuranceKind) => {
+          const spec = INSURANCE_SPECS[kind];
+          const pol = ins.policies[kind];
+          return (
+            <div key={kind} className={`border p-2.5 ${pol.active ? 'border-good/50 bg-good/5' : 'border-line'}`} style={{ borderRadius: 2 }}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[12.5px] font-semibold text-ink">{spec.labelDe}</div>
+                <span className={`kicker shrink-0 text-[8px] ${pol.active ? 'text-good' : 'text-faint'}`}>{pol.active ? '● aktiv' : '○ inaktiv'}</span>
+              </div>
+              <div className="mt-0.5 text-[10px] leading-tight text-dim">{spec.shortDe}</div>
+              <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[9.5px] text-dim">
+                <span className="num text-ink">{eur(spec.monthlyPremium)}/M</span>
+                <span>Deckung {(spec.coverage * 100).toFixed(0)} % · bis {eur(spec.capPerClaim)}</span>
+              </div>
+              <div className="mt-1 text-[9px] text-faint">deckt: {spec.covers.map((c) => claimKindLabel[c] ?? c).join(', ')}</div>
+              {pol.claimsPaid > 0 && <div className="mt-1 text-[9.5px] text-good">bereits erstattet: {eur(pol.claimsPaid)}</div>}
+              <button
+                className={`btn mt-2 w-full justify-center py-1 text-[11px] ${pol.active ? 'border-bad/60 text-bad' : ''}`}
+                disabled={busy || !active}
+                onClick={() => void act(pol.active ? { type: 'CANCEL_INSURANCE', kind } : { type: 'BUY_INSURANCE', kind }, null)}
+              >
+                {pol.active ? 'Kündigen' : 'Abschließen'}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      {ins.logDe.length > 0 && (
+        <div className="mt-3 border-t border-line/40 pt-2">
+          <div className="kicker mb-1 text-[8px]">Chronik</div>
+          <ul className="grid gap-x-4 gap-y-0.5 text-[9.5px] leading-tight text-dim sm:grid-cols-2">
+            {ins.logDe.slice(0, 6).map((l, i) => <li key={i}>· {l}</li>)}
+          </ul>
+        </div>
+      )}
+    </Panel>
   );
 }
 

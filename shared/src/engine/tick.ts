@@ -50,6 +50,7 @@ import { politicsTaxRelief, tickPolitics } from './politics.js';
 import { tickRegulation } from './regulation.js';
 import { tickMacro } from './macro.js';
 import { tickMacroShocks } from './macroShocks.js';
+import { insurancePremiumMonthly, fileInsuranceClaim, classifyClaim } from './insurance.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -391,7 +392,9 @@ function applyEffect(state: CompanyState, fx: EffectPayload, sourceDe: string, l
     case 'DELAYED_SCANDAL': {
       const rng = stream(state.meta.seed, 'scandal', week, fx.fine);
       if (rng() < fx.probability) {
-        ledger.oneOffsPaid += fx.fine;
+        // Versicherung greift: die passende Police deckt einen Teil des Bußgelds/Schadens.
+        const covered = fileInsuranceClaim(state, classifyClaim(fx.topicDe), fx.fine, fx.topicDe, occ);
+        ledger.oneOffsPaid += fx.fine - covered;
         state.reputation.press = clamp(state.reputation.press - 8, 0, 100);
         state.reputation.investors = clamp(state.reputation.investors - 5, 0, 100);
         state.ceo.boardTrust = clamp(state.ceo.boardTrust - 8, 0, 100);
@@ -735,8 +738,10 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   const b = f.budgetsMonthly;
   const projectsCostM = projectsMonthlyCost(state);
   const coachFee = state.ceo.coach?.monthlyFee ?? 0; // Executive-Coaching (Phase 12)
-  const otherOpexMonthly = b.marketing + b.customerSuccess + b.rndTools + b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee;
+  const insurancePremiumM = insurancePremiumMonthly(state); // Versicherungsprämien (V1) → G&A
+  const otherOpexMonthly = b.marketing + b.customerSuccess + b.rndTools + b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee + insurancePremiumM;
   ledger.otherOpexBooked = otherOpexMonthly * wf;
+  if (state.insurance) state.insurance.premiumsPaidTotal += insurancePremiumM * wf;
   f.accountsPayable += ledger.cogsBooked + ledger.otherOpexBooked;
   const payRate = Math.min(1, 7 / f.dpoDays);
   ledger.apPaid = f.accountsPayable * payRate;
@@ -758,7 +763,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
     salesMarketing: { payroll: payrollByDept.sales + payrollByDept.marketing, other: b.marketing * wf },
     rnd: { payroll: payrollByDept.engineering, other: b.rndTools * wf },
     customerSuccess: { payroll: payrollByDept.cs, other: b.customerSuccess * wf },
-    ga: { payroll: payrollByDept.ga + ceoPay, other: (b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee) * wf },
+    ga: { payroll: payrollByDept.ga + ceoPay, other: (b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee + insurancePremiumM) * wf },
   };
   const opexTotal = Object.values(opex).reduce((s, o) => s + o.payroll + o.other, 0);
   const grossProfit = ledger.revenueRecognized - ledger.cogsBooked;

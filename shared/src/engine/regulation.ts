@@ -6,6 +6,7 @@ import { stream } from './rng.js';
 import { schedule, nextId } from './stateHelpers.js';
 import { addMessage, assistantSender } from './comms.js';
 import { totalMrr } from './derive.js';
+import { fileInsuranceClaim } from './insurance.js';
 
 /**
  * Regulierung & Aufsicht (Phase 22, M5). Die politische Gegenkraft: regulatorischer
@@ -77,7 +78,9 @@ export function tickRegulation(state: CompanyState, occ: Occurrence[]): void {
       const cost = Math.max(6_000, Math.round(spec.baseCost * (1 - access / 250)));
       const dur = Math.max(3, spec.durationWeeks - (access >= 55 ? 1 : 0));
       pol.activeRegulation = { kind, startWeek: week, endWeek: week + dur, headlineDe: spec.headlineDe, complianceCost: cost };
-      schedule(state, 0, `Auflage: ${spec.labelDe}`, null, { kind: 'ONE_OFF_COST', amount: cost, labelDe: `Compliance: ${spec.labelDe}` });
+      // Rechtsschutz-/Haftpflicht-Deckung übernimmt einen Teil der Verfahrens-/Compliance-Kosten.
+      const insCovered = fileInsuranceClaim(state, 'regulation', cost, spec.labelDe, occ);
+      schedule(state, 0, `Auflage: ${spec.labelDe}`, null, { kind: 'ONE_OFF_COST', amount: Math.max(0, cost - insCovered), labelDe: `Compliance: ${spec.labelDe}` });
       if (spec.reputationHit > 0) {
         const hit = Math.max(1, Math.round(spec.reputationHit * (1 - access / 300)));
         state.reputation.press = clamp(state.reputation.press - hit, 0, 100);

@@ -73,6 +73,8 @@ export * from './engine/outlook.js';
 export * from './engine/rivalry.js';
 export * from './engine/politics.js';
 export * from './engine/regulation.js';
+export * from './types/insurance.js';
+export * from './engine/insurance.js';
 export * from './engine/legacy.js';
 
 // ── Kuratierte Daten (Phase 4) ───────────────────────────────────────
