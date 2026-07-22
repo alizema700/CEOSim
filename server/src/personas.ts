@@ -235,6 +235,100 @@ export interface MeetingRoundResult {
   trustReasonDe: string | null;
 }
 
+type MeetingParticipant = { name: string; roleDe: string; flavor: string };
+
+/** Archetyp einer Meeting-Stimme — bestimmt Blickwinkel, Datenbezug und Ton (offline). */
+function voiceArchetype(roleDe: string): 'finance' | 'sales' | 'cs' | 'tech' | 'governance' | 'founder' | 'moderator' | 'generic' {
+  const r = roleDe.toLowerCase();
+  if (/cfo|invest|analyst|kapital|bank/.test(r)) return 'finance';
+  if (/sales|vertrieb/.test(r)) return 'sales';
+  if (/\bcs\b|customer|erfolg|success/.test(r)) return 'cs';
+  if (/cto|tech/.test(r)) return 'tech';
+  if (/unabh|governance|aufsicht|board/.test(r)) return 'governance';
+  if (/gründer|founder/.test(r)) return 'founder';
+  if (/ir|moderation|relations/.test(r)) return 'moderator';
+  return 'generic';
+}
+
+/** Ein kurzer, datengegründeter Blickwinkel-Satz je Archetyp (deterministisch). */
+function voiceFact(arch: ReturnType<typeof voiceArchetype>, state: CompanyState): string {
+  const runway = Math.round(runwayWeeks(state));
+  const churn = (effectiveMonthlyChurn(state) * 100).toFixed(1);
+  const mrrK = Math.round(totalMrr(state) / 1000);
+  const techDebt = Math.round(state.product.techDebt);
+  const leads = state.customers.pipeline.lastWeekLeads;
+  const cashK = Math.round(state.finance.cash / 1000);
+  switch (arch) {
+    case 'finance': return `Zahlenlage: Runway ${runway} Wochen, Kasse ${cashK} k€, MRR ${mrrK} k€. Da hängt die Freiheit dran.`;
+    case 'sales': return `Bei mir vorne: ${leads} Leads letzte Woche. Ohne Futter im Trichter reden wir hinten über nichts.`;
+    case 'cs': return `Kundenseite: ${churn} % Logo-Churn im Monat. Die Abgänge kommen aus den ersten Monaten — das ist steuerbar.`;
+    case 'tech': return `Technisch: Tech-Debt bei ${techDebt}/100. Jede Woche, die wir das schieben, wird der nächste Ausfall wahrscheinlicher.`;
+    case 'governance': return `Aus Governance-Sicht zählt weniger die eine Zahl als der Prozess dahinter — wo ist das Risiko dokumentiert?`;
+    case 'founder': return `Ich kenne das Team und jede Altlast. Wichtig ist mir, dass wir die Leute nicht verheizen für einen Quartalseffekt.`;
+    case 'moderator': return `Ich halte kurz fest, was hier zugesagt wurde — das geht so ins Protokoll.`;
+    default: return `MRR ${mrrK} k€, Runway ${runway} Wochen — das ist der Rahmen, in dem wir hier entscheiden.`;
+  }
+}
+
+/** Öffnender Reagierer auf die CEO-Aussage (variiert per Index). */
+function voiceOpener(arch: ReturnType<typeof voiceArchetype>, i: number): string {
+  const pools: Record<string, string[]> = {
+    finance: ['Danke — nur muss das durch die Kasse passen.', 'Klingt gut, ich rechne das aber gegen den Runway.', 'Einverstanden im Prinzip, meine Frage ist die Finanzierung.'],
+    sales: ['Aus Vertriebssicht: das hilft mir nur, wenn es Deals bewegt.', 'Ok — aber was sage ich damit dem Kunden am Freitag?', 'Ich bin dabei, wenn es die Pipeline füllt.'],
+    cs: ['Für die Bestandskunden ist das relevant.', 'Gut, solange wir die Basis nicht vergraulen.', 'Ich sehe die Chance — und das Risiko für die Bindung.'],
+    tech: ['Baubar, ja — die Frage ist zu welchem Preis in Tech-Debt.', 'Technisch machbar, aber nicht umsonst.', 'Ich kann liefern, wenn wir bei der Qualität nicht wieder abkürzen.'],
+    governance: ['Bevor wir weiter springen: ist das Risiko abgewogen?', 'Wichtiger Punkt — mich interessiert die Kontrolle dahinter.', 'Gut gemeint; wie stellen wir sicher, dass es sauber läuft?'],
+    founder: ['Ich trage das mit — mit einem Auge aufs Team.', 'Verstanden. Passt das zu dem, was wir mal versprochen haben?', 'Bin dafür, wenn wir nicht die Kultur opfern.'],
+    moderator: ['Bleiben wir bei der Agenda.', 'Kurz zur Ordnung — ein Punkt nach dem anderen.', 'Ich fasse zusammen, dann weiter.'],
+    generic: ['Verstehe den Punkt.', 'Sehe ich ähnlich.', 'Dazu ein Gedanke.'],
+  };
+  const p = pools[arch] ?? pools.generic!;
+  return p[i % p.length]!;
+}
+
+/** Reaktion auf den vorherigen Sprecher (macht aus Monologen ein Gespräch). */
+function voiceReactTo(prevName: string, agree: boolean, i: number): string {
+  const first = prevName.split(' ')[0] ?? prevName;
+  const agrees = [`Da bin ich ganz bei ${first}.`, `${first} hat recht —`, `Genau wie ${first} sagt:`, `Ich schließe an ${first} an:`];
+  const dis = [`Ich sehe das anders als ${first}.`, `Mit Verlaub, ${first} — da widerspreche ich.`, `${first}, das greift mir zu kurz.`, `Anders als ${first} würde ich sagen:`];
+  const pool = agree ? agrees : dis;
+  return pool[i % pool.length]!;
+}
+
+/**
+ * Offline-Meeting (Phase 22): ein zusammenhängendes Gespräch statt paralleler
+ * Monologe — 2–3 Teilnehmer reden nacheinander, greifen die CEO-Aussage UND
+ * einander auf, jeweils mit einem datengegründeten Blickwinkel. Deterministisch,
+ * variiert pro Runde — funktioniert ohne API-Key.
+ */
+function buildOfflineMeetingTurns(state: CompanyState, participants: MeetingParticipant[], roundNo: number): { speaker: string; roleDe: string; textDe: string }[] {
+  if (participants.length === 0) return [];
+  // Sprecher-Reihenfolge pro Runde rotieren, 2–3 Wortmeldungen.
+  const rot = participants.map((_, i) => participants[(i + roundNo) % participants.length]!);
+  const count = Math.min(participants.length, roundNo % 3 === 2 ? 2 : 3);
+  const speakers = rot.slice(0, count);
+  const turns: { speaker: string; roleDe: string; textDe: string }[] = [];
+  speakers.forEach((p, idx) => {
+    const arch = voiceArchetype(p.roleDe);
+    const fact = voiceFact(arch, state);
+    let text: string;
+    if (idx === 0) {
+      text = `${voiceOpener(arch, roundNo)} ${fact}`;
+    } else {
+      const prev = speakers[idx - 1]!;
+      const agree = (roundNo + idx) % 3 !== 0; // meist Zustimmung, gelegentlich Reibung
+      text = `${voiceReactTo(prev.name, agree, roundNo)} ${fact}`;
+    }
+    // Letzter Beitrag stellt gelegentlich eine Rückfrage an den CEO.
+    if (idx === speakers.length - 1 && roundNo % 2 === 1) {
+      const qs = ['Was ist dein nächster konkreter Schritt?', 'Wo genau brauchst du von uns eine Entscheidung?', 'Was ist die eine Kennzahl, an der wir das messen?'];
+      text += ` ${qs[roundNo % qs.length]!}`;
+    }
+    turns.push({ speaker: p.name, roleDe: p.roleDe, textDe: text });
+  });
+  return turns;
+}
+
 /** Meeting-Szene: mehrere Personas antworten in einer Runde. */
 export async function meetingRound(
   state: CompanyState,
@@ -265,9 +359,9 @@ export async function meetingRound(
   const threadKey = 'meeting:' + appointmentId;
   const isBoard = apt.kind === 'boardCall';
   const history = getThread(state.meta.gameId, threadKey).slice(-12);
-  const system = `Du inszenierst eine Meeting-Szene in einem CEO-Trainings-Simulator („${apt.titleDe}“). Teilnehmer:\n${participants
+  const system = `Du inszenierst EINE zusammenhängende Meeting-Szene (kein Einzelgespräch) in einem CEO-Trainings-Simulator („${apt.titleDe}“). Teilnehmer:\n${participants
     .map((p) => `- ${p.name} (${p.roleDe}): ${p.flavor}`)
-    .join('\n')}\nRegeln: 1–3 Wortmeldungen pro Runde, unterschiedliche Perspektiven, auch mal Widerspruch untereinander. Kurz und konkret, auf Deutsch. Keine erfundenen Zahlen — nur das Lagebild. Keine Entscheidungen treffen; das tut der CEO im Entscheidungs-Panel.${
+    .join('\n')}\nRegeln für ein ECHTES Meeting: (1) 2–3 Wortmeldungen pro Runde, die NACHEINANDER aufeinander eingehen — spätere Sprecher beziehen sich namentlich auf vorige („Da bin ich bei Sandra…", „Anders als Marc sehe ich…"), stimmen zu oder widersprechen. (2) Es ist ein Gespräch, keine Sammlung paralleler Statements. (3) Jede Stimme bleibt in ihrem Charakter/ihrer Agenda. (4) Kurz, konkret, auf Deutsch, keine erfundenen Zahlen — nur das Lagebild. (5) Keine Entscheidungen treffen; das tut der CEO. (6) Nicht jede Runde müssen alle reden.${
     isBoard
       ? ' ZUSÄTZLICH: Bewerte nach jeder CEO-Aussage, wie sie beim Board ankommt: boardTrustDelta −3..+3 (0 = neutral; nur bei substanziellen Zusagen/Klarheit positiv, bei Ausweichen/Widersprüchen negativ) + trustReasonDe (max 1 Satz).'
       : ''
@@ -296,15 +390,10 @@ export async function meetingRound(
       trustReasonDe: res.trustReasonDe ?? null,
     };
   }
-  const first = participants[0]!;
+  // Offline: ein echtes, zusammenhängendes Gespräch (Teilnehmer reagieren aufeinander).
+  const roundNo = history.filter((t) => t.isPlayer).length;
   return {
-    turns: [
-      {
-        speaker: first.name,
-        roleDe: first.roleDe,
-        textDe: 'Danke für den Punkt — lass uns das anhand der Agenda durchgehen. Aus meiner Sicht ist der wichtigste nächste Schritt, die offenen Themen aus dem Lagebild zu priorisieren. (Offline-Modus: Für lebendige Meetings einen API-Key (OpenAI/Anthropic) hinterlegen.)',
-      },
-    ],
+    turns: buildOfflineMeetingTurns(state, participants, roundNo),
     boardTrustDelta: 0,
     trustReasonDe: null,
   };
