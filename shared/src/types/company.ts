@@ -77,6 +77,7 @@ export interface CompanyState {
   rivalry: import('./rivalry.js').CompetitorStrikeState;
   politics: import('./politics.js').PoliticsState;
   insurance: import('./insurance.js').InsuranceState;
+  certifications: import('./certifications.js').CertificationState;
 
   /** Wöchentliche KPI-Schnappschüsse (Chart-Cache, aus Events rekonstruierbar). */
   history: KpiSnapshot[];

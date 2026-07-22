@@ -7,6 +7,7 @@ import { schedule, nextId } from './stateHelpers.js';
 import { addMessage, assistantSender } from './comms.js';
 import { totalMrr } from './derive.js';
 import { fileInsuranceClaim } from './insurance.js';
+import { certRegulatoryRelief } from './certifications.js';
 
 /**
  * Regulierung & Aufsicht (Phase 22, M5). Die politische Gegenkraft: regulatorischer
@@ -50,7 +51,7 @@ export function tickRegulation(state: CompanyState, occ: Occurrence[]): void {
   const share = marketShare(state);
   const access = pol.politicalCapital;
   // Druckaufbau: Grunddruck + Marktmacht + Skandal-Nachwirkung − politischer Zugang.
-  const drift = 0.5 + Math.max(0, share - 0.1) * 22 + pol.exposure * 0.02 - access * 0.03;
+  const drift = 0.5 + Math.max(0, share - 0.1) * 22 + pol.exposure * 0.02 - access * 0.03 - certRegulatoryRelief(state);
   pol.regulatoryPressure = clamp(pol.regulatoryPressure + drift, 0, 100);
 
   // ── Laufende Auflage: Ablauf zuerst, sonst Reibung ───────────────────

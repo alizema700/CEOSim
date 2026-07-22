@@ -64,6 +64,7 @@ export type PlayerAction =
   | EthicsProgramAction
   | BuyInsuranceAction
   | CancelInsuranceAction
+  | PursueCertificationAction
   | LobbyAction
   | StepDownAction;
 
@@ -504,6 +505,13 @@ export interface BuyInsuranceAction {
 export interface CancelInsuranceAction {
   type: 'CANCEL_INSURANCE';
   kind: import('./insurance.js').InsuranceKind;
+}
+
+// ── Zertifizierungen (Phase 22, V2) ──────────────────────────────────
+/** Eine Zertifizierung starten (Audit-Prozess über Wochen). */
+export interface PursueCertificationAction {
+  type: 'PURSUE_CERTIFICATION';
+  kind: import('./certifications.js').CertificationKind;
 }
 
 /**

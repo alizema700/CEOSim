@@ -14,9 +14,14 @@ import {
   BOARD_MEETING_COOLDOWN,
   BOARD_MEETING_ENERGY,
   MEETING_APPROACHES,
+  CERTIFICATION_KINDS,
+  CERTIFICATION_SPECS,
+  certMaintenanceMonthly,
+  certifiedCount,
   type BoardMeetingApproach,
   type BoardMember,
   type CapTableEntry,
+  type CertificationKind,
 } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Bar, Drill, Panel, scoreColor } from '../components/ui.js';
@@ -80,6 +85,9 @@ export function StructureView() {
 
       {/* ── Formwechsel / IPO-Reife ─────────────────────────────────── */}
       <FormwechselPanel />
+
+      {/* ── Zertifizierungen & Standards (V2) ───────────────────────── */}
+      <CertificationsPanel />
 
       <section className="grid gap-6 lg:grid-cols-2">
         {/* ── Organigramm ───────────────────────────────────────────── */}
@@ -502,5 +510,83 @@ function CompliancePanel() {
         </div>
       </Drill>
     </section>
+  );
+}
+
+/**
+ * Zertifizierungen & Standards (Phase 22, V2): DSGVO/ISO 27001/SOC 2/ISO 9001 als
+ * „Siegel" mit Fortschritts-Ring — zertifiziert (gold), im Audit (Ring füllt sich)
+ * oder offen. Öffnet Enterprise-Türen, senkt Churn & Regulierungsrisiko.
+ */
+const CERT_ABBR: Record<CertificationKind, string> = { dsgvo: 'DSGVO', iso27001: 'ISO 27001', soc2: 'SOC 2', iso9001: 'ISO 9001' };
+
+function CertificationsPanel() {
+  const { state, act, busy } = useStore();
+  if (!state) return null;
+  const active = state.meta.status === 'active';
+  const cs = state.certifications;
+  const week = state.meta.week;
+  const done = certifiedCount(state);
+
+  return (
+    <Panel icon="shield" title="Zertifizierungen & Standards" right={<span className="num text-[12px] text-dim">{done}/4 zertifiziert · Pflege {eur(certMaintenanceMonthly(state))}/M</span>}>
+      <p className="mb-3 max-w-[82ch] text-[11px] leading-relaxed text-dim">
+        Reife als Wettbewerbsvorteil: Zertifikate sind ein Audit-Prozess über Wochen und öffnen danach Enterprise-Türen (höhere Abschlussquote), senken den Churn und das Regulierungsrisiko. Ohne Nachweis sprechen viele Großkunden gar nicht erst mit dir.
+      </p>
+      <div className="grid gap-3 md:grid-cols-2">
+        {CERTIFICATION_KINDS.map((kind: CertificationKind) => {
+          const spec = CERTIFICATION_SPECS[kind];
+          const cert = cs.certs[kind];
+          const total = spec.weeksToCertify;
+          const elapsed = cert.status === 'in_progress' ? Math.min(total, week - cert.startedWeek) : cert.status === 'certified' ? total : 0;
+          const ringPct = Math.round((elapsed / total) * 100);
+          const ringColor = cert.status === 'certified' ? 'var(--color-warn)' : cert.status === 'in_progress' ? 'var(--color-accent)' : 'var(--color-line)';
+          const left = cert.status === 'in_progress' ? Math.max(0, cert.completesWeek - week) : 0;
+          return (
+            <div key={kind} className={`flex gap-3 border p-3 ${cert.status === 'certified' ? 'border-warn/50 bg-warn/5' : cert.status === 'in_progress' ? 'border-accent/40' : 'border-line'}`} style={{ borderRadius: 3 }}>
+              {/* Siegel mit Fortschritts-Ring */}
+              <div className="relative shrink-0" style={{ width: 60, height: 60 }}>
+                <div className="grid h-full w-full place-items-center rounded-full" style={{ background: `conic-gradient(${ringColor} ${ringPct * 3.6}deg, var(--color-panel2) 0)` }}>
+                  <div className="grid place-items-center rounded-full bg-panel text-center" style={{ width: 46, height: 46 }}>
+                    {cert.status === 'certified'
+                      ? <Icon name="check" size={24} className="text-warn" />
+                      : <span className="num text-[8.5px] font-bold leading-none text-dim">{CERT_ABBR[kind].replace(' ', ' ')}</span>}
+                  </div>
+                </div>
+              </div>
+              {/* Inhalt */}
+              <div className="min-w-0 flex-1">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="text-[13px] font-semibold text-ink">{spec.labelDe}</div>
+                  <span className={`kicker shrink-0 text-[8px] ${cert.status === 'certified' ? 'text-warn' : cert.status === 'in_progress' ? 'text-accent' : 'text-faint'}`}>
+                    {cert.status === 'certified' ? '✓ zertifiziert' : cert.status === 'in_progress' ? 'im Audit' : 'offen'}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-[10px] leading-tight text-dim">{spec.shortDe}</div>
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[9px] text-dim">
+                  <span>Abschluss +{((spec.winFactor - 1) * 100).toFixed(0)} %</span>
+                  <span>Churn −{((1 - spec.churnFactor) * 100).toFixed(0)} %</span>
+                  <span>{eur(spec.maintenanceMonthly)}/M Pflege</span>
+                </div>
+                {cert.status === 'none' && (
+                  <button className="btn mt-2 w-full justify-center py-1 text-[11px]" disabled={busy || !active || state.finance.cash < spec.prepCost} onClick={() => void act({ type: 'PURSUE_CERTIFICATION', kind }, null)}>
+                    Zertifizierung starten · {eur(spec.prepCost)}
+                  </button>
+                )}
+                {cert.status === 'in_progress' && (
+                  <div className="mt-2">
+                    <div className="mb-0.5 flex justify-between text-[9px] text-dim"><span>Audit läuft</span><span className="num">noch ~{left} {left === 1 ? 'Woche' : 'Wochen'}</span></div>
+                    <Bar value={ringPct} color="bg-accent" />
+                  </div>
+                )}
+                {cert.status === 'certified' && (
+                  <div className="mt-2 text-[10px] text-warn">Zertifiziert seit Woche {cert.certifiedWeek} · dauerhaft wirksam</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Panel>
   );
 }

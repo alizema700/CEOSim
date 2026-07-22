@@ -13,6 +13,8 @@ import { doLobby } from './politics.js';
 import { LOBBY_COST, LOBBY_LABELS } from '../types/politics.js';
 import { buyInsurance, cancelInsurance } from './insurance.js';
 import { INSURANCE_SPECS } from '../types/insurance.js';
+import { startCertification } from './certifications.js';
+import { CERTIFICATION_SPECS } from '../types/certifications.js';
 import { deptDe, nextId, schedule as scheduleFx } from './stateHelpers.js';
 import { resolveEventOption } from './eventsDeck.js';
 import { executeDelegation } from './comms.js';
@@ -458,6 +460,14 @@ export function validateAction(state: CompanyState, action: PlayerAction): Actio
     case 'CANCEL_INSURANCE': {
       if (!state.insurance.policies[action.kind]?.active) errors.push(`${INSURANCE_SPECS[action.kind].labelDe} ist nicht aktiv.`);
       else warnings.push('Kündigen spart die Prämie — aber ein Schaden trifft dich danach ungedeckt (volles Eigenrisiko).');
+      break;
+    }
+    case 'PURSUE_CERTIFICATION': {
+      const cSpec = CERTIFICATION_SPECS[action.kind];
+      const cert = state.certifications.certs[action.kind];
+      if (cert.status === 'certified') errors.push(`${cSpec.labelDe} ist bereits zertifiziert.`);
+      else if (cert.status === 'in_progress') errors.push(`${cSpec.labelDe} befindet sich bereits im Audit.`);
+      if (f.cash < cSpec.prepCost) errors.push(`Zu wenig Liquidität für Vorbereitung & Audit (~${fmt(cSpec.prepCost)}).`);
       break;
     }
 
@@ -1131,6 +1141,15 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
       analysis.push('Die laufende Prämie entfällt. Ab sofort trägst du Schäden dieser Art wieder voll selbst — kalkuliere das Restrisiko bewusst.');
       break;
     }
+    case 'PURSUE_CERTIFICATION': {
+      const cSpec = CERTIFICATION_SPECS[action.kind];
+      schedule(state, 0, `Zertifizierung ${cSpec.labelDe} W${week}`, decisionId, { kind: 'ONE_OFF_COST', amount: cSpec.prepCost, labelDe: `Zertifizierung: ${cSpec.labelDe} (Vorbereitung & Audit)` });
+      startCertification(state, action.kind);
+      summary = `Zertifizierung gestartet: ${cSpec.labelDe} (Audit ~${cSpec.weeksToCertify} Wochen)`;
+      analysis.push(`${cSpec.shortDe} Der Prozess läuft über ~${cSpec.weeksToCertify} Wochen; danach steigt die Abschlussquote (Enterprise-Vertrauen), der Churn sinkt und das Regulierungsrisiko fällt. Laufende Pflege ~${fmt(cSpec.maintenanceMonthly)}/Monat (G&A).`);
+      analysis.push('Zertifikate sind gekaufte Glaubwürdigkeit: Sie öffnen Türen zu Großkunden, die ohne Nachweis gar nicht erst mit dir sprechen.');
+      break;
+    }
     case 'COUNTER_COMPETITOR': {
       const strikeOcc: Occurrence[] = [];
       const attacker = state.rivalry.attackerName;
@@ -1242,7 +1261,7 @@ export function applyAction(state: CompanyState, action: PlayerAction, hypothesi
     immediateAnalysisDe: analysis,
     // Leichte Verwaltungs-Aktionen (Termine) laufen NICHT durch die
     // Bewertungs-Pipeline — der Sentinel wird nie fällig.
-    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'TOWNHALL' || action.type === 'AUSTERITY' || action.type === 'KEY_ACCOUNT_OFFENSIVE' || action.type === 'SPECIAL_BONUS' || action.type === 'STAR_HIRE' || action.type === 'CUSTOMER_ADVISORY_BOARD' || action.type === 'ETHICS_PROGRAM' || action.type === 'BUY_INSURANCE' || action.type === 'CANCEL_INSURANCE' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
+    evaluateAtWeek: action.type === 'CREATE_APPOINTMENT' || action.type === 'STEP_DOWN' || action.type === 'TAKEOVER_RESPOND' || action.type === 'CRISIS_RESPOND' || action.type === 'HOLD_BOARD_MEETING' || action.type === 'CEO_PERSONAL_TIME' || action.type === 'COUNTER_COMPETITOR' || action.type === 'CEO_INVEST' || action.type === 'CEO_DIVEST' || action.type === 'TREASURY_ALLOCATE' || action.type === 'TREASURY_WITHDRAW' || action.type === 'TOWNHALL' || action.type === 'AUSTERITY' || action.type === 'KEY_ACCOUNT_OFFENSIVE' || action.type === 'SPECIAL_BONUS' || action.type === 'STAR_HIRE' || action.type === 'CUSTOMER_ADVISORY_BOARD' || action.type === 'ETHICS_PROGRAM' || action.type === 'BUY_INSURANCE' || action.type === 'CANCEL_INSURANCE' || action.type === 'PURSUE_CERTIFICATION' || action.type === 'LOBBY' ? 9_999_999 : week + 4,
     kpiBaseline: {
       mrr: kpis.values.mrr,
       logoChurnMonthly: kpis.values.logoChurnMonthly,

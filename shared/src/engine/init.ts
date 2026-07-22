@@ -25,6 +25,7 @@ import { initialMacroState } from '../types/macro.js';
 import { initialCompetitorStrikeState } from '../types/rivalry.js';
 import { initialPoliticsState } from '../types/politics.js';
 import { initialInsuranceState } from '../types/insurance.js';
+import { initialCertificationState } from '../types/certifications.js';
 import { initialCeoPersonal, initialCeoPortfolio } from '../types/ceo.js';
 import { initialLegalState } from './legal.js';
 import { buildInitialBoard } from './governance.js';
@@ -410,6 +411,7 @@ export function createCompany(setup: GameSetup, seed: number, gameId: string, cr
     rivalry: initialCompetitorStrikeState(),
     politics: initialPoliticsState(),
     insurance: initialInsuranceState(),
+    certifications: initialCertificationState(),
     history: [],
     decisionLog: [],
     evaluations: [],

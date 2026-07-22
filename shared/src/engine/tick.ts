@@ -51,6 +51,7 @@ import { tickRegulation } from './regulation.js';
 import { tickMacro } from './macro.js';
 import { tickMacroShocks } from './macroShocks.js';
 import { insurancePremiumMonthly, fileInsuranceClaim, classifyClaim } from './insurance.js';
+import { tickCertifications, certMaintenanceMonthly } from './certifications.js';
 
 /**
  * ═══ DER WOCHENTICK ═══
@@ -139,6 +140,7 @@ export function closeWeek(state: CompanyState): WeekReport {
   tickRivalry(state, occurrences);
   tickPolitics(state, occurrences);
   tickRegulation(state, occurrences);
+  tickCertifications(state, occurrences);
 
   // ── 7. Zufallsereignisse ──────────────────────────────────────────
   autoResolveOverdueEvents(state, occurrences);
@@ -739,7 +741,8 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
   const projectsCostM = projectsMonthlyCost(state);
   const coachFee = state.ceo.coach?.monthlyFee ?? 0; // Executive-Coaching (Phase 12)
   const insurancePremiumM = insurancePremiumMonthly(state); // Versicherungsprämien (V1) → G&A
-  const otherOpexMonthly = b.marketing + b.customerSuccess + b.rndTools + b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee + insurancePremiumM;
+  const certMaintenanceM = certMaintenanceMonthly(state); // Zertifikats-Pflege (V2) → G&A
+  const otherOpexMonthly = b.marketing + b.customerSuccess + b.rndTools + b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee + insurancePremiumM + certMaintenanceM;
   ledger.otherOpexBooked = otherOpexMonthly * wf;
   if (state.insurance) state.insurance.premiumsPaidTotal += insurancePremiumM * wf;
   f.accountsPayable += ledger.cogsBooked + ledger.otherOpexBooked;
@@ -763,7 +766,7 @@ function closeLedger(state: CompanyState, ledger: Ledger, cashStart: number) {
     salesMarketing: { payroll: payrollByDept.sales + payrollByDept.marketing, other: b.marketing * wf },
     rnd: { payroll: payrollByDept.engineering, other: b.rndTools * wf },
     customerSuccess: { payroll: payrollByDept.cs, other: b.customerSuccess * wf },
-    ga: { payroll: payrollByDept.ga + ceoPay, other: (b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee + insurancePremiumM) * wf },
+    ga: { payroll: payrollByDept.ga + ceoPay, other: (b.gaOther + officeCostMonthly(state) + projectsCostM + coachFee + insurancePremiumM + certMaintenanceM) * wf },
   };
   const opexTotal = Object.values(opex).reduce((s, o) => s + o.payroll + o.other, 0);
   const grossProfit = ledger.revenueRecognized - ledger.cogsBooked;

@@ -75,6 +75,8 @@ export * from './engine/politics.js';
 export * from './engine/regulation.js';
 export * from './types/insurance.js';
 export * from './engine/insurance.js';
+export * from './types/certifications.js';
+export * from './engine/certifications.js';
 export * from './engine/legacy.js';
 
 // ── Kuratierte Daten (Phase 4) ───────────────────────────────────────

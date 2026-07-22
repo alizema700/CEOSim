@@ -144,6 +144,7 @@ const zAction: z.ZodType<PlayerAction> = z.discriminatedUnion('type', [
   z.object({ type: z.literal('ETHICS_PROGRAM') }),
   z.object({ type: z.literal('BUY_INSURANCE'), kind: z.enum(['haftpflicht', 'rechtsschutz', 'cyber', 'do', 'vertrauensschaden']) }),
   z.object({ type: z.literal('CANCEL_INSURANCE'), kind: z.enum(['haftpflicht', 'rechtsschutz', 'cyber', 'do', 'vertrauensschaden']) }),
+  z.object({ type: z.literal('PURSUE_CERTIFICATION'), kind: z.enum(['dsgvo', 'iso27001', 'soc2', 'iso9001']) }),
 ]);
 
 const zHypothesis = z
