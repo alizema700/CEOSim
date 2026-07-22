@@ -10,6 +10,7 @@ import {
   macroShockSummaryDe,
   rivalrySummaryDe,
   politicsSummaryDe,
+  regulationSummaryDe,
   laborSummaryDe,
   legalSummaryDe,
   runwayWeeks,
@@ -67,6 +68,7 @@ export function stateBriefDe(state: CompanyState): string {
     ...(state.macro.shock ? [`⚠️ Wirtschaftsschock — ${macroShockSummaryDe(state)}.`] : []),
     ...(state.rivalry.status !== 'none' ? [`⚔️ Wettbewerber-Angriff: ${rivalrySummaryDe(state)}.`] : []),
     ...(state.politics.politicalCapital > 8 || state.politics.exposure > 0 ? [`Politik & Lobbyismus: ${politicsSummaryDe(state)}.`] : []),
+    ...(state.politics.activeRegulation || state.politics.regulatoryPressure >= 40 ? [`Aufsicht & Regulierung: ${regulationSummaryDe(state)}.`] : []),
   ].join('\n');
 }
 

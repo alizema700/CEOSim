@@ -1,8 +1,8 @@
-import { EVENT_CARDS, LOBBY_COST, LOBBY_LABELS } from '@boardroom/shared';
+import { EVENT_CARDS, LOBBY_COST, LOBBY_LABELS, REGULATION_SPECS } from '@boardroom/shared';
 import type { LobbyFocus } from '@boardroom/shared';
 import { useStore } from '../store.js';
 import { Panel, Bar } from '../components/ui.js';
-import { Icon, type IconName } from '../components/Icon.js';
+import { Icon, Glyph, type IconName } from '../components/Icon.js';
 import { eur } from '../format.js';
 import { ThreadPane } from './ChatView.js';
 
@@ -94,6 +94,10 @@ function LobbyPanel() {
   const cash = state.finance.cash;
   const cap = Math.round(pol.politicalCapital);
   const exp = Math.round(pol.exposure);
+  const regPress = Math.round(pol.regulatoryPressure);
+  const reg = pol.activeRegulation;
+  const regSpec = reg ? REGULATION_SPECS[reg.kind] : null;
+  const regLeft = reg ? Math.max(0, reg.endWeek - state.meta.week) : 0;
 
   const foci: { key: LobbyFocus; icon: IconName; hintDe: string; thresholdDe: string }[] = [
     { key: 'steuern', icon: 'scale', hintDe: 'Senkt ab genug Einfluss den effektiven Steuersatz dauerhaft um 3 Pp.', thresholdDe: 'ab Kapital 55' },
@@ -152,6 +156,26 @@ function LobbyPanel() {
             </button>
           );
         })}
+      </div>
+
+      {/* Regulierung & Aufsicht (M5): die defensive Gegenkraft */}
+      <div className="mt-3 border-t border-line/40 pt-2">
+        <div className="mb-1 flex items-center justify-between text-[10px]">
+          <span className="kicker inline-flex items-center gap-1 text-[8px]"><Icon name="shield" size={11} /> Regulierungsdruck</span>
+          <span className={`num ${regPress >= 55 ? 'text-bad' : regPress >= 35 ? 'text-warn' : 'text-ink'}`}>{regPress}/100</span>
+        </div>
+        <Bar value={regPress} color={regPress >= 55 ? 'bg-bad' : 'bg-warn'} />
+        {reg && regSpec ? (
+          <div className="mt-2 flex items-start gap-2 border-l-2 border-bad/60 bg-panel2/40 px-2 py-1.5" style={{ borderRadius: 2 }}>
+            <Glyph e={regSpec.emoji} size={14} className="mt-0.5 shrink-0 text-bad" />
+            <div className="min-w-0">
+              <div className="text-[10.5px] font-semibold text-bad">{regSpec.labelDe} <span className="font-normal text-dim">· noch ~{regLeft} {regLeft === 1 ? 'Wo.' : 'Wo.'} · {eur(reg.complianceCost)}</span></div>
+              <div className="text-[9.5px] leading-tight text-dim">{regSpec.headlineDe}</div>
+            </div>
+          </div>
+        ) : (
+          <p className="mt-1 text-[9.5px] leading-tight text-dim">Marktmacht & Skandale ziehen Aufsicht an. Politisches Kapital senkt Druck, Kosten und Dauer von Auflagen — „Zugang“ wirkt hier defensiv.</p>
+        )}
       </div>
 
       {pol.logDe.length > 0 && (

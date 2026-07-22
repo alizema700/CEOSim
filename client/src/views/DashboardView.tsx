@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'rec
 import {
   EVENT_CARDS,
   MACRO_SHOCK_SPECS,
+  REGULATION_SPECS,
   effectiveMonthlyChurn,
   runwayWeeks,
   totalMrr,
@@ -203,6 +204,21 @@ export function DashboardView() {
               <button className={`btn ${cls}`} onClick={() => useStore.getState().setView('market')}>Zum Markt →</button>
             </div>
             <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-ink2">{spec.headlineDe} Die Episode prägt die Märkte noch ~{left} {left === 1 ? 'Woche' : 'Wochen'} — Stimmung, Inflation, Zins und Kapitalmarkt bewegen sich, das wirkt auf Nachfrage und Bewertungen.</p>
+          </section>
+        );
+      })()}
+
+      {/* ── Regulierung/Aufsicht (M5): warn-Banner bei aktiver Auflage ── */}
+      {state.politics.activeRegulation && (() => {
+        const rspec = REGULATION_SPECS[state.politics.activeRegulation.kind];
+        const rleft = Math.max(0, state.politics.activeRegulation.endWeek - state.meta.week);
+        return (
+          <section className="breaking border-2 border-warn bg-warn/5 px-4 py-3" style={{ borderRadius: 3 }}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <span className="breaking-kicker kicker inline-flex items-center gap-1.5 px-1 text-warn"><Glyph e={rspec.emoji} size={13} /> Aufsicht · {rspec.labelDe}</span>
+              <button className="btn border-warn text-warn" onClick={() => useStore.getState().setView('legal')}>Zur Kanzlei →</button>
+            </div>
+            <p className="mt-1 max-w-[72ch] text-[13px] leading-relaxed text-ink2">{rspec.headlineDe} Compliance-Aufwand {eur(state.politics.activeRegulation.complianceCost)}, Frist noch ~{rleft} {rleft === 1 ? 'Woche' : 'Wochen'}. Politisches Kapital senkt Druck, Kosten und Dauer solcher Auflagen.</p>
           </section>
         );
       })()}

@@ -71,6 +71,7 @@ export * from './engine/macro.js';
 export * from './engine/macroShocks.js';
 export * from './engine/rivalry.js';
 export * from './engine/politics.js';
+export * from './engine/regulation.js';
 export * from './engine/legacy.js';
 
 // ── Kuratierte Daten (Phase 4) ───────────────────────────────────────

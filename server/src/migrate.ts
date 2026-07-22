@@ -68,6 +68,7 @@ export function ensureStateShape(state: CompanyState): CompanyState {
   if (!s.macro) s.macro = initialMacroState();
   if (!s.rivalry) s.rivalry = initialCompetitorStrikeState();
   if (!s.politics) s.politics = initialPoliticsState();
+  if (s.politics && (s.politics as { regulatoryPressure?: number }).regulatoryPressure === undefined) { const p = s.politics as { regulatoryPressure: number; activeRegulation: null; lastRegulationWeek: number }; p.regulatoryPressure = 0; p.activeRegulation = null; p.lastRegulationWeek = -99; }
   if (s.macro && (s.macro as { inflationPct?: number }).inflationPct === undefined) { (s.macro as { inflationPct: number }).inflationPct = 2.0; (s.macro as { capitalIndex: number }).capitalIndex = 100; }
   if (s.macro && (s.macro as { shock?: unknown }).shock === undefined) { (s.macro as { shock: null }).shock = null; (s.macro as { lastShockEpisodeWeek: number }).lastShockEpisodeWeek = -99; }
   if (s.board && s.board.lastMeetingWeek === undefined) { s.board.lastMeetingWeek = -99; s.board.lastMeeting = null; }

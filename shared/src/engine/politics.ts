@@ -51,7 +51,8 @@ export function doLobby(state: CompanyState, focus: LobbyFocus, occ: Occurrence[
     occ.push({ icon: '🏦', textDe: `Fördermittel bewilligt: ${Math.round(grant / 1000)} k€ Zuschuss fließen aufs Firmenkonto.`, severity: 'good' });
   } else if (focus === 'zugang') {
     pol.exposure = clamp(pol.exposure - 2, 0, 100); // Beziehungspflege wirkt diskreter
-    notes.push('Türen öffnen sich: mehr Zugang, weniger Angriffsfläche — die Grundlage für spätere Erfolge.');
+    pol.regulatoryPressure = clamp(pol.regulatoryPressure - 8, 0, 100); // Zugang senkt regulatorische Aufmerksamkeit
+    notes.push('Türen öffnen sich: mehr Zugang, weniger Angriffsfläche und geringerer Regulierungsdruck — die Grundlage für spätere Erfolge.');
   } else {
     notes.push(`Noch nicht genug Einfluss für einen ${focus === 'steuern' ? 'Steuer-' : 'Förder-'}erfolg — weiter aufbauen (Schwelle ${focus === 'steuern' ? 55 : 45}).`);
   }
